@@ -1,3 +1,5 @@
+import "server-only"
+
 import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore"
 import { getDb } from "./client"
 import type { AssetPack } from "@/lib/types"

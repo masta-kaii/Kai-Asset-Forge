@@ -1,4 +1,4 @@
-"use server"
+import "server-only"
 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { getFirebaseStorage } from "./client"
