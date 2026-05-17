@@ -4,7 +4,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { getFirebaseStorage } from "./client"
 
 export async function uploadAssetBuffer(
-  buffer: ArrayBuffer,
+  buffer: Uint8Array,
   path: string,
   contentType: string
 ): Promise<string> {

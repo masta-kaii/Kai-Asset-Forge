@@ -61,10 +61,9 @@ export async function generateAssets(input: GenerateInput): Promise<GenerateResu
 
       let storageUrl = img.url
       try {
-        const buffer = await downloadImageBuffer(img.url)
-        const ext = img.url.includes(".png") ? "png" : "png"
-        const path = `assets/${assetType}/${timestamp}-${i + 1}.${ext}`
-        storageUrl = await uploadAssetBuffer(buffer, path, "image/png")
+        const rawBuffer = img.buffer ?? new Uint8Array(await downloadImageBuffer(img.url))
+        const path = `assets/${assetType}/${timestamp}-${i + 1}.png`
+        storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
       } catch {
         // fall back to OpenAI CDN URL if storage upload fails
       }

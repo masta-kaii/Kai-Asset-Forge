@@ -1,20 +1,19 @@
 import OpenAI from "openai"
-import type { ImageGenParams, ImageGenResponse, ImageGenResult, TextGenParams, TextGenResponse } from "./types"
+import type { ImageGenParams, ImageGenResponse, ImageGenResult, TextGenParams, TextGenResponse, AIProvider } from "./types"
 
-function getClient(): OpenAI {
+function getClient(provider?: AIProvider): OpenAI {
+  if (provider === "deepseek") {
+    const apiKey = process.env.DEEPSEEK_API_KEY
+    if (!apiKey) {
+      throw new Error("DEEPSEEK_API_KEY is not configured")
+    }
+    return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" })
+  }
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured")
   }
   return new OpenAI({ apiKey })
-}
-
-const SIZE_MAP: Record<string, `${number}x${number}`> = {
-  "256x256": "256x256",
-  "512x512": "512x512",
-  "1024x1024": "1024x1024",
-  "1792x1024": "1792x1024",
-  "1024x1792": "1024x1792",
 }
 
 function parseSize(size: string): { width: number; height: number } {
@@ -29,21 +28,32 @@ export async function generateImage(params: ImageGenParams): Promise<ImageGenRes
 
   try {
     const response = await client.images.generate({
-      model: "dall-e-3",
+      model: "gpt-image-1",
       prompt: params.prompt,
       n,
-      size: SIZE_MAP[size] ?? "1024x1024",
-      quality: params.quality ?? "standard",
+      size: size === "auto" ? "auto" : size,
+      quality: params.quality ?? "auto",
     })
 
     const data = response.data ?? []
-    const images: ImageGenResult[] = data.map((img) => ({
-      url: img.url ?? "",
-      revisedPrompt: img.revised_prompt ?? undefined,
-      provider: "openai",
-      model: "dall-e-3",
-      ...parseSize(size),
-    }))
+    const images: ImageGenResult[] = data.map((img) => {
+      let url = img.url ?? ""
+      let buffer: Buffer | undefined
+
+      if (!url && img.b64_json) {
+        buffer = Buffer.from(img.b64_json, "base64")
+        url = `data:image/png;base64,${img.b64_json}`
+      }
+
+      return {
+        url,
+        buffer,
+        revisedPrompt: img.revised_prompt ?? undefined,
+        provider: "openai",
+        model: "gpt-image-1",
+        ...parseSize(size),
+      }
+    })
 
     return { success: true, images }
   } catch (error) {
@@ -53,8 +63,8 @@ export async function generateImage(params: ImageGenParams): Promise<ImageGenRes
 }
 
 export async function generateText(params: TextGenParams): Promise<TextGenResponse> {
-  const client = getClient()
-  const model = params.model ?? "gpt-4o"
+  const client = getClient(params.provider)
+  const model = params.model ?? (params.provider === "deepseek" ? "deepseek-chat" : "gpt-4o")
 
   try {
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []
