@@ -12,6 +12,7 @@ import { Sparkles, Zap, Settings2 } from "lucide-react"
 import { PreviewGallery } from "@/components/assets/preview-gallery"
 import { useGeneration } from "@/hooks/use-generation"
 import type { AssetStyle, AssetType } from "@/lib/types"
+import type { AIProvider } from "@/lib/ai/types"
 
 const STYLES: { value: AssetStyle; label: string }[] = [
   { value: "pixel-art", label: "Pixel Art" },
@@ -31,11 +32,17 @@ const TYPES: { value: AssetType; label: string }[] = [
   { value: "ui-icon", label: "UI Icons" },
 ]
 
+const PROVIDERS: { value: AIProvider; label: string }[] = [
+  { value: "gemini", label: "Gemini (Imagen)" },
+  { value: "openai", label: "OpenAI (GPT Image)" },
+]
+
 export default function AssetGeneratorPage() {
   const [assetType, setAssetType] = useState<AssetType>("creature")
   const [style, setStyle] = useState<AssetStyle>("pastel-cyber-fantasy")
   const [batchCount, setBatchCount] = useState(4)
   const [prompt, setPrompt] = useState("")
+  const [provider, setProvider] = useState<AIProvider>("gemini")
   const { isGenerating, error, results, generate } = useGeneration()
 
   const handleGenerate = () => {
@@ -45,6 +52,7 @@ export default function AssetGeneratorPage() {
       assetType,
       style,
       batchCount: Math.min(Math.max(batchCount, 1), 10),
+      provider,
       quality: "auto",
     })
   }
@@ -121,6 +129,22 @@ export default function AssetGeneratorPage() {
                 value={batchCount}
                 onChange={(e) => setBatchCount(Number(e.target.value))}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="provider">AI Provider</Label>
+              <Select value={provider} onValueChange={(v) => setProvider(v as AIProvider)}>
+                <SelectTrigger id="provider">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDERS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

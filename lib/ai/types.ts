@@ -1,6 +1,6 @@
-export type AIProvider = 'openai' | 'gemini' | 'deepseek' | 'claude'
+export type AIProvider = 'openai' | 'deepseek' | 'gemini' | 'claude'
 
-export type ImageModel = 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5' | 'gpt-image-2' | 'dall-e-3' | 'dall-e-2' | 'imagen' | 'flux'
+export type ImageModel = 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5' | 'gpt-image-2' | 'dall-e-3' | 'dall-e-2' | 'imagen-4.0-generate-001' | 'imagen-3.0-generate-001' | 'imagen' | 'flux'
 
 export type TextModel = 'gpt-4o' | 'gpt-4-turbo' | 'deepseek-chat' | 'deepseek-reasoner' | 'gemini-pro' | 'gemini-flash' | 'claude-3-opus' | 'claude-3-sonnet'
 
@@ -19,6 +19,9 @@ export interface ImageGenParams {
   style?: ImageStyle
   n?: number
   negativePrompt?: string
+  aspectRatio?: string
+  guidanceScale?: number
+  seed?: number
 }
 
 export interface ImageGenResult {

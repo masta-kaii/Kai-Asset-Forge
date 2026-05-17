@@ -5,13 +5,14 @@ import { createAsset } from "@/lib/firebase/assets"
 import { createGeneration } from "@/lib/firebase/generations"
 import { uploadAssetBuffer } from "@/lib/firebase/storage"
 import type { AssetType, AssetStyle } from "@/lib/types"
-import type { ImageGenParams } from "@/lib/ai/types"
+import type { ImageGenParams, AIProvider } from "@/lib/ai/types"
 
 export interface GenerateInput {
   prompt: string
   assetType: AssetType
   style: AssetStyle
   batchCount: number
+  provider?: AIProvider
   quality?: "low" | "medium" | "high" | "auto"
 }
 
@@ -37,10 +38,11 @@ async function downloadImageBuffer(url: string): Promise<ArrayBuffer> {
 }
 
 export async function generateAssets(input: GenerateInput): Promise<GenerateResult> {
-  const { prompt, assetType, style, batchCount, quality } = input
+  const { prompt, assetType, style, batchCount, quality, provider } = input
 
   const params: ImageGenParams = {
     prompt,
+    provider,
     size: "1024x1024",
     n: batchCount,
     quality: quality ?? "auto",
