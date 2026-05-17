@@ -15,7 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { AGENTS, PIPELINE_STEPS } from "@/lib/agents/agent-types"
-import { getRecentWorkflows, getActiveWorkflows, createWorkflow, updateWorkflowStatus } from "@/lib/firebase/workflows"
+import { fetchRecentWorkflows, fetchActiveWorkflows, startWorkflow, failWorkflow } from "@/app/actions/workflows"
 import type { Workflow, AgentName, WorkflowType, WorkflowStatus } from "@/lib/types"
 
 interface AgentStatus {
@@ -49,8 +49,8 @@ export default function AgentsPage() {
   const loadData = useCallback(async () => {
     try {
       const [recent, active] = await Promise.all([
-        getRecentWorkflows(20),
-        getActiveWorkflows(),
+        fetchRecentWorkflows(20),
+        fetchActiveWorkflows(),
       ])
       setWorkflows(recent)
 
@@ -90,11 +90,9 @@ export default function AgentsPage() {
 
     try {
       for (const step of pipelineOrder) {
-        await createWorkflow({
+        await startWorkflow({
           workflowType: step.type,
-          status: "pending",
-          assignedAgent: step.agent,
-          input: { auto: true },
+          agent: step.agent,
         })
       }
       loadData()
@@ -105,9 +103,9 @@ export default function AgentsPage() {
 
   const pausePipeline = async () => {
     try {
-      const active = await getActiveWorkflows()
+      const active = await fetchActiveWorkflows()
       await Promise.all(
-        active.map((w) => updateWorkflowStatus(w.id, "failed"))
+        active.map((w) => failWorkflow(w.id))
       )
       loadData()
     } catch (err) {
@@ -117,11 +115,9 @@ export default function AgentsPage() {
 
   const resetPipeline = async () => {
     try {
-      const active = await getActiveWorkflows()
+      const active = await fetchActiveWorkflows()
       await Promise.all(
-        active.map((w) =>
-          updateWorkflowStatus(w.id, "failed", new Date().toISOString())
-        )
+        active.map((w) => failWorkflow(w.id))
       )
       loadData()
     } catch (err) {
@@ -230,11 +226,9 @@ export default function AgentsPage() {
                     size="sm"
                     className="flex-1 h-7 text-xs gap-1"
                     onClick={() =>
-                      createWorkflow({
+                      startWorkflow({
                         workflowType: "asset-generation",
-                        status: "pending",
-                        assignedAgent: agent.name,
-                        input: { manual: true },
+                        agent: agent.name,
                       }).then(() => loadData())
                     }
                   >

@@ -10,8 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Library, Search, SlidersHorizontal, Grid3X3, List, AlertTriangle, Sparkles, Check, X } from "lucide-react"
 import { useAssets } from "@/hooks/use-assets"
-import { updateAssetStatus } from "@/lib/firebase/assets"
-import type { AssetType, AssetStatus } from "@/lib/types"
+import type { AssetType } from "@/lib/types"
 
 const FILTER_TYPES: { value: string; label: string }[] = [
   { value: "all", label: "All" },
@@ -26,9 +25,17 @@ const FILTER_TYPES: { value: string; label: string }[] = [
 ]
 
 export default function AssetLibraryPage() {
-  const { assets, loading, error, filterByType, refresh } = useAssets()
+  const { assets, loading, error, filterByType, refresh, approve, reject } = useAssets()
   const [activeFilter, setActiveFilter] = useState("all")
   const [search, setSearch] = useState("")
+
+  const handleApprove = async (assetId: string) => {
+    await approve(assetId)
+  }
+
+  const handleReject = async (assetId: string) => {
+    await reject(assetId)
+  }
 
   const handleFilter = (filter: string) => {
     setActiveFilter(filter)
@@ -37,11 +44,6 @@ export default function AssetLibraryPage() {
     } else {
       filterByType(filter)
     }
-  }
-
-  const handleStatusUpdate = async (assetId: string, status: AssetStatus) => {
-    await updateAssetStatus(assetId, status)
-    refresh()
   }
 
   const filteredAssets = assets.filter((a) => {
@@ -183,7 +185,7 @@ export default function AssetLibraryPage() {
                       size="sm"
                       variant="secondary"
                       className="h-7 text-xs gap-1 bg-green-500/20 hover:bg-green-500/30 text-green-500"
-                      onClick={(e) => { e.stopPropagation(); handleStatusUpdate(asset.id, "approved") }}
+                      onClick={(e) => { e.stopPropagation(); handleApprove(asset.id) }}
                     >
                       <Check className="size-3" />
                       Approve
@@ -192,7 +194,7 @@ export default function AssetLibraryPage() {
                       size="sm"
                       variant="secondary"
                       className="h-7 text-xs gap-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
-                      onClick={(e) => { e.stopPropagation(); handleStatusUpdate(asset.id, "rejected") }}
+                      onClick={(e) => { e.stopPropagation(); handleReject(asset.id) }}
                     >
                       <X className="size-3" />
                       Reject

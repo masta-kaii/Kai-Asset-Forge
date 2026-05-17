@@ -11,8 +11,8 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Package, Plus, ImageIcon, Check, Sparkles } from "lucide-react"
-import { getAssetsByStatus } from "@/lib/firebase/assets"
-import { createPack, getPacks } from "@/lib/firebase/packs"
+import { fetchAssetsByStatus } from "@/app/actions/assets"
+import { fetchPacks, createNewPack } from "@/app/actions/packs"
 import type { Asset, AssetPack } from "@/lib/types"
 
 export default function ProductBuilderPage() {
@@ -28,8 +28,8 @@ export default function ProductBuilderPage() {
 
   useEffect(() => {
     Promise.all([
-      getAssetsByStatus("approved").then(setApprovedAssets).catch(() => {}),
-      getPacks().then(setPacks).catch(() => {}),
+      fetchAssetsByStatus("approved").then(setApprovedAssets).catch(() => {}),
+      fetchPacks().then(setPacks).catch(() => {}),
     ]).finally(() => setLoading(false))
   }, [])
 
@@ -47,12 +47,11 @@ export default function ProductBuilderPage() {
     setSaving(true)
     setError(null)
     try {
-      const pack = await createPack({
+      const pack = await createNewPack({
         title: title.trim(),
         description: description.trim(),
         assets: Array.from(selectedIds),
         price: parseFloat(price) || 4.99,
-        status: "review",
         previewUrl: approvedAssets.find((a) => selectedIds.has(a.id))?.previewUrl ?? "",
       })
       setPacks((prev) => [pack, ...prev])

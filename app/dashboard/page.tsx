@@ -21,19 +21,17 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
-import { useAssets } from "@/hooks/use-assets"
 import { usePipeline } from "@/hooks/use-pipeline"
-import { getAssetCount } from "@/lib/firebase/assets"
-import { getRecentGenerations } from "@/lib/firebase/generations"
 import { runAutoForge } from "@/app/actions/pipeline"
+import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
-import type { AgentName } from "@/lib/types"
+import type { Asset } from "@/lib/types"
 
 export default function DashboardPage() {
-  const { assets, loading: assetsLoading } = useAssets()
   const { steps, activeStep, isRunning, startPipeline, pausePipeline, resetPipeline } = usePipeline()
   const [totalCount, setTotalCount] = useState(0)
   const [recentGens, setRecentGens] = useState<{ action: string; time: string }[]>([])
+  const [assets, setAssets] = useState<Asset[]>([])
   const [forgeRunning, setForgeRunning] = useState(false)
   const [forgeSteps, setForgeSteps] = useState<{ step: string; status: string; summary: string }[]>([])
   const [forgeError, setForgeError] = useState<string | null>(null)
@@ -65,16 +63,19 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    getAssetCount().then(setTotalCount).catch((e) => { console.error("asset count error:", e); setTotalCount(0) })
-    getRecentGenerations(8).then((gens) => {
+    getDashboardData().then((data) => {
+      setTotalCount(data.totalAssets)
+      setAssets(data.recentAssets)
       setRecentGens(
-        gens.map((g) => ({
+        data.recentGenerations.map((g) => ({
           action: `Generated asset ${g.assetId.slice(0, 8)}...`,
           time: new Date(g.createdAt).toLocaleTimeString(),
         }))
       )
-    }).catch(() => setRecentGens([]))
-  }, [assets])
+    }).catch((e) => {
+      console.error("Dashboard load error:", e)
+    })
+  }, [])
 
   const approvedCount = assets.filter((a) => a.status === "approved").length
   const activeAgents = isRunning ? 1 : 0

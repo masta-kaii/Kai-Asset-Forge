@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { getRecentAssets, getAssetsByType } from "@/lib/firebase/assets"
+import { fetchRecentAssets, fetchAssetsByType, approveAsset, rejectAsset } from "@/app/actions/assets"
 import type { Asset } from "@/lib/types"
 
 interface UseAssetsReturn {
@@ -10,6 +10,8 @@ interface UseAssetsReturn {
   error: string | null
   filterByType: (type: string) => Promise<void>
   refresh: () => Promise<void>
+  approve: (assetId: string) => Promise<void>
+  reject: (assetId: string) => Promise<void>
 }
 
 export function useAssets(): UseAssetsReturn {
@@ -21,7 +23,7 @@ export function useAssets(): UseAssetsReturn {
     setLoading(true)
     setError(null)
     try {
-      const data = await getRecentAssets(24)
+      const data = await fetchRecentAssets(24)
       setAssets(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load assets")
@@ -34,7 +36,7 @@ export function useAssets(): UseAssetsReturn {
     setLoading(true)
     setError(null)
     try {
-      const data = await getAssetsByType(type)
+      const data = await fetchAssetsByType(type)
       setAssets(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to filter assets")
@@ -43,9 +45,31 @@ export function useAssets(): UseAssetsReturn {
     }
   }, [])
 
+  const approve = useCallback(async (assetId: string) => {
+    try {
+      await approveAsset(assetId)
+      setAssets((prev) =>
+        prev.map((a) => (a.id === assetId ? { ...a, status: "approved" as const } : a))
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve asset")
+    }
+  }, [])
+
+  const reject = useCallback(async (assetId: string) => {
+    try {
+      await rejectAsset(assetId)
+      setAssets((prev) =>
+        prev.map((a) => (a.id === assetId ? { ...a, status: "rejected" as const } : a))
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reject asset")
+    }
+  }, [])
+
   useEffect(() => {
     refresh()
   }, [refresh])
 
-  return { assets, loading, error, filterByType, refresh }
+  return { assets, loading, error, filterByType, refresh, approve, reject }
 }
