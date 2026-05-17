@@ -26,6 +26,7 @@ import { usePipeline } from "@/hooks/use-pipeline"
 import { getAssetCount } from "@/lib/firebase/assets"
 import { getRecentGenerations } from "@/lib/firebase/generations"
 import { runAutoForge } from "@/app/actions/pipeline"
+import { toast } from "sonner"
 import type { AgentName } from "@/lib/types"
 
 export default function DashboardPage() {
@@ -38,26 +39,33 @@ export default function DashboardPage() {
   const [forgeError, setForgeError] = useState<string | null>(null)
 
   const handleAutoForge = async () => {
+    if (forgeRunning) return
+    console.log("Auto Forge clicked")
     setForgeRunning(true)
     setForgeError(null)
     setForgeSteps([])
+    toast.info("Auto Forge started — agents are working...")
     try {
       const result = await runAutoForge({ theme: "fantasy creatures" })
       if (result.success) {
         setForgeSteps(result.steps)
+        toast.success(`Forge complete! ${result.assetIds.length} assets created.`)
       } else {
         setForgeError(result.error ?? "Auto Forge failed")
         setForgeSteps(result.steps)
+        toast.error(result.error ?? "Auto Forge failed")
       }
     } catch (err) {
-      setForgeError(err instanceof Error ? err.message : "Auto Forge failed")
+      const msg = err instanceof Error ? err.message : "Auto Forge failed"
+      setForgeError(msg)
+      toast.error(msg)
     } finally {
       setForgeRunning(false)
     }
   }
 
   useEffect(() => {
-    getAssetCount().then(setTotalCount).catch(() => setTotalCount(0))
+    getAssetCount().then(setTotalCount).catch((e) => { console.error("asset count error:", e); setTotalCount(0) })
     getRecentGenerations(8).then((gens) => {
       setRecentGens(
         gens.map((g) => ({

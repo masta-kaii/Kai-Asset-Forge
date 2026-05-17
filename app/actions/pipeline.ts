@@ -42,7 +42,7 @@ export async function runAutoForge(input: {
       prompt: `Research trending game asset types in the "${theme}" category. List the top 3 most popular asset subtypes (e.g., dragons, slimes, goblins) and briefly explain why each is trending. Be concise.`,
       provider: textProvider,
       temperature: 0.7,
-      maxTokens: 500,
+      maxTokens: 200,
     })
 
     if (!trendText.success) {
@@ -65,7 +65,7 @@ export async function runAutoForge(input: {
       prompt: `Based on these trending asset types:\n${trendText.text}\n\nCreate an art direction brief for generating game assets. Specify: 1) Visual style (e.g. pixel art, cute retro), 2) Color palette, 3) Key features for each asset type, 4) Aspect ratio and composition. Be concise but specific.`,
       provider: textProvider,
       temperature: 0.8,
-      maxTokens: 600,
+      maxTokens: 200,
     })
 
     if (!artText.success) {
@@ -84,7 +84,7 @@ export async function runAutoForge(input: {
       input: { theme, artDirection: artText.text },
     })
 
-    const assetTypes: AssetType[] = ["creature", "item", "accessory"]
+    const assetTypes: AssetType[] = ["creature"]
     const style: AssetStyle = theme.toLowerCase().includes("pixel") ? "pixel-art" : "pastel-cyber-fantasy"
 
     for (const assetType of assetTypes) {
