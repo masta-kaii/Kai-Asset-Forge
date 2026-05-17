@@ -38,6 +38,16 @@ async function downloadImageBuffer(url: string): Promise<ArrayBuffer> {
 }
 
 export async function generateAssets(input: GenerateInput): Promise<GenerateResult> {
+  try {
+    return await generateAssetsInternal(input)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    console.error("generateAssets error:", message)
+    return { success: false, assets: [], error: message }
+  }
+}
+
+async function generateAssetsInternal(input: GenerateInput): Promise<GenerateResult> {
   const { prompt, assetType, style, batchCount, quality, provider } = input
 
   const params: ImageGenParams = {

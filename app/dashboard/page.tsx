@@ -16,6 +16,8 @@ import {
   Play,
   Pause,
   RotateCcw,
+  Zap,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
@@ -23,6 +25,7 @@ import { useAssets } from "@/hooks/use-assets"
 import { usePipeline } from "@/hooks/use-pipeline"
 import { getAssetCount } from "@/lib/firebase/assets"
 import { getRecentGenerations } from "@/lib/firebase/generations"
+import { runAutoForge } from "@/app/actions/pipeline"
 import type { AgentName } from "@/lib/types"
 
 export default function DashboardPage() {
@@ -30,6 +33,28 @@ export default function DashboardPage() {
   const { steps, activeStep, isRunning, startPipeline, pausePipeline, resetPipeline } = usePipeline()
   const [totalCount, setTotalCount] = useState(0)
   const [recentGens, setRecentGens] = useState<{ action: string; time: string }[]>([])
+  const [forgeRunning, setForgeRunning] = useState(false)
+  const [forgeSteps, setForgeSteps] = useState<{ step: string; status: string; summary: string }[]>([])
+  const [forgeError, setForgeError] = useState<string | null>(null)
+
+  const handleAutoForge = async () => {
+    setForgeRunning(true)
+    setForgeError(null)
+    setForgeSteps([])
+    try {
+      const result = await runAutoForge({ theme: "fantasy creatures" })
+      if (result.success) {
+        setForgeSteps(result.steps)
+      } else {
+        setForgeError(result.error ?? "Auto Forge failed")
+        setForgeSteps(result.steps)
+      }
+    } catch (err) {
+      setForgeError(err instanceof Error ? err.message : "Auto Forge failed")
+    } finally {
+      setForgeRunning(false)
+    }
+  }
 
   useEffect(() => {
     getAssetCount().then(setTotalCount).catch(() => setTotalCount(0))
@@ -55,16 +80,65 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-heading font-bold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Welcome to your AI game asset forge. Ready to create?
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-heading font-bold tracking-tight">
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Welcome to your AI game asset forge. Ready to create?
+          </p>
+        </div>
+        <Button className="gap-2" onClick={handleAutoForge} disabled={forgeRunning}>
+          {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
+          {forgeRunning ? "Forging..." : "Auto Forge"}
+        </Button>
       </div>
 
       <Separator />
+
+      {(forgeSteps.length > 0 || forgeRunning) && (
+        <Card className={forgeRunning ? "border-primary/30" : ""}>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              {forgeRunning ? <Loader2 className="size-5 animate-spin text-primary" /> : <Zap className="size-5 text-primary" />}
+              Auto Forge {forgeRunning ? "in Progress" : "Complete"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {forgeError && (
+              <div className="flex items-center gap-2 text-sm text-red-500 mb-4 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                <AlertTriangle className="size-4" />
+                {forgeError}
+              </div>
+            )}
+            <div className="space-y-3">
+              {forgeSteps.map((s, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className={`size-5 rounded-full flex items-center justify-center shrink-0 ${
+                    s.status === "completed" ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"
+                  }`}>
+                    {s.status === "completed" ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{s.step}</p>
+                    <p className="text-xs text-muted-foreground truncate">{s.summary}</p>
+                  </div>
+                  <Badge variant={s.status === "completed" ? "default" : "destructive"} className="text-xs shrink-0">
+                    {s.status}
+                  </Badge>
+                </div>
+              ))}
+              {forgeRunning && forgeSteps.length === 0 && (
+                <div className="flex items-center gap-3 py-4">
+                  <Loader2 className="size-5 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Running agent pipeline...</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {STATS.map((stat) => (
@@ -140,9 +214,7 @@ export default function DashboardPage() {
                 <span className="text-lg">{agent.emoji}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{agent.label}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {agent.role}
-                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{agent.role}</p>
                 </div>
                 <Badge
                   variant={isRunning && agent.name === "asset-generator" ? "default" : "secondary"}
@@ -174,14 +246,9 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-2">
               {recentGens.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between text-sm py-1"
-                >
+                <div key={i} className="flex items-center justify-between text-sm py-1">
                   <span>{item.action}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {item.time}
-                  </span>
+                  <span className="text-muted-foreground text-xs">{item.time}</span>
                 </div>
               ))}
             </div>
