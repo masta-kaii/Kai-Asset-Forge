@@ -1,12 +1,16 @@
+"use client"
+
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sparkles, ImagePlus, Zap, Settings2 } from "lucide-react"
+import { Sparkles, Zap, Settings2 } from "lucide-react"
+import { PreviewGallery } from "@/components/assets/preview-gallery"
+import { useGeneration } from "@/hooks/use-generation"
 import type { AssetStyle, AssetType } from "@/lib/types"
 
 const STYLES: { value: AssetStyle; label: string }[] = [
@@ -28,6 +32,23 @@ const TYPES: { value: AssetType; label: string }[] = [
 ]
 
 export default function AssetGeneratorPage() {
+  const [assetType, setAssetType] = useState<AssetType>("creature")
+  const [style, setStyle] = useState<AssetStyle>("pastel-cyber-fantasy")
+  const [batchCount, setBatchCount] = useState(4)
+  const [prompt, setPrompt] = useState("")
+  const { isGenerating, error, results, generate } = useGeneration()
+
+  const handleGenerate = () => {
+    if (!prompt.trim()) return
+    generate({
+      prompt: prompt.trim(),
+      assetType,
+      style,
+      batchCount: Math.min(Math.max(batchCount, 1), 10),
+      quality: "standard",
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -60,9 +81,9 @@ export default function AssetGeneratorPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="asset-type">Asset Type</Label>
-              <Select>
+              <Select value={assetType} onValueChange={(v) => setAssetType(v as AssetType)}>
                 <SelectTrigger id="asset-type">
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {TYPES.map((t) => (
@@ -76,9 +97,9 @@ export default function AssetGeneratorPage() {
 
             <div className="space-y-2">
               <Label htmlFor="style">Art Style</Label>
-              <Select>
+              <Select value={style} onValueChange={(v) => setStyle(v as AssetStyle)}>
                 <SelectTrigger id="style">
-                  <SelectValue placeholder="Select style" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {STYLES.map((s) => (
@@ -92,7 +113,14 @@ export default function AssetGeneratorPage() {
 
             <div className="space-y-2">
               <Label htmlFor="count">Batch Count</Label>
-              <Input id="count" type="number" min={1} max={20} defaultValue={4} />
+              <Input
+                id="count"
+                type="number"
+                min={1}
+                max={10}
+                value={batchCount}
+                onChange={(e) => setBatchCount(Number(e.target.value))}
+              />
             </div>
 
             <div className="space-y-2">
@@ -101,18 +129,19 @@ export default function AssetGeneratorPage() {
                 id="prompt"
                 placeholder="Describe your asset in detail..."
                 rows={4}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
               />
             </div>
 
-            <div className="flex gap-2">
-              <Button className="flex-1 gap-2">
-                <Zap className="size-4" />
-                Generate
-              </Button>
-              <Button variant="outline" size="icon">
-                <ImagePlus className="size-4" />
-              </Button>
-            </div>
+            <Button
+              className="w-full gap-2"
+              onClick={handleGenerate}
+              disabled={isGenerating || !prompt.trim()}
+            >
+              <Zap className="size-4" />
+              {isGenerating ? "Generating..." : "Generate"}
+            </Button>
           </CardContent>
         </Card>
 
@@ -127,15 +156,11 @@ export default function AssetGeneratorPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center py-16 text-center">
-              <ImagePlus className="size-12 text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground font-medium">
-                No assets generated yet
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Configure your settings and hit Generate to start creating
-              </p>
-            </div>
+            <PreviewGallery
+              assets={results}
+              isGenerating={isGenerating}
+              error={error}
+            />
           </CardContent>
         </Card>
       </div>
@@ -145,9 +170,20 @@ export default function AssetGeneratorPage() {
           <CardTitle className="text-lg">Recent Generations</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground text-center py-8">
-            Your generation history will appear here
-          </div>
+          {results && results.length > 0 ? (
+            <div className="space-y-2">
+              {results.map((asset) => (
+                <div key={asset.id} className="flex items-center justify-between text-sm py-1">
+                  <span className="font-medium truncate">{asset.name}</span>
+                  <span className="text-muted-foreground text-xs capitalize">{asset.type}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground text-center py-8">
+              Your generation history will appear here
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
