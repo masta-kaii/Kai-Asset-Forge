@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // === Assets ===
+    match /assets/{assetId} {
+      allow read, write: if request.auth != null;
+      // Indexes: type, status, style, tags, createdAt
+    }
+
+    // === Prompts ===
+    match /prompts/{promptId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // === Asset Packs ===
+    match /assetPacks/{packId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // === Generation Records ===
+    match /generations/{generationId} {
+      allow read, write: if request.auth != null;
+      // Indexes: assetId, agentName, createdAt
+    }
+
+    // === Workflows ===
+    match /workflows/{workflowId} {
+      allow read, write: if request.auth != null;
+      // Indexes: status, workflowType, assignedAgent
+    }
+
+    // === User Profile / Settings ===
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
