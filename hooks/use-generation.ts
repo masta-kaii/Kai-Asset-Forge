@@ -8,7 +8,7 @@ interface UseGenerationReturn {
   isGenerating: boolean
   error: string | null
   results: { id: string; name: string; type: AssetType; style: AssetStyle; previewUrl: string; status: string }[] | null
-  generate: (input: { prompt: string; assetType: AssetType; style: AssetStyle; batchCount: number; quality?: "standard" | "hd" }) => Promise<void>
+  generate: (input: { prompt: string; assetType: AssetType; style: AssetStyle; batchCount: number; quality?: "low" | "medium" | "high" | "auto" }) => Promise<void>
   reset: () => void
 }
 

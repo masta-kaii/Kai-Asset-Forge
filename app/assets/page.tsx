@@ -45,7 +45,7 @@ export default function AssetGeneratorPage() {
       assetType,
       style,
       batchCount: Math.min(Math.max(batchCount, 1), 10),
-      quality: "standard",
+      quality: "auto",
     })
   }
 

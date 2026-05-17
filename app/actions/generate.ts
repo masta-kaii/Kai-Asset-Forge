@@ -12,7 +12,7 @@ export interface GenerateInput {
   assetType: AssetType
   style: AssetStyle
   batchCount: number
-  quality?: "standard" | "hd"
+  quality?: "low" | "medium" | "high" | "auto"
 }
 
 export interface GenerateResult {
@@ -43,8 +43,7 @@ export async function generateAssets(input: GenerateInput): Promise<GenerateResu
     prompt,
     size: "1024x1024",
     n: batchCount,
-    quality: quality ?? "standard",
-    style: "vivid",
+    quality: quality ?? "auto",
   }
 
   const result = await generateImage(params)
