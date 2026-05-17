@@ -34,7 +34,6 @@ export async function generateImage(params: ImageGenParams): Promise<ImageGenRes
       n,
       size: SIZE_MAP[size] ?? "1024x1024",
       quality: params.quality ?? "standard",
-      style: params.style ?? "vivid",
     })
 
     const data = response.data ?? []
