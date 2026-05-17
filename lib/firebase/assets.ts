@@ -1,6 +1,6 @@
-import { collection, addDoc, getDocs, query, orderBy, limit, where, Timestamp } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc } from "firebase/firestore"
 import { getDb } from "./client"
-import type { Asset } from "@/lib/types"
+import type { Asset, AssetStatus } from "@/lib/types"
 
 const COLLECTION = "assets"
 
@@ -40,4 +40,10 @@ export async function getAssetCount(): Promise<number> {
   const db = getDb()
   const snapshot = await getDocs(collection(db, COLLECTION))
   return snapshot.size
+}
+
+export async function updateAssetStatus(assetId: string, status: AssetStatus): Promise<void> {
+  const db = getDb()
+  const ref = doc(db, COLLECTION, assetId)
+  await updateDoc(ref, { status, updatedAt: new Date().toISOString() })
 }
