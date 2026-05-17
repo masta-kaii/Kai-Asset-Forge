@@ -1,5 +1,3 @@
-import "server-only"
-
 import { collection, addDoc, getDocs, query, orderBy, limit, Timestamp } from "firebase/firestore"
 import { getDb } from "./client"
 import type { GenerationRecord } from "@/lib/types"
