@@ -15,6 +15,7 @@ import {
   Activity,
   Settings,
   Anvil,
+  Monitor,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -47,6 +48,11 @@ const NAV_ITEMS = [
     title: "Agent Monitor",
     href: "/agents",
     icon: Activity,
+  },
+  {
+    title: "Workspace",
+    href: "/workspace",
+    icon: Monitor,
   },
   {
     title: "Settings",
