@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
-import { runAutoForge } from "@/app/actions/pipeline"
+import { forgeStepTrend, forgeStepArtDirection, forgeStepGenerate, forgeStepFinalize } from "@/app/actions/pipeline-steps"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
 import type { Asset } from "@/lib/types"
@@ -42,24 +42,61 @@ export default function DashboardPage() {
     setForgeRunning(true)
     setForgeError(null)
     setForgeSteps([])
-    toast.info("Auto Forge started — agents are working...")
-    try {
-      const result = await runAutoForge({ theme: "fantasy creatures" })
-      if (result.success) {
-        setForgeSteps(result.steps)
-        toast.success(`Forge complete! ${result.assetIds.length} assets created.`)
-      } else {
-        setForgeError(result.error ?? "Auto Forge failed")
-        setForgeSteps(result.steps)
-        toast.error(result.error ?? "Auto Forge failed")
+    toast.info("Forge started — running agents step by step...")
+
+    const results: typeof forgeSteps = []
+    const theme = "fantasy creatures"
+    let trends = ""
+    let artDirection = ""
+    const allAssetIds: string[] = []
+
+    const report = (step: { step: string; status: string; summary: string; error?: string }) => {
+      results.push(step)
+      setForgeSteps([...results])
+      if (step.status === "failed" && step.error) {
+        setForgeError(step.error)
+        toast.error(`${step.step}: ${step.error}`)
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Auto Forge failed"
-      setForgeError(msg)
-      toast.error(msg)
-    } finally {
-      setForgeRunning(false)
     }
+
+    // Step 1: Trend Research
+    const s1 = await forgeStepTrend({ theme, textProvider: "deepseek" })
+    report(s1)
+    if (s1.status === "failed") { setForgeRunning(false); return }
+    trends = (s1.data as Record<string, unknown>)?.trends as string ?? ""
+
+    // Step 2: Art Direction
+    const s2 = await forgeStepArtDirection({ theme, trends, textProvider: "deepseek" })
+    report(s2)
+    if (s2.status === "failed") { setForgeRunning(false); return }
+    artDirection = (s2.data as Record<string, unknown>)?.artDirection as string ?? ""
+
+    // Step 3: Generate 1-2 assets
+    for (const assetType of ["creature", "item"] as const) {
+      const s3 = await forgeStepGenerate({
+        artDirection,
+        assetType,
+        style: "pixel-art",
+        imageProvider: "gemini",
+      })
+      report(s3)
+      const assetId = (s3.data as Record<string, unknown>)?.assetId as string
+      if (assetId) allAssetIds.push(assetId)
+    }
+
+    // Step 4: Finalize
+    if (allAssetIds.length > 0) {
+      const s4 = await forgeStepFinalize({ assetIds: allAssetIds, theme, textProvider: "deepseek" })
+      report(s4)
+    }
+
+    if (allAssetIds.length > 0) {
+      toast.success(`Forge complete! ${allAssetIds.length} assets created and packed.`)
+    } else {
+      toast.error("No assets were generated successfully.")
+    }
+
+    setForgeRunning(false)
   }
 
   useEffect(() => {
