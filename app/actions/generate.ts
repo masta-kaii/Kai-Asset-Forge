@@ -72,6 +72,7 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
   }
 
   const timestamp = Date.now()
+  let storageErrors = 0
 
   const assets = await Promise.all(
     result.images.map(async (img, i) => {
@@ -82,12 +83,17 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
         const rawBuffer = img.buffer ?? new Uint8Array(await downloadImageBuffer(img.url))
         const path = `assets/${assetType}/${timestamp}-${i + 1}.png`
         storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
-      } catch {
-        // Skip asset if storage upload fails — data URLs are too large for Firestore
+      } catch (uploadErr) {
+        console.error(`Storage upload failed for ${name}:`, uploadErr)
+        storageErrors++
         return null
       }
 
-      if (!storageUrl) return null
+      if (!storageUrl) {
+        console.error(`Storage upload returned empty URL for ${name}`)
+        storageErrors++
+        return null
+      }
 
       const asset = await createAsset({
         name,
@@ -120,7 +126,17 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
         status: asset.status,
       }
     })
-  ).then((results) => results.filter((a): a is NonNullable<typeof a> => a !== null))
+  )
+
+  const succeeded = assets.filter((a): a is NonNullable<typeof a> => a !== null)
+
+  if (succeeded.length === 0 && result.images.length > 0) {
+    return {
+      success: false,
+      assets: [],
+      error: `Firebase Storage upload failed for all ${result.images.length} images. Go to Firebase Console → Storage → Rules and set: allow read, write: if request.auth != null;`,
+    }
+  }
 
   logImageCost(imageProvider, "default", result.images.length, params.size ?? "1024x1024", {
     assetType,
@@ -128,5 +144,5 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
     batchCount: String(batchCount),
   }).catch(() => {})
 
-  return { success: true, assets }
+  return { success: true, assets: succeeded }
 }

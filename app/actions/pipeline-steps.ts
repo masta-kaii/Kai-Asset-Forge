@@ -89,8 +89,9 @@ export async function forgeStepGenerate(input: {
       const rawBuffer = img.buffer ?? Buffer.from(await (await fetch(img.url)).arrayBuffer())
       const path = `assets/${input.assetType}/forge-${Date.now()}.png`
       storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
-    } catch {
-      return { step: "Asset Generation", status: "failed", summary: "Storage upload failed", error: "Could not upload asset to Firebase Storage" }
+    } catch (uploadErr) {
+      console.error("Pipeline storage upload failed:", uploadErr)
+      return { step: "Asset Generation", status: "failed", summary: "Storage upload failed — check Firebase Storage rules", error: String(uploadErr) }
     }
 
     if (!storageUrl) {
