@@ -6,27 +6,17 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import {
-  Sparkles,
-  Package,
-  Activity,
-  TrendingUp,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  Play,
-  Pause,
-  RotateCcw,
-  Zap,
-  Loader2,
+  Sparkles, Package, Activity, TrendingUp, CheckCircle2, Clock, AlertTriangle,
+  Play, Pause, RotateCcw, Zap, Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
-import { forgeStepTrend, forgeStepScout, forgeStepArtDirection, forgeStepGenerate, forgeStepCurate, forgeStepFinalize, forgeStepReflect } from "@/app/actions/pipeline-steps"
+import { startForgePipeline, getPipelineRun } from "@/app/actions/forge-pipeline"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
 import type { BudgetStatus } from "@/lib/budget/types"
-import type { Asset, AssetStyle } from "@/lib/types"
+import type { Asset } from "@/lib/types"
 
 export default function DashboardPage() {
   const { steps, activeStep, isRunning, startPipeline, pausePipeline, resetPipeline } = usePipeline()
@@ -40,86 +30,29 @@ export default function DashboardPage() {
 
   const handleAutoForge = async () => {
     if (forgeRunning) return
-    console.log("Auto Forge clicked")
     setForgeRunning(true)
     setForgeError(null)
     setForgeSteps([])
-    toast.info("Forge started — running agents step by step...")
+    toast.info("Forge pipeline started — runs server-side, survives refresh")
 
-    const results: typeof forgeSteps = []
-    const theme = "fantasy creatures"
-    let trends = ""
-    let artDirection = ""
-    const allAssetIds: string[] = []
-
-    const report = (step: { step: string; status: string; summary: string; error?: string }) => {
-      results.push(step)
-      setForgeSteps([...results])
-      if (step.status === "failed" && step.error) {
-        setForgeError(step.error)
-        toast.error(`${step.step}: ${step.error}`)
+    try {
+      const { runId } = await startForgePipeline({ theme: "fantasy creatures" })
+      const run = await getPipelineRun(runId)
+      if (run) {
+        setForgeSteps(run.steps.map((s) => ({ step: s.step, status: s.status, summary: s.summary })))
+        if (run.status === "completed") toast.success(`Forge complete! ${run.steps.length} steps`)
+        if (run.status === "failed") {
+          setForgeError(run.error ?? "Pipeline failed")
+          toast.error(run.error ?? "Pipeline failed")
+        }
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Pipeline failed"
+      setForgeError(msg)
+      toast.error(msg)
+    } finally {
+      setForgeRunning(false)
     }
-
-    // Step 0: Scout (research market trends)
-    const s0 = await forgeStepScout({ theme, textProvider: "deepseek" })
-    report(s0)
-    const proposal = s0.data as Record<string, unknown> | undefined
-
-    // Step 1: Trend Research (deep dive on scout proposal)
-    const s1 = await forgeStepTrend({ theme, textProvider: "deepseek" })
-    report(s1)
-    if (s1.status === "failed") { setForgeRunning(false); return }
-    trends = (s1.data as Record<string, unknown>)?.trends as string ?? ""
-
-    // Step 2: Art Direction
-    const s2 = await forgeStepArtDirection({ theme, trends, textProvider: "deepseek" })
-    report(s2)
-    if (s2.status === "failed") { setForgeRunning(false); return }
-    artDirection = (s2.data as Record<string, unknown>)?.artDirection as string ?? ""
-
-    // Step 3: Generate 1-2 assets
-    for (const assetType of ["creature", "item"] as const) {
-      const s3 = await forgeStepGenerate({
-        artDirection,
-        assetType,
-        style: (proposal?.style as AssetStyle) ?? "pixel-art",
-        imageProvider: "openai",
-      })
-      report(s3)
-      const assetId = (s3.data as Record<string, unknown>)?.assetId as string
-      if (assetId) allAssetIds.push(assetId)
-    }
-
-    // Step 4: Curator score
-    if (allAssetIds.length > 0) {
-      const curator = await forgeStepCurate({
-        assetName: `batch-${Date.now()}`,
-        assetType: (proposal?.assetType as string) ?? "creature",
-        assetStyle: (proposal?.style as string) ?? "pixel-art",
-        prompt: artDirection,
-        textProvider: "deepseek",
-      })
-      report(curator)
-    }
-
-    // Step 5: Finalize (approve, pack, listing)
-    if (allAssetIds.length > 0) {
-      const s5 = await forgeStepFinalize({ assetIds: allAssetIds, theme, textProvider: "deepseek" })
-      report(s5)
-    }
-
-    // Step 6: Reflection (analyze and learn)
-    const s6 = await forgeStepReflect({ textProvider: "deepseek" })
-    report(s6)
-
-    if (allAssetIds.length > 0) {
-      toast.success(`Forge complete! ${allAssetIds.length} assets created and packed.`)
-    } else {
-      toast.error("No assets were generated successfully.")
-    }
-
-    setForgeRunning(false)
   }
 
   useEffect(() => {
@@ -133,13 +66,10 @@ export default function DashboardPage() {
           time: new Date(g.createdAt).toLocaleTimeString(),
         }))
       )
-    }).catch((e) => {
-      console.error("Dashboard load error:", e)
-    })
+    }).catch((e) => console.error("Dashboard load error:", e))
   }, [])
 
   const approvedCount = assets.filter((a) => a.status === "approved").length
-  const activeAgents = isRunning ? 1 : 0
 
   const STATS = [
     { label: "Total Assets", value: totalCount, icon: Sparkles, trend: `${assets.length} recent` },
@@ -152,12 +82,8 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold tracking-tight">
-            Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Welcome to your AI game asset forge. Ready to create?
-          </p>
+          <h1 className="text-2xl font-heading font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Welcome to your AI game asset forge. Ready to create?</p>
         </div>
         <Button className="gap-2" onClick={handleAutoForge} disabled={forgeRunning}>
           {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
@@ -172,37 +98,34 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               {forgeRunning ? <Loader2 className="size-5 animate-spin text-primary" /> : <Zap className="size-5 text-primary" />}
-              Auto Forge {forgeRunning ? "in Progress" : "Complete"}
+              Auto Forge {forgeRunning ? "in Progress" : forgeError ? "Failed" : "Complete"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {forgeError && (
               <div className="flex items-center gap-2 text-sm text-red-500 mb-4 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
-                <AlertTriangle className="size-4" />
-                {forgeError}
+                <AlertTriangle className="size-4" />{forgeError}
               </div>
             )}
             <div className="space-y-3">
               {forgeSteps.map((s, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className={`size-5 rounded-full flex items-center justify-center shrink-0 ${
-                    s.status === "completed" ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"
+                    s.status === "completed" ? "bg-green-500/20 text-green-500" : s.status === "running" ? "bg-blue-500/20 text-blue-500" : "bg-red-500/20 text-red-500"
                   }`}>
-                    {s.status === "completed" ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+                    {s.status === "completed" ? <CheckCircle2 className="size-3.5" /> : s.status === "running" ? <Loader2 className="size-3.5 animate-spin" /> : <AlertTriangle className="size-3.5" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{s.step}</p>
                     <p className="text-xs text-muted-foreground truncate">{s.summary}</p>
                   </div>
-                  <Badge variant={s.status === "completed" ? "default" : "destructive"} className="text-xs shrink-0">
-                    {s.status}
-                  </Badge>
+                  <Badge variant={s.status === "completed" ? "default" : s.status === "running" ? "secondary" : "destructive"} className="text-xs shrink-0">{s.status}</Badge>
                 </div>
               ))}
               {forgeRunning && forgeSteps.length === 0 && (
                 <div className="flex items-center gap-3 py-4">
                   <Loader2 className="size-5 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Running agent pipeline...</p>
+                  <p className="text-sm text-muted-foreground">Running agent pipeline on server...</p>
                 </div>
               )}
             </div>
@@ -214,9 +137,7 @@ export default function DashboardPage() {
         {STATS.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.label}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
               <stat.icon className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -231,25 +152,11 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="size-5" />
-                Pipeline Status
-              </CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2"><Activity className="size-5" />Pipeline Status</CardTitle>
               <div className="flex gap-1">
-                {!isRunning ? (
-                  <Button variant="outline" size="sm" className="gap-1" onClick={startPipeline}>
-                    <Play className="size-3" />
-                    Start
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" className="gap-1" onClick={pausePipeline}>
-                    <Pause className="size-3" />
-                    Pause
-                  </Button>
-                )}
-                <Button variant="ghost" size="sm" className="gap-1" onClick={resetPipeline}>
-                  <RotateCcw className="size-3" />
-                </Button>
+                {!isRunning ? <Button variant="outline" size="sm" className="gap-1" onClick={startPipeline}><Play className="size-3" />Start</Button>
+                : <Button variant="outline" size="sm" className="gap-1" onClick={pausePipeline}><Pause className="size-3" />Pause</Button>}
+                <Button variant="ghost" size="sm" className="gap-1" onClick={resetPipeline}><RotateCcw className="size-3" /></Button>
               </div>
             </div>
           </CardHeader>
@@ -258,14 +165,9 @@ export default function DashboardPage() {
               <div key={step.key} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">{step.label}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {i === activeStep && isRunning ? "Running..." : step.progress}%
-                  </span>
+                  <span className="text-muted-foreground text-xs">{i === activeStep && isRunning ? "Running..." : step.progress}%</span>
                 </div>
-                <Progress
-                  value={step.progress}
-                  className={`h-1.5 ${i === activeStep && isRunning ? "[&>div]:animate-pulse" : ""}`}
-                />
+                <Progress value={step.progress} className={`h-1.5 ${i === activeStep && isRunning ? "[&>div]:animate-pulse" : ""}`} />
               </div>
             ))}
           </CardContent>
@@ -273,10 +175,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="size-5" />
-              Agent Fleet
-            </CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="size-5" />Agent Fleet</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {AGENTS.map((agent) => (
@@ -286,10 +185,7 @@ export default function DashboardPage() {
                   <p className="text-sm font-medium truncate">{agent.label}</p>
                   <p className="text-xs text-muted-foreground truncate">{agent.role}</p>
                 </div>
-                <Badge
-                  variant={isRunning && agent.name === "asset-generator" ? "default" : "secondary"}
-                  className="text-xs shrink-0"
-                >
+                <Badge variant={isRunning && agent.name === "asset-generator" ? "default" : "secondary"} className="text-xs shrink-0">
                   {isRunning && agent.name === "asset-generator" ? "Running" : "Idle"}
                 </Badge>
               </div>
@@ -300,18 +196,13 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Clock className="size-5" />
-            Recent Activity
-          </CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2"><Clock className="size-5" />Recent Activity</CardTitle>
         </CardHeader>
         <CardContent>
           {recentGens.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <AlertTriangle className="size-8 text-muted-foreground/50 mb-2" />
-              <p className="text-sm text-muted-foreground">
-                No activity yet. Start your first asset generation run!
-              </p>
+              <p className="text-sm text-muted-foreground">No activity yet. Start your first asset generation run!</p>
             </div>
           ) : (
             <div className="space-y-2">
