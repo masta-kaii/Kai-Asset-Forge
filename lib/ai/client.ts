@@ -1,5 +1,4 @@
 import OpenAI from "openai"
-import { GoogleGenAI } from "@google/genai"
 import type { ImageGenParams, ImageGenResponse, ImageGenResult, TextGenParams, TextGenResponse, AIProvider } from "./types"
 
 function getClient(provider?: AIProvider): OpenAI {
@@ -90,7 +89,13 @@ async function generateImageWithGemini(params: ImageGenParams): Promise<ImageGen
     return { success: false, images: [], error: "GEMINI_API_KEY is not configured" }
   }
 
-  const ai = new GoogleGenAI({ apiKey })
+  let ai: InstanceType<typeof import("@google/genai").GoogleGenAI>
+  try {
+    const { GoogleGenAI } = await import("@google/genai")
+    ai = new GoogleGenAI({ apiKey })
+  } catch {
+    return { success: false, images: [], error: "Gemini SDK failed to load" }
+  }
   const model = params.model ?? "imagen-4.0-generate-001"
   const n = params.n ?? 1
 
