@@ -553,7 +553,7 @@ export default function WorkstationPage() {
 
         {/* Top label */}
         <div className="absolute top-2 left-3 z-20 font-mono text-[10px] text-muted-foreground/50 tracking-widest uppercase">
-          Kai Asset Forge · Dungeon Floor
+          Kai Asset Forge · Dungeon Floor · v2.1
         </div>
 
         {/* Grid */}
