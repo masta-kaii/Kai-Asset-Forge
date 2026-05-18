@@ -7,13 +7,14 @@ import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import {
   Sparkles, Package, Activity, TrendingUp, CheckCircle2, Clock, AlertTriangle,
-  Play, Pause, RotateCcw, Zap, Loader2, Brain,
+  Play, Pause, RotateCcw, Zap, Loader2, Brain, PauseCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
 import { runOrchestrator, findIncompleteRun } from "@/app/actions/orchestrator"
 import { getDashboardData } from "@/app/actions/dashboard"
+import { pause as pauseKill, resume as resumeKill, isPaused } from "@/lib/budget/kill-switch"
 import { toast } from "sonner"
 import type { BudgetStatus } from "@/lib/budget/types"
 import type { Asset } from "@/lib/types"
@@ -28,6 +29,19 @@ export default function DashboardPage() {
   const [forgeSteps, setForgeSteps] = useState<{ step: string; status: string; summary: string }[]>([])
   const [forgeError, setForgeError] = useState<string | null>(null)
   const [resumeRunId, setResumeRunId] = useState<string | null>(null)
+  const [forgePaused, setForgePaused] = useState(false)
+
+  const handleKillSwitch = async () => {
+    if (forgePaused) {
+      await resumeKill()
+      setForgePaused(false)
+      toast.success("Forge resumed — operations active")
+    } else {
+      await pauseKill()
+      setForgePaused(true)
+      toast.warning("Forge paused — all operations stopped")
+    }
+  }
 
   useEffect(() => {
     findIncompleteRun().then((run) => {
@@ -75,6 +89,7 @@ export default function DashboardPage() {
       setTotalCount(data.totalAssets)
       setAssets(data.recentAssets)
       setBudget(data.budget)
+      setForgePaused(data.isPaused)
       setRecentGens(
         data.recentGenerations.map((g) => ({
           action: `Generated asset ${g.assetId.slice(0, 8)}...`,
@@ -100,10 +115,21 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-heading font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Welcome to your AI game asset forge. Ready to create?</p>
         </div>
-        <Button className="gap-2" onClick={handleOrchestrator} disabled={forgeRunning}>
-          {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Brain className="size-4" />}
-          {forgeRunning ? "Running..." : resumeRunId ? "Resume Forge" : "Launch Orchestrator"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className={forgePaused ? "border-red-500/30 bg-red-500/5" : ""}
+            onClick={handleKillSwitch}
+            title={forgePaused ? "Resume all operations" : "Pause all operations"}
+          >
+            {forgePaused ? <Play className="size-4 text-green-500" /> : <PauseCircle className="size-4 text-red-500" />}
+          </Button>
+          <Button className="gap-2" onClick={handleOrchestrator} disabled={forgeRunning || forgePaused}>
+            {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Brain className="size-4" />}
+            {forgeRunning ? "Running..." : resumeRunId ? "Resume Forge" : "Launch Orchestrator"}
+          </Button>
+        </div>
       </div>
 
       <Separator />

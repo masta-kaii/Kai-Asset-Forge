@@ -3,6 +3,7 @@
 import { generateText } from "@/lib/ai/client"
 import { getEntriesSince } from "@/lib/firebase/ledger"
 import { guardTextGen, logTextCost } from "@/app/actions/budget-guard"
+import { updatePrompt } from "@/lib/firebase/prompts"
 import type { AIProvider } from "@/lib/ai/types"
 
 export interface ReflectionOutput {
@@ -61,13 +62,23 @@ Return ONLY valid JSON, no markdown:`,
 
   try {
     const parsed = JSON.parse(result.text)
-    return {
-      success: true,
-      output: {
-        ...parsed,
-        generatedAt: new Date().toISOString(),
-      } as ReflectionOutput,
+    const output = {
+      ...parsed,
+      generatedAt: new Date().toISOString(),
+    } as ReflectionOutput
+
+    // Apply prompt deltas to Firestore for self-improvement
+    if (output.promptDeltas?.scout) {
+      await updatePrompt("scout", output.promptDeltas.scout).catch(() => {})
     }
+    if (output.promptDeltas?.forge) {
+      await updatePrompt("forge", output.promptDeltas.forge).catch(() => {})
+    }
+    if (output.promptDeltas?.lister) {
+      await updatePrompt("lister", output.promptDeltas.lister).catch(() => {})
+    }
+
+    return { success: true, output }
   } catch {
     return { success: false, error: "Failed to parse Reflection output" }
   }

@@ -5,6 +5,7 @@ import { getRecentGenerations } from "@/lib/firebase/generations"
 import { getReadyPacks } from "@/lib/firebase/packs"
 import { getActiveWorkflows } from "@/lib/firebase/workflows"
 import { getBudgetStatus } from "@/lib/budget/budget"
+import { isPaused, pause, resume } from "@/lib/budget/kill-switch"
 import { getRecentEntries } from "@/lib/firebase/ledger"
 import type { Asset, GenerationRecord } from "@/lib/types"
 import type { BudgetStatus, CostEntry } from "@/lib/budget/types"
@@ -17,6 +18,7 @@ export interface DashboardData {
   activeWorkflows: number
   budget: BudgetStatus
   recentCosts: CostEntry[]
+  isPaused: boolean
   error?: string
 }
 
@@ -33,6 +35,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       ])
 
     const budget = await getBudgetStatus()
+    const paused = await isPaused()
 
     return {
       totalAssets,
@@ -45,6 +48,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       activeWorkflows,
       budget,
       recentCosts,
+      isPaused: paused,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load dashboard"
@@ -57,6 +61,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       activeWorkflows: 0,
       budget: { dailyUsed: 0, monthlyUsed: 0, dailyRemaining: 0, monthlyRemaining: 0, dailyCap: 0, monthlyCap: 0, dailyPercent: 0, monthlyPercent: 0, isExceeded: false, lastResetDaily: "", lastResetMonthly: "" },
       recentCosts: [],
+      isPaused: false,
       error: message,
     }
   }

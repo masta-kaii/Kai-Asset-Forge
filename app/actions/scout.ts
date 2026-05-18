@@ -2,6 +2,7 @@
 
 import { generateText } from "@/lib/ai/client"
 import { getRecentEntries } from "@/lib/firebase/ledger"
+import { getPrompt } from "@/lib/firebase/prompts"
 import { guardTextGen, logTextCost } from "@/app/actions/budget-guard"
 import type { AIProvider } from "@/lib/ai/types"
 import type { AssetType, AssetStyle } from "@/lib/types"
@@ -35,21 +36,16 @@ export async function scoutTrends(input: {
     ? `Previously generated types: ${[...new Set(pastThemes)].join(", ")}. Avoid repeating.`
     : "No prior generation data."
 
-  const result = await generateText({
-    prompt: `You are Scout, a market analyst for a pixel-art game asset store on itch.io. Research trending game asset types for "${input.theme ?? "fantasy creatures"}".
+  // Read evolved prompt from Firestore (updated by Reflection)
+  const scoutPrompt = await getPrompt("scout")
 
+  const result = await generateText({
+    prompt: `${scoutPrompt}
+
+Theme: "${input.theme ?? "fantasy creatures"}"
 ${pastThemesStr}
 
-Return JSON with:
-- "theme": concrete visual theme (e.g., "haunted forest enemies")
-- "assetType": one of creature, accessory, item, weapon, food, material, animation, ui-icon
-- "style": one of pixel-art, cute-retro, pastel-cyber-fantasy, tamagotchi
-- "count": number between 2-8
-- "styleAnchor": keyword string for generation (e.g., "gritty 32px dark outline limited palette")
-- "targetPrice": price in USD between 2-8
-- "rationale": 1 sentence why this will sell
-- "trendingScore": 1-10 estimate
-
+Return JSON with: theme, assetType, style, count (2-8), styleAnchor, targetPrice (2-8 USD), rationale (1 sentence), trendingScore (1-10).
 Return ONLY valid JSON, no markdown:`,
     provider,
     temperature: 0.8,
