@@ -22,11 +22,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
-import { forgeStepTrend, forgeStepArtDirection, forgeStepGenerate, forgeStepFinalize } from "@/app/actions/pipeline-steps"
+import { forgeStepTrend, forgeStepScout, forgeStepArtDirection, forgeStepGenerate, forgeStepCurate, forgeStepFinalize, forgeStepReflect } from "@/app/actions/pipeline-steps"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
 import type { BudgetStatus } from "@/lib/budget/types"
-import type { Asset } from "@/lib/types"
+import type { Asset, AssetStyle } from "@/lib/types"
 
 export default function DashboardPage() {
   const { steps, activeStep, isRunning, startPipeline, pausePipeline, resetPipeline } = usePipeline()
@@ -61,7 +61,12 @@ export default function DashboardPage() {
       }
     }
 
-    // Step 1: Trend Research
+    // Step 0: Scout (research market trends)
+    const s0 = await forgeStepScout({ theme, textProvider: "deepseek" })
+    report(s0)
+    const proposal = s0.data as Record<string, unknown> | undefined
+
+    // Step 1: Trend Research (deep dive on scout proposal)
     const s1 = await forgeStepTrend({ theme, textProvider: "deepseek" })
     report(s1)
     if (s1.status === "failed") { setForgeRunning(false); return }
@@ -78,7 +83,7 @@ export default function DashboardPage() {
       const s3 = await forgeStepGenerate({
         artDirection,
         assetType,
-        style: "pixel-art",
+        style: (proposal?.style as AssetStyle) ?? "pixel-art",
         imageProvider: "gemini",
       })
       report(s3)
@@ -86,11 +91,27 @@ export default function DashboardPage() {
       if (assetId) allAssetIds.push(assetId)
     }
 
-    // Step 4: Finalize
+    // Step 4: Curator score
     if (allAssetIds.length > 0) {
-      const s4 = await forgeStepFinalize({ assetIds: allAssetIds, theme, textProvider: "deepseek" })
-      report(s4)
+      const curator = await forgeStepCurate({
+        assetName: `batch-${Date.now()}`,
+        assetType: (proposal?.assetType as string) ?? "creature",
+        assetStyle: (proposal?.style as string) ?? "pixel-art",
+        prompt: artDirection,
+        textProvider: "deepseek",
+      })
+      report(curator)
     }
+
+    // Step 5: Finalize (approve, pack, listing)
+    if (allAssetIds.length > 0) {
+      const s5 = await forgeStepFinalize({ assetIds: allAssetIds, theme, textProvider: "deepseek" })
+      report(s5)
+    }
+
+    // Step 6: Reflection (analyze and learn)
+    const s6 = await forgeStepReflect({ textProvider: "deepseek" })
+    report(s6)
 
     if (allAssetIds.length > 0) {
       toast.success(`Forge complete! ${allAssetIds.length} assets created and packed.`)

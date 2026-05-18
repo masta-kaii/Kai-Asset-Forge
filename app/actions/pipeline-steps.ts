@@ -6,6 +6,10 @@ import { createAsset, updateAssetStatus } from "@/lib/firebase/assets"
 import { createGeneration } from "@/lib/firebase/generations"
 import { createPack } from "@/lib/firebase/packs"
 import { uploadAssetBuffer } from "@/lib/firebase/storage"
+import { scoutTrends } from "@/app/actions/scout"
+import { curatorScore } from "@/app/actions/curator"
+import { publishPack } from "@/app/actions/marketplace"
+import { runReflection } from "@/app/actions/reflection"
 import type { AssetType, AssetStyle } from "@/lib/types"
 import type { AIProvider } from "@/lib/ai/types"
 
@@ -158,5 +162,73 @@ export async function forgeStepFinalize(input: {
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Finalize failed"
     return { step: "Finalize", status: "failed", summary: msg, error: msg }
+  }
+}
+
+// ── Step 5: Scout (research trends for next batch) ──
+export async function forgeStepScout(input: {
+  theme: string
+  textProvider?: AIProvider
+}): Promise<StepResult> {
+  try {
+    const result = await scoutTrends({ theme: input.theme, provider: input.textProvider })
+    if (!result.success || !result.proposal) return { step: "Scout", status: "failed", summary: "Trend research failed", error: result.error }
+    return {
+      step: "Scout",
+      status: "completed",
+      summary: `${result.proposal.theme} — ${result.proposal.rationale}`,
+      data: { proposal: result.proposal },
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Scout failed"
+    return { step: "Scout", status: "failed", summary: msg, error: msg }
+  }
+}
+
+// ── Step 6: Curator (quality scoring) ──
+export async function forgeStepCurate(input: {
+  assetName: string
+  assetType: string
+  assetStyle: string
+  prompt: string
+  textProvider?: AIProvider
+}): Promise<StepResult> {
+  try {
+    const result = await curatorScore({
+      assetName: input.assetName,
+      assetType: input.assetType,
+      assetStyle: input.assetStyle,
+      prompt: input.prompt,
+      provider: input.textProvider,
+    })
+    if (!result.success || !result.score) return { step: "Curator", status: "failed", summary: "Quality scoring failed", error: result.error }
+    return {
+      step: "Curator",
+      status: "completed",
+      summary: `${result.score.verdict.toUpperCase()} — ${result.score.overall}/10 — ${result.score.reasoning}`,
+      data: { score: result.score },
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Curator failed"
+    return { step: "Curator", status: "failed", summary: msg, error: msg }
+  }
+}
+
+// ── Step 7: Reflection (analyze ledger, update prompts) ──
+export async function forgeStepReflect(input?: {
+  textProvider?: AIProvider
+}): Promise<StepResult> {
+  try {
+    const result = await runReflection({ provider: input?.textProvider })
+    if (!result.success || !result.output) return { step: "Reflection", status: "failed", summary: "Reflection failed", error: result.error }
+    return {
+      step: "Reflection",
+      status: "completed",
+      summary: result.output.summary.slice(0, 150),
+      data: { reflection: result.output },
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Reflection failed"
+    return { step: "Reflection", status: "failed", summary: msg, error: msg }
   }
 }
