@@ -49,16 +49,17 @@ export default function MapPage() {
 
         if (tick.action === "resume") {
           toast.info("Resuming stuck forge run...")
-          const result = await runOrchestrator({ maxAssets: 2, resumeRunId: undefined })
+          const result = await runOrchestrator({ maxAssets: 2 })
           log(`[${new Date().toLocaleTimeString()}] Orchestrator ${result.status}${result.error ? `: ${result.error}` : ""}`)
-        } else if (tick.action === "ready" && tick.budget.remaining > 0.5) {
+        } else if (tick.action === "ready") {
           toast.info("Auto-forging new product...")
           const result = await runOrchestrator({ maxAssets: 1 })
           log(`[${new Date().toLocaleTimeString()}] Orchestrator ${result.status}${result.error ? `: ${result.error}` : ""}`)
-        } else if (tick.action === "packaged") {
+        } else if (tick.action === "packaged" || tick.action === "published") {
           toast.success(tick.detail)
-        } else if (tick.action === "paused") {
-          log(`[${new Date().toLocaleTimeString()}] PAUSED: ${tick.detail}`)
+          log(`[${new Date().toLocaleTimeString()}] ${tick.action.toUpperCase()}: ${tick.detail}`)
+        } else if (tick.action === "paused" || tick.action === "backlog") {
+          log(`[${new Date().toLocaleTimeString()}] ${tick.action.toUpperCase()}: ${tick.detail}`)
         }
       } catch (err) {
         log(`[${new Date().toLocaleTimeString()}] ERROR: ${err}`)

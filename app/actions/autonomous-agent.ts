@@ -4,7 +4,7 @@ import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy, limit } fr
 import { getDb } from "@/lib/firebase/client"
 import { getBudgetStatus } from "@/lib/budget/budget"
 import { getRecentAssets, getAssetsByStatus, updateAssetStatus } from "@/lib/firebase/assets"
-import { getReadyPacks, createPack } from "@/lib/firebase/packs"
+import { getReadyPacks, createPack, getPacks } from "@/lib/firebase/packs"
 import { findIncompleteRun, runOrchestrator } from "@/app/actions/orchestrator"
 import { publishPack } from "@/app/actions/marketplace"
 import { generateText, generateImage } from "@/lib/ai/client"
@@ -117,52 +117,84 @@ export async function getAutonomousStatus(): Promise<AutonomousStatus> {
 }
 
 export async function autonomousTick(): Promise<AutonomousStatus> {
+  const budget = getBudgetStatus()
+
   try {
-    // ── 1. Check for stuck runs FIRST ──
+    // ═══ 1. Stuck runs — need manual resume on dashboard ═══
     const stuck = await findIncompleteRun()
     if (stuck) {
       return {
-        action: "resume", detail: `Resuming stuck run with ${stuck.completedSteps.length} steps done`,
+        action: "resume", detail: `Stuck run found with ${stuck.completedSteps.length} steps done — click Resume on dashboard`,
         timestamp: new Date().toISOString(),
         backlog: { unlistedAssets: 0, stuckRuns: 1, packsNeedingPublish: 0 },
         providers: { openai: (await getOrCreateProviderHealth("openai")).status, deepseek: (await getOrCreateProviderHealth("deepseek")).status },
-        budget: { used: getBudgetStatus().monthlyUsed, cap: 10, remaining: getBudgetStatus().monthlyRemaining },
-        lastAction: "Detected stuck run — resume on dashboard",
+        budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
+        lastAction: "Stuck run detected",
         isProcessing: true,
       }
     }
 
-    // ── 2. Check for unlisted approved assets → auto-package ──
+    // ═══ 2. Auto-package approved assets that aren't in any pack ═══
     const approved = await getAssetsByStatus("approved").catch(() => [])
-    if (approved.length >= 2) {
-      const assetIds = approved.slice(0, 4).map((a) => a.id)
+    if (approved.length >= 1) {
+      const allPacks = await getPacks().catch(() => [])
+      const packedAssetIds = new Set(allPacks.flatMap((p) => p.assets))
+      const unpackaged = approved.filter((a) => !packedAssetIds.has(a.id))
+      
+      if (unpackaged.length >= 1) {
+        const assetIds = unpackaged.slice(0, 4).map((a) => a.id)
+        try {
+          const pack = await createPack({
+            title: `${unpackaged[0]?.type ?? "Asset"} Pack ${new Date().toLocaleDateString()}`,
+            description: `Auto-packaged ${assetIds.length} approved assets.`,
+            assets: assetIds, price: 4.99, status: "review",
+            previewUrl: unpackaged[0]?.previewUrl ?? "",
+          })
+          // Mark assets as draft so they aren't re-packaged
+          for (const id of assetIds) {
+            await updateAssetStatus(id, "draft").catch(() => {})
+          }
+          // Auto-publish the pack
+          await publishPack(pack).catch(() => {})
+          return {
+            action: "packaged", detail: `Packaged ${assetIds.length} assets → "${pack.title}" (published to itch.io)`,
+            timestamp: new Date().toISOString(),
+            backlog: { unlistedAssets: 0, stuckRuns: 0, packsNeedingPublish: 1 },
+            providers: { openai: "healthy", deepseek: "healthy" },
+            budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
+            lastAction: "Auto-packaged assets",
+            isProcessing: true,
+          }
+        } catch (err) {
+          console.error("Auto-package error:", err)
+        }
+      }
+    }
+
+    // ═══ 3. Publish any packs that haven't been published yet ═══
+    const packs = await getPacks().catch(() => [])
+    const unpublishedPack = packs.find((p) => !p.storeUrl)
+    if (unpublishedPack) {
       try {
-        const pack = await createPack({
-          title: `Auto Pack ${new Date().toLocaleDateString()}`,
-          description: `Auto-packaged ${assetIds.length} approved assets.`,
-          assets: assetIds, price: 4.99, status: "review",
-          previewUrl: approved[0]?.previewUrl ?? "",
-        })
-        await publishPack(pack).catch(() => {})
+        await publishPack(unpublishedPack)
         return {
-          action: "packaged", detail: `Auto-packaged ${assetIds.length} assets into "${pack.title}"`,
+          action: "published", detail: `Published "${unpublishedPack.title}" to marketplaces`,
           timestamp: new Date().toISOString(),
-          backlog: { unlistedAssets: 0, stuckRuns: 0, packsNeedingPublish: 1 },
+          backlog: { unlistedAssets: 0, stuckRuns: 0, packsNeedingPublish: packs.length },
           providers: { openai: "healthy", deepseek: "healthy" },
-          budget: { used: getBudgetStatus().monthlyUsed, cap: 10, remaining: getBudgetStatus().monthlyRemaining },
-          lastAction: "Packaged unlisted assets",
+          budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
+          lastAction: "Published existing pack",
           isProcessing: true,
         }
       } catch {}
     }
 
-    // ── 3. Check budget and provider health → start new forge if possible ──
-    const budget = getBudgetStatus()
+    // ═══ 4. Budget check ═══
     if (budget.isExceeded) {
       return {
-        action: "paused", detail: "Budget exceeded — waiting for reset",
+        action: "paused", detail: `Budget exceeded — $${budget.monthlyUsed.toFixed(2)}/$${budget.monthlyCap.toFixed(2)}`,
         timestamp: new Date().toISOString(),
-        backlog: { unlistedAssets: approved.length, stuckRuns: 0, packsNeedingPublish: 0 },
+        backlog: { unlistedAssets: approved.length, stuckRuns: 0, packsNeedingPublish: packs.length },
         providers: { openai: (await getOrCreateProviderHealth("openai")).status, deepseek: (await getOrCreateProviderHealth("deepseek")).status },
         budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
         lastAction: "Budget cap reached",
@@ -170,15 +202,19 @@ export async function autonomousTick(): Promise<AutonomousStatus> {
       }
     }
 
-    // ── 4. Check provider health ──
-    const openaiOk = (await getOrCreateProviderHealth("openai")).status !== "down"
-    const deepseekOk = (await getOrCreateProviderHealth("deepseek")).status !== "down"
+    // ═══ 5. Provider health check ═══
+    const [openaiHealth, deepseekHealth] = await Promise.all([
+      getOrCreateProviderHealth("openai"),
+      getOrCreateProviderHealth("deepseek"),
+    ])
+    const openaiOk = openaiHealth.status !== "down"
+    const deepseekOk = deepseekHealth.status !== "down"
 
     if (!openaiOk && !deepseekOk) {
       return {
         action: "paused", detail: "All providers down — check API keys and billing",
         timestamp: new Date().toISOString(),
-        backlog: { unlistedAssets: approved.length, stuckRuns: 0, packsNeedingPublish: 0 },
+        backlog: { unlistedAssets: approved.length, stuckRuns: 0, packsNeedingPublish: packs.length },
         providers: { openai: "down", deepseek: "down" },
         budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
         lastAction: "All providers offline",
@@ -186,14 +222,27 @@ export async function autonomousTick(): Promise<AutonomousStatus> {
       }
     }
 
-    // ── 5. Idle — ready for new forge ──
+    // ═══ 6. Don't forge if already have approved assets waiting for packaging ═══
+    if (approved.length >= 3) {
+      return {
+        action: "backlog", detail: `${approved.length} approved assets waiting — package them first`,
+        timestamp: new Date().toISOString(),
+        backlog: { unlistedAssets: approved.length, stuckRuns: 0, packsNeedingPublish: packs.filter(p => !p.storeUrl).length },
+        providers: { openai: openaiOk ? "healthy" : "degraded", deepseek: deepseekOk ? "healthy" : "degraded" },
+        budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
+        lastAction: "Backlog — packaging first",
+        isProcessing: false,
+      }
+    }
+
+    // ═══ 7. All clear — forge a new product ═══
     return {
-      action: "ready", detail: "All clear — ready to forge",
+      action: "ready", detail: "All clear — time to forge new assets",
       timestamp: new Date().toISOString(),
-      backlog: { unlistedAssets: approved.length, stuckRuns: 0, packsNeedingPublish: 0 },
-      providers: { openai: openaiOk ? "healthy" : "down", deepseek: deepseekOk ? "healthy" : "down" },
+      backlog: { unlistedAssets: approved.length, stuckRuns: 0, packsNeedingPublish: packs.filter(p => !p.storeUrl).length },
+      providers: { openai: openaiOk ? "healthy" : "degraded", deepseek: deepseekOk ? "healthy" : "degraded" },
       budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
-      lastAction: "System ready",
+      lastAction: "Starting new forge cycle",
       isProcessing: false,
     }
   } catch (error) {
