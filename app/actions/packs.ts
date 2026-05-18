@@ -1,10 +1,14 @@
 "use server"
 
-import { createPack, getPacks, updatePackAssets } from "@/lib/firebase/packs"
+import { createPack, getPacks, getPackById, updatePackAssets } from "@/lib/firebase/packs"
 import type { AssetPack } from "@/lib/types"
 
 export async function fetchPacks(): Promise<AssetPack[]> {
   return getPacks()
+}
+
+export async function getPackForUploadView(packId: string): Promise<AssetPack | null> {
+  return getPackById(packId)
 }
 
 export async function createNewPack(data: {

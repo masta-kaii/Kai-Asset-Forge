@@ -10,6 +10,7 @@ import { autonomousTick } from "@/app/actions/autonomous-agent"
 import { scoutTrends } from "@/app/actions/scout"
 import { runReflection } from "@/app/actions/reflection"
 import { buildPackDeliverable } from "@/app/actions/pack-builder"
+import { generatePackItchListing, markPackUploaded } from "@/app/actions/itchio-listing"
 import { getPackById, getPacks } from "@/lib/firebase/packs"
 
 export interface MastaToolEvent {
@@ -194,6 +195,39 @@ function tools(): OpenAI.Chat.Completions.ChatCompletionTool[] {
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "generate_itchio_listing",
+        description:
+          "Draft an itch.io-shaped listing (title, description, tags, suggested price) for a pack and store it on the pack record. Use after build_pack_deliverable when the operator says 'prep listing' or 'ready it for itch.io'.",
+        parameters: {
+          type: "object",
+          properties: {
+            packId: { type: "string" },
+          },
+          required: ["packId"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "mark_pack_uploaded",
+        description:
+          "Record that the operator finished uploading a pack to itch.io. Sets the storeUrl and flips the pack to approved.",
+        parameters: {
+          type: "object",
+          properties: {
+            packId: { type: "string" },
+            storeUrl: { type: "string", description: "Live itch.io URL." },
+          },
+          required: ["packId", "storeUrl"],
+          additionalProperties: false,
+        },
+      },
+    },
   ]
 }
 
@@ -292,7 +326,20 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
         previewGridUrl: pack.previewGridUrl,
         listing: pack.listing,
         uploaded: !!pack.storeUrl,
+        storeUrl: pack.storeUrl,
+        uploadPagePath: `/products/upload/${pack.id}`,
       }
+    }
+    case "generate_itchio_listing": {
+      const packId = typeof args.packId === "string" ? args.packId : ""
+      if (!packId) return { success: false, error: "packId required" }
+      return await generatePackItchListing(packId)
+    }
+    case "mark_pack_uploaded": {
+      const packId = typeof args.packId === "string" ? args.packId : ""
+      const storeUrl = typeof args.storeUrl === "string" ? args.storeUrl : ""
+      if (!packId || !storeUrl) return { success: false, error: "packId and storeUrl required" }
+      return await markPackUploaded(packId, storeUrl)
     }
     default:
       return { error: `Unknown tool: ${name}` }

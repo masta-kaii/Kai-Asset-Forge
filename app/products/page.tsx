@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Package, Plus, ImageIcon, Check, Sparkles, Download, Loader2, Wrench } from "lucide-react"
+import Link from "next/link"
+import { Package, Plus, ImageIcon, Check, Sparkles, Download, Loader2, Wrench, ArrowUpRight, CheckCircle2 } from "lucide-react"
 import { fetchAssetsByStatus } from "@/app/actions/assets"
 import { fetchPacks, createNewPack } from "@/app/actions/packs"
 import { buildPackDeliverable } from "@/app/actions/pack-builder"
@@ -315,36 +316,40 @@ export default function ProductBuilderPage() {
                     <p className="text-xs text-muted-foreground">
                       {pack.assets.length} assets · ${pack.price.toFixed(2)}
                       {pack.zipUrl && " · ZIP ready"}
+                      {pack.storeUrl && " · uploaded"}
                     </p>
                   </div>
-                  {pack.zipUrl ? (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs gap-1 shrink-0"
-                    >
-                      <a href={pack.zipUrl} download={`${pack.slug ?? pack.title}.zip`}>
-                        <Download className="size-3" />
-                        Download
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs gap-1 shrink-0"
-                      onClick={() => handleBuildDeliverable(pack)}
-                      disabled={buildingId === pack.id || !pack.assets.length}
-                    >
-                      {buildingId === pack.id ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <Wrench className="size-3" />
-                      )}
-                      Build ZIP
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!pack.zipUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => handleBuildDeliverable(pack)}
+                        disabled={buildingId === pack.id || !pack.assets.length}
+                      >
+                        {buildingId === pack.id ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : (
+                          <Wrench className="size-3" />
+                        )}
+                        Build ZIP
+                      </Button>
+                    )}
+                    {pack.zipUrl && pack.storeUrl ? (
+                      <Badge className="text-xs gap-1 bg-green-500/10 text-green-500 border-green-500/20">
+                        <CheckCircle2 className="size-2.5" />
+                        Live
+                      </Badge>
+                    ) : pack.zipUrl ? (
+                      <Button asChild variant="default" size="sm" className="h-7 text-xs gap-1">
+                        <Link href={`/products/upload/${pack.id}`}>
+                          Prepare upload
+                          <ArrowUpRight className="size-3" />
+                        </Link>
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>

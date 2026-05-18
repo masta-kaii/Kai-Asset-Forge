@@ -42,7 +42,7 @@ export async function getPackById(packId: string): Promise<AssetPack | null> {
 
 export async function updatePackDeliverable(
   packId: string,
-  data: Partial<Pick<AssetPack, "slug" | "zipUrl" | "coverUrl" | "previewGridUrl" | "readmeText" | "listing" | "previewUrl" | "status">>,
+  data: Partial<Pick<AssetPack, "slug" | "zipUrl" | "coverUrl" | "previewGridUrl" | "readmeText" | "listing" | "previewUrl" | "status" | "storeUrl">>,
 ): Promise<void> {
   const db = getDb()
   const ref = doc(db, COLLECTION, packId)
