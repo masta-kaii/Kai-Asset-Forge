@@ -7,6 +7,9 @@ import { runOrchestrator } from "@/app/actions/orchestrator"
 import { autonomousTick } from "@/app/actions/autonomous-agent"
 import { getDashboardData } from "@/app/actions/dashboard"
 
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
+
 function verifyAuth(req: NextRequest): boolean {
   const token = req.headers.get("authorization")?.replace("Bearer ", "")
   const expected = process.env.AGENT_API_TOKEN
