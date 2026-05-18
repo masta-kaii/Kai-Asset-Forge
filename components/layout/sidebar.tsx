@@ -50,7 +50,7 @@ const NAV_ITEMS = [
     icon: Activity,
   },
   {
-    title: "Workspace",
+    title: "Base Map",
     href: "/workspace",
     icon: Monitor,
   },

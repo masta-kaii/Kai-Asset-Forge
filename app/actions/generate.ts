@@ -6,6 +6,7 @@ import { createGeneration } from "@/lib/firebase/generations"
 import { uploadAssetBuffer } from "@/lib/firebase/storage"
 import type { AssetType, AssetStyle } from "@/lib/types"
 import type { ImageGenParams, AIProvider } from "@/lib/ai/types"
+import { guardImageGen, logImageCost } from "@/app/actions/budget-guard"
 
 export interface GenerateInput {
   prompt: string
@@ -49,6 +50,12 @@ export async function generateAssets(input: GenerateInput): Promise<GenerateResu
 
 async function generateAssetsInternal(input: GenerateInput): Promise<GenerateResult> {
   const { prompt, assetType, style, batchCount, quality, provider } = input
+
+  const imageProvider = provider ?? "gemini"
+  const guard = guardImageGen(imageProvider, batchCount)
+  if (!guard.allowed) {
+    return { success: false, assets: [], error: guard.error }
+  }
 
   const params: ImageGenParams = {
     prompt,
@@ -111,6 +118,12 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
       }
     })
   )
+
+  logImageCost(imageProvider, "default", result.images.length, params.size ?? "1024x1024", {
+    assetType,
+    style,
+    batchCount: String(batchCount),
+  }).catch(() => {})
 
   return { success: true, assets }
 }

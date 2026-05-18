@@ -1,6 +1,7 @@
 "use server"
 
 import { generateText } from "@/lib/ai/client"
+import { guardTextGen, logTextCost } from "@/app/actions/budget-guard"
 import type { AIProvider } from "@/lib/ai/types"
 
 export interface ListingInput {
@@ -21,6 +22,12 @@ export interface ListingResult {
 export async function generateListing(input: ListingInput): Promise<ListingResult> {
   const { platform, keywords, pricingTier, provider } = input
 
+  const textProvider = provider ?? "deepseek"
+  const guard = guardTextGen(textProvider, 1500)
+  if (!guard.allowed) {
+    return { success: false, title: "", description: "", tags: [], error: guard.error }
+  }
+
   const prompt = `You are a marketplace listing expert. Generate a store listing for the following product details. Respond ONLY with valid JSON — no markdown, no backticks.
 
 Platform: ${platform}
@@ -34,7 +41,7 @@ The JSON must have exactly these keys:
 
   const result = await generateText({
     prompt,
-    provider: provider ?? "deepseek",
+    provider: textProvider,
     model: provider === "deepseek" ? "deepseek-chat" : "gpt-4o",
     temperature: 0.8,
     maxTokens: 1024,
@@ -43,6 +50,8 @@ The JSON must have exactly these keys:
   if (!result.success) {
     return { success: false, title: "", description: "", tags: [], error: result.error ?? "Generation failed" }
   }
+
+  logTextCost(textProvider, provider === "deepseek" ? "deepseek-chat" : "gpt-4o", prompt, result.text).catch(() => {})
 
   try {
     const parsed = JSON.parse(result.text)

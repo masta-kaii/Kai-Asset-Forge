@@ -25,6 +25,7 @@ import { usePipeline } from "@/hooks/use-pipeline"
 import { forgeStepTrend, forgeStepArtDirection, forgeStepGenerate, forgeStepFinalize } from "@/app/actions/pipeline-steps"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
+import type { BudgetStatus } from "@/lib/budget/types"
 import type { Asset } from "@/lib/types"
 
 export default function DashboardPage() {
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [recentGens, setRecentGens] = useState<{ action: string; time: string }[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
+  const [budget, setBudget] = useState<BudgetStatus | null>(null)
   const [forgeRunning, setForgeRunning] = useState(false)
   const [forgeSteps, setForgeSteps] = useState<{ step: string; status: string; summary: string }[]>([])
   const [forgeError, setForgeError] = useState<string | null>(null)
@@ -103,6 +105,7 @@ export default function DashboardPage() {
     getDashboardData().then((data) => {
       setTotalCount(data.totalAssets)
       setAssets(data.recentAssets)
+      setBudget(data.budget)
       setRecentGens(
         data.recentGenerations.map((g) => ({
           action: `Generated asset ${g.assetId.slice(0, 8)}...`,
@@ -120,7 +123,7 @@ export default function DashboardPage() {
   const STATS = [
     { label: "Total Assets", value: totalCount, icon: Sparkles, trend: `${assets.length} recent` },
     { label: "Approved", value: approvedCount, icon: Package, trend: `${assets.filter(a => a.status === "review").length} pending` },
-    { label: "Active Agents", value: `${activeAgents}/7`, icon: Activity, trend: isRunning ? "Pipeline running" : "All idle" },
+    { label: "Budget Used", value: budget ? `$${budget.monthlyUsed.toFixed(2)}` : "--", icon: Activity, trend: budget ? `$${budget.monthlyRemaining.toFixed(2)} left` : "--" },
     { label: "Completed Today", value: recentGens.length, icon: CheckCircle2, trend: `${recentGens.length} generations` },
   ]
 

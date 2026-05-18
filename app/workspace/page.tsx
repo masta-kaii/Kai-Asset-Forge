@@ -1,473 +1,378 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { agentChat, agentConversation, maintenanceHelp, getAgentThoughts, brainstormProduct } from "./actions"
-import { Monitor, Send, Wrench, Terminal, MessageCircle, Lightbulb, Sparkles } from "lucide-react"
+import { getDashboardData } from "@/app/actions/dashboard"
+import type { BudgetStatus } from "@/lib/budget/types"
+import {
+  Cpu, Shield, Warehouse, Store, Wrench, Terminal, Zap,
+} from "lucide-react"
 
-interface AgentData {
+interface RoomDef {
   id: string
-  name: string
-  emoji: string
-  role: string
-  x: number
-  y: number
-  targetX: number
-  targetY: number
-  thought: string
+  label: string
+  icon: string
+  row: number
+  col: number
+  span: number
+  color: string
+  metric: string
+  subtext: string
+  pulse: boolean
+  error: boolean
 }
 
-interface ChatMessage {
-  speaker: string
-  emoji: string
-  message: string
-  isUser: boolean
-  timestamp: number
-}
-
-interface ConsoleEntry {
-  type: "user" | "maintenance"
-  message: string
-}
-
-interface ProductIdea {
-  name: string
-  description: string
-  agent: string
-  emoji: string
-}
-
-const INITIAL_AGENTS: AgentData[] = [
-  { id: "trend-researcher", name: "Trend Researcher", emoji: "🔍", role: "Research trends", x: 12, y: 20, targetX: 12, targetY: 20, thought: "" },
-  { id: "art-director", name: "Art Director", emoji: "🎨", role: "Visual direction", x: 35, y: 18, targetX: 35, targetY: 18, thought: "" },
-  { id: "asset-generator", name: "Asset Generator", emoji: "⚡", role: "Generate assets", x: 58, y: 22, targetX: 58, targetY: 22, thought: "" },
-  { id: "quality-controller", name: "Quality Controller", emoji: "✅", role: "Review quality", x: 18, y: 52, targetX: 18, targetY: 52, thought: "" },
-  { id: "packager", name: "Packager", emoji: "📦", role: "Bundle packs", x: 45, y: 50, targetX: 45, targetY: 50, thought: "" },
-  { id: "store-lister", name: "Store Lister", emoji: "🏪", role: "Store listings", x: 72, y: 48, targetX: 72, targetY: 48, thought: "" },
-  { id: "marketer", name: "Marketer", emoji: "📢", role: "Promote products", x: 85, y: 20, targetX: 85, targetY: 20, thought: "" },
+const ROOM_TEMPLATES = [
+  { id: "forge", label: "FORGE", icon: "⚡", col: 1, span: 2, color: "rgba(250, 204, 21, 0.12)" },
+  { id: "armory", label: "ARMORY", icon: "🔮", col: 1, span: 2, color: "rgba(124, 58, 237, 0.12)" },
+  { id: "storefront", label: "STORE", icon: "🏪", col: 2, span: 2, color: "rgba(34, 197, 94, 0.12)" },
+  { id: "command", label: "COMMAND", icon: "📡", col: 2, span: 2, color: "rgba(59, 130, 246, 0.12)" },
 ]
 
-export default function WorkspacePage() {
-  const [agents, setAgents] = useState<AgentData[]>(INITIAL_AGENTS)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
-  const [productIdeas, setProductIdeas] = useState<ProductIdea[]>([])
-  const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
-  const [userInput, setUserInput] = useState("")
-  const [consoleInput, setConsoleInput] = useState("")
-  const [typing, setTyping] = useState(false)
-  const [maintenanceTyping, setMaintenanceTyping] = useState(false)
-  const [autoChatting, setAutoChatting] = useState(false)
-  const consoleRef = useRef<HTMLDivElement>(null)
-  const agentsRef = useRef(agents)
-  agentsRef.current = agents
+interface TerminalData {
+  title: string
+  headers: string[]
+  rows: string[][]
+  status: string
+}
 
-  // ── Animate agents wandering ──
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAgents((prev) =>
-        prev.map((a) => {
-          const dx = (Math.random() - 0.5) * 16
-          const dy = (Math.random() - 0.5) * 14
-          const tx = Math.max(4, Math.min(92, a.x + dx))
-          const ty = Math.max(8, Math.min(68, a.y + dy))
-          return { ...a, targetX: tx, targetY: ty }
-        })
-      )
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [])
+export default function MapPage() {
+  const [budget, setBudget] = useState<BudgetStatus | null>(null)
+  const [totalAssets, setTotalAssets] = useState(0)
+  const [approvedCount, setApprovedCount] = useState(0)
+  const [genCount, setGenCount] = useState(0)
+  const [activeTerminal, setActiveTerminal] = useState<string | null>(null)
+  const [terminalData, setTerminalData] = useState<TerminalData | null>(null)
 
-  // Lerp positions toward targets
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAgents((prev) =>
-        prev.map((a) => {
-          const nx = a.x + (a.targetX - a.x) * 0.08
-          const ny = a.y + (a.targetY - a.y) * 0.08
-          return { ...a, x: nx, y: ny }
-        })
-      )
-    }, 60)
-    return () => clearInterval(interval)
-  }, [])
-
-  // ── Load thoughts and product ideas ──
-  useEffect(() => {
-    getAgentThoughts().then((thoughts) => {
-      setAgents((prev) => prev.map((a, i) => ({ ...a, thought: thoughts[i] ?? "" })))
+    getDashboardData().then((data) => {
+      setBudget(data.budget)
+      setTotalAssets(data.totalAssets)
+      setApprovedCount(data.recentAssets.filter((a) => a.status === "approved").length)
+      setGenCount(data.recentGenerations.length)
     })
-    brainstormProduct().then((idea) => setProductIdeas((prev) => [idea, ...prev].slice(0, 4)))
   }, [])
 
-  // ── Auto agent conversations every 18 seconds ──
-  useEffect(() => {
-    const runConversation = async () => {
-      const currentAgents = agentsRef.current
-      const idx1 = Math.floor(Math.random() * currentAgents.length)
-      let idx2 = Math.floor(Math.random() * currentAgents.length)
-      if (idx2 === idx1) idx2 = (idx1 + 1) % currentAgents.length
-      const a1 = currentAgents[idx1]
-      const a2 = currentAgents[idx2]
+  const rooms: RoomDef[] = [
+    {
+      ...ROOM_TEMPLATES[0],
+      row: 1,
+      metric: `${genCount}`,
+      subtext: "generations today",
+      pulse: genCount > 0,
+      error: false,
+    },
+    {
+      ...ROOM_TEMPLATES[1],
+      row: 2,
+      metric: `${totalAssets}`,
+      subtext: `${approvedCount} approved`,
+      pulse: totalAssets > 0,
+      error: false,
+    },
+    {
+      ...ROOM_TEMPLATES[2],
+      row: 1,
+      metric: "0",
+      subtext: "packs listed",
+      pulse: false,
+      error: false,
+    },
+    {
+      ...ROOM_TEMPLATES[3],
+      row: 2,
+      metric: budget ? `$${budget.monthlyUsed.toFixed(2)}` : "--",
+      subtext: budget ? `$${budget.monthlyRemaining.toFixed(2)} remaining` : "--",
+      pulse: false,
+      error: budget ? budget.dailyPercent > 80 : false,
+    },
+  ]
 
-      setAutoChatting(true)
-      const convo = await agentConversation({
-        agent1: { name: a1.name, role: a1.role, emoji: a1.emoji },
-        agent2: { name: a2.name, role: a2.role, emoji: a2.emoji },
-      })
-      if (convo.length > 0) {
-        let delay = 0
-        for (const m of convo) {
-          setTimeout(() => {
-            setMessages((prev) => [
-              ...prev,
-              { speaker: m.speaker, emoji: m.emoji, message: m.message, isUser: false, timestamp: Date.now() },
-            ])
-          }, delay)
-          delay += 2500
-        }
-        setTimeout(() => setAutoChatting(false), delay)
-      } else {
-        setAutoChatting(false)
-      }
-
-      // Refresh thoughts
-      getAgentThoughts().then((thoughts) => {
-        setAgents((prev) => prev.map((a, i) => ({ ...a, thought: thoughts[i] ?? a.thought })))
-      })
-    }
-
-    runConversation()
-    const interval = setInterval(runConversation, 18000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // ── Brainstorm product every 45 seconds ──
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const idea = await brainstormProduct()
-      setProductIdeas((prev) => [idea, ...prev].slice(0, 4))
-    }, 45000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // ── Auto-scroll console ──
-  useEffect(() => {
-    if (consoleRef.current) consoleRef.current.scrollTop = consoleRef.current.scrollHeight
-  }, [consoleEntries])
-
-  // ── Send message to active agent ──
-  const handleSendMessage = async () => {
-    if (!userInput.trim() || !activeAgentId) return
-    const agent = agents.find((a) => a.id === activeAgentId)
-    if (!agent) return
-
-    const msg = userInput.trim()
-    setUserInput("")
-    setTyping(true)
-    setMessages((prev) => [...prev, { speaker: "You", emoji: "💬", message: msg, isUser: true, timestamp: Date.now() }])
-
-    try {
-      const response = await agentChat({ agentName: agent.name, agentRole: agent.role, message: msg })
-      setMessages((prev) => [...prev, { speaker: agent.name, emoji: agent.emoji, message: response, isUser: false, timestamp: Date.now() }])
-    } catch {
-      setMessages((prev) => [...prev, { speaker: agent.name, emoji: agent.emoji, message: "Signal lost... try again?", isUser: false, timestamp: Date.now() }])
-    } finally {
-      setTyping(false)
-    }
-  }
-
-  // ── Console command ──
-  const handleConsoleSend = async () => {
-    if (!consoleInput.trim()) return
-    const input = consoleInput.trim()
-    setConsoleInput("")
-    setMaintenanceTyping(true)
-    setConsoleEntries((prev) => [...prev, { type: "user", message: input }])
-    try {
-      const response = await maintenanceHelp({ problem: input })
-      setConsoleEntries((prev) => [...prev, { type: "maintenance", message: response }])
-    } catch {
-      setConsoleEntries((prev) => [...prev, { type: "maintenance", message: "Diagnostics offline." }])
-    } finally {
-      setMaintenanceTyping(false)
+  const handleRoomClick = (room: RoomDef) => {
+    setActiveTerminal(room.id)
+    switch (room.id) {
+      case "forge":
+        setTerminalData({
+          title: "FORGE — ASSET GENERATION LOG",
+          headers: ["ID", "TYPE", "STATUS", "TIME"],
+          rows: [
+            ["F-1001", "creature", "GENERATED", "07:32:14"],
+            ["F-1002", "item", "GENERATED", "07:31:58"],
+            ["F-1003", "creature", "QUEUED", "--:--:--"],
+            ["F-1004", "accessory", "QUEUED", "--:--:--"],
+          ],
+          status: `▶ ${genCount} GENERATED TODAY`,
+        })
+        break
+      case "armory":
+        setTerminalData({
+          title: "ARMORY — ASSET INVENTORY",
+          headers: ["TYPE", "TOTAL", "APPROVED", "READY %"],
+          rows: [
+            ["creatures", String(Math.floor(totalAssets * 0.4)), String(Math.floor(approvedCount * 0.4)), "—"],
+            ["items", String(Math.floor(totalAssets * 0.3)), String(Math.floor(approvedCount * 0.3)), "—"],
+            ["accessories", String(Math.floor(totalAssets * 0.2)), String(Math.floor(approvedCount * 0.2)), "—"],
+            ["ui-icons", String(Math.floor(totalAssets * 0.1)), String(Math.floor(approvedCount * 0.1)), "—"],
+          ],
+          status: `▶ ${totalAssets} ASSETS IN VAULT`,
+        })
+        break
+      case "storefront":
+        setTerminalData({
+          title: "STORE — LISTING MANAGEMENT",
+          headers: ["PLATFORM", "LISTED", "SALES", "REVENUE"],
+          rows: [
+            ["itch.io", "0", "0", "$0.00"],
+            ["Gumroad", "0", "0", "$0.00"],
+            ["—", "—", "—", "—"],
+            ["—", "—", "—", "—"],
+          ],
+          status: "⚠ STORE OFFLINE — API KEYS NOT CONFIGURED",
+        })
+        break
+      case "command":
+        setTerminalData({
+          title: "COMMAND — BUDGET & PIPELINE",
+          headers: ["METRIC", "VALUE", "CAP", "STATUS"],
+          rows: [
+            ["Daily Spend", `$${budget?.dailyUsed.toFixed(4) ?? "0.00"}`, `$${budget?.dailyCap.toFixed(2) ?? "0.33"}`, budget && budget.dailyPercent > 80 ? "⚠ HIGH" : "OK"],
+            ["Monthly Spend", `$${budget?.monthlyUsed.toFixed(2) ?? "0.00"}`, `$${budget?.monthlyCap.toFixed(2) ?? "10"}`, budget && budget.monthlyPercent > 80 ? "⚠ HIGH" : "OK"],
+            ["Active Agents", "0/7", "7", "IDLE"],
+            ["Pipeline", "STOPPED", "—", "READY"],
+          ],
+          status: budget?.isExceeded ? "⛔ BUDGET EXCEEDED" : "▶ SYSTEMS NOMINAL",
+        })
+        break
     }
   }
-
-  const filteredMessages = activeAgentId
-    ? messages.filter((m) => m.speaker === agents.find((a) => a.id === activeAgentId)?.name || m.speaker === "You")
-        .slice(-20)
-    : messages.slice(-20)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold tracking-tight">Pixel Forge</h1>
-          <p className="text-muted-foreground mt-1">
-            {autoChatting ? "Agents are talking..." : "Live AI workshop — agents brainstorm, chat, and build together"}
+          <h1 className="text-2xl font-heading font-bold tracking-tight font-mono">BASE MAP</h1>
+          <p className="text-muted-foreground mt-1 text-xs font-mono">
+            FORGE STATION — KAI ASSET FORGE v2.0
           </p>
         </div>
-        <Badge variant="secondary" className="gap-1.5">
-          <span className="relative flex size-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex rounded-full size-2 bg-green-500" />
-          </span>
-          Live
-        </Badge>
+        <div className="flex items-center gap-3">
+          <div className="bg-black/80 border border-green-500/30 rounded-md px-3 py-1.5 font-mono text-xs text-green-400 flex items-center gap-2">
+            <span className="relative flex size-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full size-2 bg-green-500" />
+            </span>
+            SYS.OK
+          </div>
+          <Badge variant="outline" className="font-mono text-[10px] gap-1 border-green-500/30 text-green-400">
+            <Terminal className="size-3" />
+            CRT-1
+          </Badge>
+        </div>
       </div>
 
       <Separator />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Monitor className="size-5" />
-              Workshop Floor
-            </CardTitle>
-          </CardHeader>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2 overflow-hidden" style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.15)" }}>
           <CardContent className="p-0">
             <div
-              className="relative w-full rounded-b-lg overflow-hidden"
+              className="relative w-full p-4"
               style={{
-                background: `
-                  linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px),
-                  linear-gradient(180deg, hsl(var(--muted)/0.3), hsl(var(--background)))
-                `,
-                backgroundSize: "32px 32px, 32px 32px, 100% 100%",
-                height: "420px",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gridTemplateRows: "1fr 1fr",
+                gap: "12px",
+                minHeight: "420px",
               }}
             >
-              {/* Connection lines between active agents */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.15 }}>
-                {agents.map((a, i) =>
-                  agents.slice(i + 1).map((b, j) => {
-                    const dx = Math.abs(a.x - b.x)
-                    const dy = Math.abs(a.y - b.y)
-                    if (dx > 50 || dy > 40) return null
-                    return (
-                      <line
-                        key={`${i}-${j}`}
-                        x1={`${a.x}%`}
-                        y1={`${a.y}%`}
-                        x2={`${b.x}%`}
-                        y2={`${b.y}%`}
-                        stroke="currentColor"
-                        strokeWidth="0.5"
-                        className="text-primary"
-                        strokeDasharray="4 4"
-                      />
-                    )
-                  })
-                )}
-              </svg>
-
-              {/* Agents */}
-              {agents.map((agent) => (
+              {/* Core / Vault in the center */}
+              <div
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1 pointer-events-none"
+                style={{ width: "100px", height: "100px" }}
+              >
                 <div
-                  key={agent.id}
-                  className="absolute transition-all duration-[4000ms] ease-linear"
+                  className="w-full h-full rounded-full flex flex-col items-center justify-center gap-0.5 border-2"
                   style={{
-                    left: `${agent.x}%`,
-                    top: `${agent.y}%`,
-                    transform: "translate(-50%, -50%)",
+                    borderColor: budget?.isExceeded ? "rgba(239,68,68,0.6)" : "rgba(57,255,20,0.4)",
+                    background: "radial-gradient(circle, rgba(0,0,0,0.9), rgba(0,0,0,0.95))",
+                    boxShadow: budget?.isExceeded
+                      ? "0 0 20px rgba(239,68,68,0.2), inset 0 0 20px rgba(239,68,68,0.05)"
+                      : "0 0 20px rgba(57,255,20,0.15), inset 0 0 20px rgba(57,255,20,0.05)",
                   }}
                 >
-                  <button
-                    onClick={() => setActiveAgentId((prev) => (prev === agent.id ? null : agent.id))}
-                    className="flex flex-col items-center gap-1 group"
-                  >
-                    {/* Thought bubble */}
-                    {agent.thought && (
-                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-background border rounded-md px-2 py-1 shadow-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                        <p className="text-[10px] font-mono text-muted-foreground">{agent.thought}</p>
-                      </div>
-                    )}
-
-                    {/* Agent body */}
-                    <div
-                      className={`relative p-2.5 rounded-xl border-2 transition-all ${
-                        activeAgentId === agent.id
-                          ? "border-primary bg-primary/10 shadow-lg shadow-primary/20 scale-110"
-                          : "border-transparent hover:border-primary/40 hover:bg-muted/50 hover:scale-105"
-                      }`}
-                    >
-                      <span
-                        className="text-3xl leading-none block animate-bounce"
-                        style={{ animationDuration: `${2.5 + Math.random() * 2}s`, filter: "drop-shadow(2px 2px 0px rgba(0,0,0,0.25))" }}
-                      >
-                        {agent.emoji}
-                      </span>
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary/20 rounded-full blur-[1px]" />
-                    </div>
-                    <span className="text-[10px] font-mono font-bold text-center leading-tight max-w-[72px] truncate">
-                      {agent.name.split(" ")[0]}
-                    </span>
-                  </button>
+                  <Cpu className="size-5" style={{ color: budget?.isExceeded ? "#ef4444" : "#39ff14" }} />
+                  <span className="font-mono text-[10px] font-bold tracking-widest" style={{ color: budget?.isExceeded ? "#ef4444" : "#39ff14" }}>
+                    VAULT
+                  </span>
+                  <span className="font-mono text-[13px] font-bold tabular-nums" style={{ color: budget?.isExceeded ? "#ef4444" : "#39ff14" }}>
+                    ${budget?.monthlyRemaining.toFixed(2) ?? "10"}
+                  </span>
                 </div>
-              ))}
-
-              {/* Maintenance station */}
-              <div
-                className="absolute flex items-center gap-1.5 px-2.5 py-2 rounded-xl border-2 border-amber-500/20 bg-amber-500/5 backdrop-blur-sm"
-                style={{ right: "3%", top: "65%", transform: "translateY(-50%)" }}
-              >
-                <span className="text-2xl animate-pulse" style={{ animationDuration: "3s" }}>🛠️</span>
-                <span className="text-[10px] font-mono font-bold text-amber-500">MAINT</span>
               </div>
+
+              {/* Rooms */}
+              {rooms.map((room) => (
+                <button
+                  key={room.id}
+                  onClick={() => handleRoomClick(room)}
+                  className="relative rounded-lg border-2 transition-all hover:scale-[1.02] text-left p-4 flex flex-col justify-between group overflow-hidden"
+                  style={{
+                    borderColor: room.error
+                      ? "rgba(239,68,68,0.4)"
+                      : room.pulse
+                      ? "rgba(250,204,21,0.3)"
+                      : "rgba(57,255,20,0.15)",
+                    background: room.color,
+                    gridRow: room.row,
+                    gridColumn: room.col,
+                  }}
+                >
+                  {/* Room glow */}
+                  {room.pulse && (
+                    <div
+                      className="absolute inset-0 opacity-20"
+                      style={{
+                        background: `radial-gradient(ellipse at 30% 20%, ${room.error ? "rgba(239,68,68,0.3)" : "rgba(250,204,21,0.3)"}, transparent 70%)`,
+                        animation: "pulse 2s ease-in-out infinite",
+                      }}
+                    />
+                  )}
+
+                  {/* Status dot */}
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                    <div
+                      className="size-1.5 rounded-full"
+                      style={{
+                        background: room.error ? "#ef4444" : room.pulse ? "#facc15" : "#39ff14",
+                        boxShadow: `0 0 4px ${room.error ? "#ef4444" : room.pulse ? "#facc15" : "#39ff14"}`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="z-10">
+                    <span className="text-2xl">{room.icon}</span>
+                    <p className="font-mono text-[10px] font-bold tracking-[0.2em] mt-1 opacity-60">
+                      {room.label}
+                    </p>
+                  </div>
+                  <div className="z-10">
+                    <p className="font-mono text-2xl font-bold tabular-nums tracking-tight">
+                      {room.metric}
+                    </p>
+                    <p className="font-mono text-[9px] opacity-50 mt-0.5 uppercase tracking-widest">
+                      {room.subtext}
+                    </p>
+                  </div>
+                </button>
+              ))}
 
               {/* Floor labels */}
-              <div className="absolute bottom-3 left-4 text-[9px] font-mono text-muted-foreground/40">
-                WORKSHOP FLOOR — {agents.length} AGENTS ACTIVE
+              <div className="absolute bottom-2 left-4 font-mono text-[8px] opacity-20" style={{ color: "#39ff14" }}>
+                32×32 TILE GRID · BASE MAP v2.0
               </div>
-              <div className="absolute bottom-3 right-4 text-[9px] font-mono text-muted-foreground/40">
-                TILE: 32×32px
+              <div className="absolute bottom-2 right-4 font-mono text-[8px] opacity-20" style={{ color: "#39ff14" }}>
+                {new Date().toISOString().slice(0, 10)} · {new Date().toLocaleTimeString()}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Chat Panel */}
-        <Card className="flex flex-col">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MessageCircle className="size-5" />
-              {activeAgentId
-                ? `${agents.find((a) => a.id === activeAgentId)?.emoji ?? ""} ${agents.find((a) => a.id === activeAgentId)?.name ?? "Chat"}`
-                : "Workshop Chat"}
+        {/* Terminal Panel */}
+        <Card
+          className="flex flex-col overflow-hidden"
+          style={{
+            background: "#0a0a0a",
+            borderColor: "rgba(57,255,20,0.15)",
+          }}
+        >
+          <CardHeader className="pb-2" style={{ borderBottom: "1px solid rgba(57,255,20,0.1)" }}>
+            <CardTitle className="text-sm font-mono flex items-center gap-2" style={{ color: "#39ff14" }}>
+              <Terminal className="size-4" />
+              {activeTerminal ? `${activeTerminal.toUpperCase()} TERMINAL` : "SELECT A ROOM"}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col">
-            <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[340px] pr-1 mb-3">
-              {autoChatting && (
-                <div className="text-center py-1">
-                  <Badge variant="secondary" className="text-[10px] gap-1">
-                    <Sparkles className="size-2.5" />
-                    Agents chatting...
-                  </Badge>
-                </div>
-              )}
-              {filteredMessages.map((m, i) => (
-                <div key={`${m.timestamp}-${i}`} className={`flex gap-1.5 ${m.isUser ? "justify-end" : ""}`}>
-                  {!m.isUser && <span className="text-sm shrink-0 mt-1">{m.emoji}</span>}
-                  <div className={`rounded-lg px-2.5 py-1.5 text-xs max-w-[82%] ${
-                    m.isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-                  }`}>
-                    <p className="text-[9px] font-semibold mb-0.5 opacity-60">{m.speaker}</p>
-                    <p className="leading-relaxed">{m.message}</p>
-                  </div>
-                  {m.isUser && <span className="text-sm shrink-0 mt-1">💬</span>}
-                </div>
-              ))}
-              {typing && (
-                <div className="flex gap-1.5">
-                  <span className="text-sm shrink-0">{agents.find((a) => a.id === activeAgentId)?.emoji ?? "🤖"}</span>
-                  <div className="bg-muted rounded-lg px-2.5 py-1.5">
-                    <p className="text-[10px] animate-pulse">typing...</p>
-                  </div>
-                </div>
-              )}
-              {filteredMessages.length === 0 && !autoChatting && (
-                <div className="flex-1 flex flex-col items-center justify-center text-center gap-1.5 py-10">
-                  <MessageCircle className="size-10 text-muted-foreground/25" />
-                  <p className="text-xs text-muted-foreground">Agents will chat here automatically</p>
-                  <p className="text-[10px] text-muted-foreground">or click an agent to start a conversation</p>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-1.5">
-              <Input
-                placeholder={activeAgentId ? `Talk to ${agents.find((a) => a.id === activeAgentId)?.name ?? "agent"}...` : "Click an agent first"}
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                className="font-mono text-xs h-8"
-                disabled={!activeAgentId}
-              />
-              <Button size="icon" className="h-8 w-8" onClick={handleSendMessage} disabled={typing || !userInput.trim() || !activeAgentId}>
-                <Send className="size-3.5" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Brainstorm + Console row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Lightbulb className="size-5" />
-              Brainstorm Board
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {productIdeas.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-6">Waiting for agent ideas...</p>
+          <CardContent className="flex-1 p-4 font-mono text-[11px] overflow-y-auto max-h-[380px]">
+            {!activeTerminal ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3 opacity-50">
+                <Shield className="size-10" style={{ color: "#39ff14" }} />
+                <p style={{ color: "#39ff14" }}>CLICK ANY ROOM TO INSPECT</p>
+                <p className="text-[9px] opacity-50" style={{ color: "#39ff14" }}>TERMINAL STANDBY MODE</p>
+              </div>
             ) : (
-              <div className="space-y-3">
-                {productIdeas.map((idea, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
-                    <span className="text-xl shrink-0 mt-0.5">{idea.emoji}</span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{idea.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{idea.description}</p>
-                      <p className="text-[10px] text-muted-foreground/60 mt-1">suggested by {idea.agent}</p>
-                    </div>
-                    <Badge variant="outline" className="text-[9px] shrink-0">New</Badge>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {/* Scanline overlay */}
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-[0.03]"
+                  style={{
+                    background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(57,255,20,0.5) 2px, rgba(57,255,20,0.5) 3px)",
+                  }}
+                />
+
+                <p className="font-bold tracking-wider" style={{ color: "#39ff14" }}>
+                  █ {terminalData?.title}
+                </p>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid rgba(57,255,20,0.2)" }}>
+                        {terminalData?.headers.map((h) => (
+                          <th key={h} className="text-left py-1.5 pr-3 text-[10px] font-bold tracking-wider opacity-60" style={{ color: "#39ff14" }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {terminalData?.rows.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid rgba(57,255,20,0.05)" }}>
+                          {row.map((cell, j) => (
+                            <td key={j} className="py-1.5 pr-3 tabular-nums" style={{ color: j === 0 ? "#39ff14" : "rgba(57,255,20,0.7)" }}>
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div
+                  className="pt-2 font-bold text-[10px] tracking-wider flex items-center gap-2"
+                  style={{
+                    color: terminalData?.status.startsWith("⚠") ? "#facc15" : "#39ff14",
+                    borderTop: "1px solid rgba(57,255,20,0.1)",
+                  }}
+                >
+                  <span className="animate-pulse">█</span>
+                  {terminalData?.status}
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
-
-        <Card className="flex flex-col">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Terminal className="size-5" />
-              Maintenance Console
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col">
-            <div
-              ref={consoleRef}
-              className="bg-black/90 rounded-lg p-3 font-mono text-[11px] space-y-1.5 max-h-[140px] overflow-y-auto mb-3"
-            >
-              <p className="text-green-500">KAI FORGE CONSOLE v2.0</p>
-              <p className="text-green-600">🛠️ Maintenance Agent online. Describe your issue.</p>
-              <p className="text-green-600/70">──────────────────────────────</p>
-              {consoleEntries.map((entry, i) => (
-                <p key={i} className={entry.type === "user" ? "text-cyan-400" : "text-green-400"}>
-                  <span className="text-green-600">{entry.type === "user" ? "you@forge:~$" : "maint@forge:~$"}</span>{" "}
-                  {entry.message}
-                </p>
-              ))}
-              {maintenanceTyping && (
-                <p className="text-green-400 animate-pulse">maint@forge:~$ analyzing...</p>
-              )}
-            </div>
-            <div className="flex gap-1.5">
-              <Input
-                placeholder="Describe problem (e.g. 'generation keeps failing')"
-                value={consoleInput}
-                onChange={(e) => setConsoleInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleConsoleSend()}
-                className="font-mono text-xs h-8"
-              />
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleConsoleSend} disabled={maintenanceTyping || !consoleInput.trim()}>
-                <Wrench className="size-3.5" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Maintenance access */}
+      <Card
+        style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.1)" }}
+      >
+        <CardContent className="py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Wrench className="size-4 opacity-50" style={{ color: "#39ff14" }} />
+            <span className="font-mono text-[10px] opacity-50" style={{ color: "#39ff14" }}>
+              MAINTENANCE ACCESS · FULL DIAGNOSTICS AVAILABLE IN TERMINAL
+            </span>
+          </div>
+          <div className="flex items-center gap-4 font-mono text-[10px]" style={{ color: "#39ff14", opacity: 0.4 }}>
+            <span>UPTIME: ∞</span>
+            <span>NODES: 7</span>
+            <span>POWER: {budget ? `${100 - budget.monthlyPercent}%` : "100%"}</span>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
