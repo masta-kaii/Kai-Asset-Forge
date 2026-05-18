@@ -26,7 +26,7 @@ export async function getSidebarStats(): Promise<SidebarBadges> {
   ])
   const readyToUpload = packs.filter((p) => p.zipUrl && !p.storeUrl).length
   const liveOnStore = packs.filter((p) => !!p.storeUrl).length
-  const budget = getBudgetStatus()
+  const budget = await getBudgetStatus()
   void active
   return {
     totalAssets,

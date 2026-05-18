@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     detail = tick.detail
 
     if (process.env.CRON_AUTO_FORGE === "true" && tick.shouldForge) {
-      const budget = getBudgetStatus()
+      const budget = await getBudgetStatus()
       if (!budget.isExceeded) {
         const r = await runOrchestrator({ maxAssets: 1 }).catch((err) => ({
           runId: "",

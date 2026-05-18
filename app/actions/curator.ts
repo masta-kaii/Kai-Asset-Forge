@@ -23,7 +23,7 @@ export async function curatorScore(input: {
   provider?: AIProvider
 }): Promise<{ success: boolean; score?: CuratorScore; error?: string }> {
   const provider = input.provider ?? "deepseek"
-  const guard = guardTextGen(provider, 1500)
+  const guard = await guardTextGen(provider, 1500)
   if (!guard.allowed) return { success: false, error: guard.error }
 
   const result = await generateText({

@@ -34,7 +34,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         getRecentEntries(10).catch(() => [] as CostEntry[]),
       ])
 
-    const budget = getBudgetStatus()
+    const budget = await getBudgetStatus()
 
     return {
       totalAssets,
@@ -107,7 +107,7 @@ export async function getCockpitData(): Promise<CockpitData> {
 
   return {
     autonomous,
-    budget: getBudgetStatus(),
+    budget: await getBudgetStatus(),
     totalAssets,
     pendingReview,
     approvedAssets,

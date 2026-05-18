@@ -85,7 +85,7 @@ export async function buildMastaDigest(): Promise<DigestPayload> {
   const newAssets = recentAssets.filter((a) => within24h(a.createdAt, end)).length
   const readyToUpload = packs.filter((p) => p.zipUrl && !p.storeUrl)
   const uploaded = packs.filter((p) => !!p.storeUrl)
-  const budget = getBudgetStatus()
+  const budget = await getBudgetStatus()
 
   const needsAttention: string[] = []
   if (stuckList.length > 0) needsAttention.push(`Resume ${stuckList.length} stuck run${stuckList.length === 1 ? "" : "s"}.`)

@@ -63,7 +63,7 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
   const { prompt, assetType, style, batchCount, quality, provider } = input
 
   const imageProvider = provider ?? "openai"
-  const guard = guardImageGen(imageProvider, batchCount)
+  const guard = await guardImageGen(imageProvider, batchCount)
   if (!guard.allowed) {
     return { success: false, assets: [], error: guard.error }
   }

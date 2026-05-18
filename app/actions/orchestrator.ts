@@ -4,6 +4,7 @@ import { doc, setDoc, getDoc, updateDoc, collection, getDocs, query, orderBy, li
 import { getDb } from "@/lib/firebase/client"
 import { getRecentEntries } from "@/lib/firebase/ledger"
 import { getBudgetStatus } from "@/lib/budget/budget"
+import { withLock } from "@/lib/locks"
 import { scoutTrends } from "@/app/actions/scout"
 import { forgeStepGenerate } from "@/app/actions/pipeline-steps"
 import { curatorScore } from "@/app/actions/curator"
@@ -14,6 +15,8 @@ import type { ScoutProposal } from "@/app/actions/scout"
 import type { AssetStyle, AssetType } from "@/lib/types"
 
 const COLLECTION = "orchestrator_runs"
+const RUN_LOCK = "orchestrator"
+const RUN_LOCK_TTL_MS = 15 * 60 * 1000
 
 async function markProviderDown(provider: string, error: string) {
   try {
@@ -84,6 +87,28 @@ export async function runOrchestrator(input?: {
   maxAssets?: number
   resumeRunId?: string
 }): Promise<OrchestratorResult> {
+  // Single-flight: at most one orchestrator run in the whole system. If another
+  // run is in flight (cron + manual click, two Hermes containers, etc.), the
+  // second call returns immediately with a `skipped` status rather than
+  // racing on the same Firestore run doc and burning duplicate generations.
+  const locked = await withLock(RUN_LOCK, RUN_LOCK_TTL_MS, () => runOrchestratorLocked(input))
+  if (locked.locked) {
+    return {
+      runId: input?.resumeRunId ?? "",
+      status: "skipped",
+      steps: [],
+      isResume: !!input?.resumeRunId,
+      error: "Another orchestrator run is in progress — try again in a few minutes.",
+    }
+  }
+  return locked.result
+}
+
+async function runOrchestratorLocked(input?: {
+  theme?: string
+  maxAssets?: number
+  resumeRunId?: string
+}): Promise<OrchestratorResult> {
   const isResume = !!input?.resumeRunId
   const runId = input?.resumeRunId ?? `orch-${Date.now()}`
   const theme = input?.theme ?? "fantasy creatures"
@@ -133,7 +158,7 @@ export async function runOrchestrator(input?: {
 
     // ═══ Step 1: Budget Check ═══
     if (!isDone("Budget Check")) {
-      const budget = getBudgetStatus()
+      const budget = await getBudgetStatus()
       if (budget.isExceeded) {
         await log({ step: "Budget Check", status: "failed", summary: `Budget exceeded: $${budget.monthlyUsed.toFixed(2)}/$${budget.monthlyCap.toFixed(2)}` })
         await updateDoc(ref, { status: "awaiting_resume", error: "Budget exceeded" })
@@ -167,7 +192,7 @@ export async function runOrchestrator(input?: {
     if (!isDone("Decision") && !cachedWinning && cachedProposals.length > 0) {
       const ledgerEntries = await getRecentEntries(30).catch(() => [])
       const pastTypes = [...new Set(ledgerEntries.filter(e => e.operation === "image_gen").map(e => e.metadata?.assetType).filter(Boolean))]
-      const budget = getBudgetStatus()
+      const budget = await getBudgetStatus()
       const decision = await generateText({
         prompt: `Pick the BEST proposal from this list. Consider: trending score, avoid recently tried types (${pastTypes.join(", ")}), budget remaining ($${budget.monthlyRemaining.toFixed(2)}). Return ONLY the number (1-${cachedProposals.length}) of the best proposal:\n\n${cachedProposals.map((p, i) => `${i + 1}. Theme: "${p.theme}", Score: ${p.trendingScore}/10, Rationale: ${p.rationale}`).join("\n")}`,
         provider: "deepseek",

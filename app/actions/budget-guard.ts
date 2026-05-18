@@ -3,24 +3,24 @@ import { calculateImageCost, calculateTextCost, estimateTokens } from "@/lib/ai/
 import { writeEntry } from "@/lib/firebase/ledger"
 import type { AIProvider } from "@/lib/ai/types"
 
-export function guardImageGen(provider: AIProvider, count: number): { allowed: boolean; error?: string } {
+export async function guardImageGen(provider: AIProvider, count: number): Promise<{ allowed: boolean; error?: string }> {
   const cost = calculateImageCost(provider, count)
-  const result = checkBudget(cost)
+  const result = await checkBudget(cost)
   if (!result.allowed) return { allowed: false, error: result.reason }
   return { allowed: true }
 }
 
-export function guardTextGen(provider: AIProvider, estimatedInputLength: number): { allowed: boolean; error?: string } {
+export async function guardTextGen(provider: AIProvider, estimatedInputLength: number): Promise<{ allowed: boolean; error?: string }> {
   const inputTokens = estimateTokens(estimatedInputLength > 0 ? String(estimatedInputLength) : "")
   const cost = calculateTextCost(provider, inputTokens, inputTokens)
-  const result = checkBudget(cost)
+  const result = await checkBudget(cost)
   if (!result.allowed) return { allowed: false, error: result.reason }
   return { allowed: true }
 }
 
 export async function logImageCost(provider: AIProvider, model: string, count: number, size: string, metadata: Record<string, string> = {}) {
   const cost = calculateImageCost(provider, count)
-  trackCost(cost)
+  await trackCost(cost)
   await writeEntry({
     provider,
     model,
@@ -43,7 +43,7 @@ export async function logTextCost(
   const inputTokens = estimateTokens(promptText)
   const outputTokens = estimateTokens(responseText)
   const cost = calculateTextCost(provider, inputTokens, outputTokens)
-  trackCost(cost)
+  await trackCost(cost)
   await writeEntry({
     provider,
     model,

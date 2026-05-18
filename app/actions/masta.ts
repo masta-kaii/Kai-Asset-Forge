@@ -258,7 +258,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       return tick
     }
     case "get_budget": {
-      return getBudgetStatus()
+      return await getBudgetStatus()
     }
     case "scout_trends": {
       const theme = typeof args.theme === "string" ? args.theme : undefined

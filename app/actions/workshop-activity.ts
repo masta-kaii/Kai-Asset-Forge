@@ -89,7 +89,7 @@ export async function getWorkshopActivity(): Promise<WorkshopActivity> {
     isProcessing: false,
   }))
 
-  const budget = getBudgetStatus()
+  const budget = await getBudgetStatus()
 
   return {
     runId,

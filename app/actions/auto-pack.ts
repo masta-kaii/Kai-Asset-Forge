@@ -4,7 +4,11 @@ import { getAssetsByStatus, updateAssetStatus } from "@/lib/firebase/assets"
 import { createPack, getPacks } from "@/lib/firebase/packs"
 import { buildPackDeliverable } from "@/app/actions/pack-builder"
 import { generatePackItchListing } from "@/app/actions/itchio-listing"
+import { withLock } from "@/lib/locks"
 import type { Asset, AssetType, AssetStyle } from "@/lib/types"
+
+const PACK_LOCK = "auto-pack"
+const PACK_LOCK_TTL_MS = 5 * 60 * 1000
 
 export interface AutoPackResult {
   created: { packId: string; title: string; assetCount: number; ready: boolean }[]
@@ -52,6 +56,19 @@ function packTitle(type: AssetType, style: AssetStyle, volume: number): string {
  * burn the LLM budget on listings.
  */
 export async function autoPackApproved(): Promise<AutoPackResult> {
+  // Single-flight so cron + manual click (or two Hermes containers) can't
+  // both flip the same approved asset into two different packs.
+  const locked = await withLock(PACK_LOCK, PACK_LOCK_TTL_MS, () => autoPackApprovedLocked())
+  if (locked.locked) {
+    return {
+      created: [],
+      skipped: [{ reason: "auto-pack already running" }],
+    }
+  }
+  return locked.result
+}
+
+async function autoPackApprovedLocked(): Promise<AutoPackResult> {
   const minBatch = envInt("AUTO_PACK_MIN_BATCH", 4, 1, 50)
   const maxBatch = envInt("AUTO_PACK_MAX_BATCH", 8, 1, 50)
   const maxPerTick = envInt("AUTO_PACK_MAX_PER_TICK", 2, 1, 10)

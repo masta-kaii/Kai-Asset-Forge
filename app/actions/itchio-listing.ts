@@ -46,7 +46,7 @@ export async function generatePackItchListing(
   const pack = await getPackById(packId)
   if (!pack) return { success: false, packId, error: "Pack not found" }
 
-  const guard = guardTextGen(provider, 2000)
+  const guard = await guardTextGen(provider, 2000)
   if (!guard.allowed) {
     return { success: false, packId, error: guard.error }
   }

@@ -23,7 +23,7 @@ export async function runReflection(input?: {
   provider?: AIProvider
 }): Promise<{ success: boolean; output?: ReflectionOutput; error?: string }> {
   const provider = input?.provider ?? "deepseek"
-  const guard = guardTextGen(provider, 3000)
+  const guard = await guardTextGen(provider, 3000)
   if (!guard.allowed) return { success: false, error: guard.error }
 
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()

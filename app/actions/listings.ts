@@ -23,7 +23,7 @@ export async function generateListing(input: ListingInput): Promise<ListingResul
   const { platform, keywords, pricingTier, provider } = input
 
   const textProvider = provider ?? "deepseek"
-  const guard = guardTextGen(textProvider, 1500)
+  const guard = await guardTextGen(textProvider, 1500)
   if (!guard.allowed) {
     return { success: false, title: "", description: "", tags: [], error: guard.error }
   }
