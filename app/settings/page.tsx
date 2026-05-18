@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { getSidebarStats } from "@/app/actions/sidebar"
+import { getApiKeyStatus } from "@/app/actions/settings"
 import {
   Settings, CheckCircle2, XCircle, Zap, Globe, Database, Brain, Key,
 } from "lucide-react"
@@ -23,13 +24,14 @@ export default function SettingsPage() {
     Promise.all([
       getDashboardData(),
       getSidebarStats(),
-    ]).then(([data, stats]) => {
+      getApiKeyStatus(),
+    ]).then(([data, stats, keys]) => {
       setStatus({
-        firebase: data.totalAssets >= 0,
-        openai: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        deepseek: true,
-        itch: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        gumroad: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        firebase: data.totalAssets >= 0 && keys.firebase,
+        openai: keys.openai,
+        deepseek: keys.deepseek,
+        itch: keys.itch,
+        gumroad: keys.gumroad,
         assets: data.totalAssets,
         packs: stats.readyPacks,
         agents: stats.activeAgents,

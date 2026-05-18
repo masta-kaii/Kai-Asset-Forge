@@ -58,7 +58,12 @@ export async function generateImage(params: ImageGenParams): Promise<ImageGenRes
     return { success: true, images }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
-    return { success: false, images: [], error: message }
+    console.error("OpenAI image generation error:", message)
+    return {
+      success: false,
+      images: [],
+      error: `OpenAI image generation failed: ${message}. Check OPENAI_API_KEY in Vercel env vars and billing at platform.openai.com.`,
+    }
   }
 }
 
@@ -91,6 +96,14 @@ export async function generateText(params: TextGenParams): Promise<TextGenRespon
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
-    return { success: false, text: "", provider: "openai", model, error: message }
+    const provider = params.provider ?? "openai"
+    console.error(`${provider} text generation error:`, message)
+    return {
+      success: false,
+      text: "",
+      provider: provider as "openai" | "deepseek",
+      model,
+      error: `${provider} text generation failed: ${message}. Check ${provider === "deepseek" ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY"} in Vercel.`,
+    }
   }
 }
