@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
-import { runOrchestrator } from "@/app/actions/orchestrator"
+import { runOrchestrator, findIncompleteRun } from "@/app/actions/orchestrator"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
 import type { BudgetStatus } from "@/lib/budget/types"
@@ -27,6 +27,16 @@ export default function DashboardPage() {
   const [forgeRunning, setForgeRunning] = useState(false)
   const [forgeSteps, setForgeSteps] = useState<{ step: string; status: string; summary: string }[]>([])
   const [forgeError, setForgeError] = useState<string | null>(null)
+  const [resumeRunId, setResumeRunId] = useState<string | null>(null)
+
+  useEffect(() => {
+    findIncompleteRun().then((run) => {
+      if (run) {
+        setResumeRunId(run.runId)
+        toast.info(`Found incomplete forge run. ${run.completedSteps.length} steps done. Resume to continue.`, { duration: 8000 })
+      }
+    }).catch(() => {})
+  }, [])
 
   const handleOrchestrator = async () => {
     if (forgeRunning) return
@@ -36,7 +46,12 @@ export default function DashboardPage() {
     toast.info("Orchestrator running — Scout → Decide → Forge → Curate → Finalize → Reflect")
 
     try {
-      const result = await runOrchestrator({ theme: "fantasy creatures", maxAssets: 2 })
+      const result = await runOrchestrator({
+        theme: "fantasy creatures",
+        maxAssets: 2,
+        resumeRunId: resumeRunId ?? undefined,
+      })
+      if (result.isResume) setResumeRunId(result.runId)
       if (result.steps.length > 0) {
         setForgeSteps(result.steps.map((s) => ({ step: s.step, status: s.status, summary: s.summary })))
       }
@@ -87,7 +102,7 @@ export default function DashboardPage() {
         </div>
         <Button className="gap-2" onClick={handleOrchestrator} disabled={forgeRunning}>
           {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Brain className="size-4" />}
-          {forgeRunning ? "Running..." : "Launch Orchestrator"}
+          {forgeRunning ? "Running..." : resumeRunId ? "Resume Forge" : "Launch Orchestrator"}
         </Button>
       </div>
 
