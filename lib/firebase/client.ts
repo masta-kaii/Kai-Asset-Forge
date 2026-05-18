@@ -13,18 +13,28 @@ const firebaseConfig = {
 }
 
 export function getFirebaseApp() {
-  if (getApps().length === 0) {
-    return initializeApp(firebaseConfig)
+  try {
+    if (getApps().length === 0) {
+      return initializeApp(firebaseConfig)
+    }
+    return getApps()[0]
+  } catch (error) {
+    console.error("Firebase init failed:", error)
+    throw new Error("Firebase initialization failed. Check NEXT_PUBLIC_FIREBASE_* env vars in Vercel.")
   }
-  return getApps()[0]
 }
 
 let _db: ReturnType<typeof getFirestore> | null = null
 export function getDb() {
-  if (!_db) {
-    _db = getFirestore(getFirebaseApp())
+  try {
+    if (!_db) {
+      _db = getFirestore(getFirebaseApp())
+    }
+    return _db
+  } catch (error) {
+    console.error("Firestore init failed:", error)
+    throw new Error("Firestore initialization failed. Check Firebase config.")
   }
-  return _db
 }
 
 let _auth: ReturnType<typeof getAuth> | null = null

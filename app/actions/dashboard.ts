@@ -6,7 +6,7 @@ import { getReadyPacks } from "@/lib/firebase/packs"
 import { getActiveWorkflows } from "@/lib/firebase/workflows"
 import { getBudgetStatus } from "@/lib/budget/budget"
 import { getRecentEntries } from "@/lib/firebase/ledger"
-import type { Asset } from "@/lib/types"
+import type { Asset, GenerationRecord } from "@/lib/types"
 import type { BudgetStatus, CostEntry } from "@/lib/budget/types"
 
 export interface DashboardData {
@@ -24,12 +24,12 @@ export async function getDashboardData(): Promise<DashboardData> {
   try {
     const [totalAssets, recentAssets, recentGenerations, readyPacks, activeWorkflows, recentCosts] =
       await Promise.all([
-        getAssetCount(),
-        getRecentAssets(12),
-        getRecentGenerations(8),
-        getReadyPacks(),
-        getActiveWorkflows().then((w) => w.length),
-        getRecentEntries(10),
+        getAssetCount().catch(() => 0),
+        getRecentAssets(12).catch(() => [] as Asset[]),
+        getRecentGenerations(8).catch(() => [] as GenerationRecord[]),
+        getReadyPacks().catch(() => 0),
+        getActiveWorkflows().then((w) => w.length).catch(() => 0),
+        getRecentEntries(10).catch(() => [] as CostEntry[]),
       ])
 
     const budget = getBudgetStatus()
