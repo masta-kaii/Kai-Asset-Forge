@@ -8,6 +8,17 @@ import { postProcessPixelArt } from "@/app/actions/postprocess"
 import type { AssetType, AssetStyle } from "@/lib/types"
 import type { ImageGenParams, AIProvider } from "@/lib/ai/types"
 import { guardImageGen, logImageCost } from "@/app/actions/budget-guard"
+import { doc, updateDoc } from "firebase/firestore"
+import { getDb } from "@/lib/firebase/client"
+
+async function markProviderDegraded(provider: string, error: string) {
+  try {
+    const db = getDb()
+    await updateDoc(doc(db, "provider_health", provider), {
+      status: "degraded", lastError: error, failCount: 1, lastChecked: new Date().toISOString(),
+    })
+  } catch {}
+}
 
 export interface GenerateInput {
   prompt: string
@@ -69,7 +80,11 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
   const result = await generateImage(params)
 
   if (!result.success || result.images.length === 0) {
-    return { success: false, assets: [], error: result.error ?? "Generation failed" }
+    const error = result.error ?? "Generation failed"
+    if (error.includes("billing") || error.includes("limit") || error.includes("401") || error.includes("403")) {
+      markProviderDegraded(imageProvider, error)
+    }
+    return { success: false, assets: [], error }
   }
 
   const timestamp = Date.now()

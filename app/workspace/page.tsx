@@ -3,80 +3,86 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { getDashboardData } from "@/app/actions/dashboard"
-import { findIncompleteRun } from "@/app/actions/orchestrator"
-import type { BudgetStatus } from "@/lib/budget/types"
-import { Cpu, Terminal, Wrench, Zap, ArrowRight } from "lucide-react"
+import { autonomousTick, getAutonomousStatus, type AutonomousStatus } from "@/app/actions/autonomous-agent"
+import { runOrchestrator } from "@/app/actions/orchestrator"
+import { toast } from "sonner"
+import { Terminal, Wrench, Zap, Play, Pause, Brain, Loader2 } from "lucide-react"
 
-interface AgentPixel {
-  id: string
-  emoji: string
-  name: string
-  desk: { row: number; col: number }
-  status: "idle" | "working" | "done" | "error"
-  task: string
+const STEPS = ["Budget", "Ledger", "Scout", "Decision", "Forge", "Curator", "Finalize", "Reflection"]
+
+const STATUS_COLOR: Record<string, string> = {
+  idle: "green", ready: "green", working: "yellow", done: "green", error: "red",
+  packaged: "green", resume: "yellow", paused: "orange",
 }
 
-const DESKS = [
-  { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 },
-  { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 },
-]
-
-const AGENTS = [
-  { id: "scout", emoji: "🔍", name: "Scout" },
-  { id: "trend", emoji: "📊", name: "Trend" },
-  { id: "director", emoji: "🎨", name: "Director" },
-  { id: "forge", emoji: "⚡", name: "Forge" },
-  { id: "curator", emoji: "✅", name: "Curator" },
-  { id: "packager", emoji: "📦", name: "Packager" },
-]
-
-const STEPS = ["Scout", "Trend", "Director", "Forge", "Curator", "Packager", "Reflection"]
-
 export default function MapPage() {
-  const [budget, setBudget] = useState<BudgetStatus | null>(null)
-  const [totalAssets, setTotalAssets] = useState(0)
-  const [genCount, setGenCount] = useState(0)
-  const [readyPacks, setReadyPacks] = useState(0)
-  const [activeWorkflows, setActiveWorkflows] = useState(0)
-  const [stuckStep, setStuckStep] = useState<string | null>(null)
-  const [activeStep, setActiveStep] = useState(0)
+  const [status, setStatus] = useState<AutonomousStatus | null>(null)
+  const [autoMode, setAutoMode] = useState(false)
+  const [processing, setProcessing] = useState(false)
+  const [stepIndex, setStepIndex] = useState(0)
+  const [activityLog, setActivityLog] = useState<string[]>([])
 
+  const log = (msg: string) => setActivityLog((prev) => [msg, ...prev].slice(0, 20))
+
+  // ── Poll autonomous agent ──
   useEffect(() => {
-    getDashboardData().then((data) => {
-      setBudget(data.budget)
-      setTotalAssets(data.totalAssets)
-      setGenCount(data.recentGenerations.length)
-      setReadyPacks(data.readyPacks)
-      setActiveWorkflows(data.activeWorkflows)
-    }).catch(() => {})
-
-    findIncompleteRun().then((run) => {
-      if (run) setStuckStep(STEPS[run.completedSteps.length] ?? null)
-    }).catch(() => {})
-  }, [])
-
-  // Animate active step cycling
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveStep((prev) => (prev + 1) % STEPS.length)
-    }, 3000)
+    const tick = () => {
+      getAutonomousStatus().then(setStatus).catch(() => {})
+    }
+    tick()
+    const interval = setInterval(tick, 5000)
     return () => clearInterval(interval)
   }, [])
 
-  const agents: AgentPixel[] = AGENTS.map((a, i) => ({
-    ...a,
-    desk: DESKS[i],
-    status: stuckStep && STEPS.indexOf(stuckStep) === i ? "error" as const
-      : i < activeStep ? "done" as const
-      : i === activeStep ? "working" as const
-      : "idle" as const,
-    task: stuckStep && STEPS.indexOf(stuckStep) === i ? `Stuck at ${stuckStep}`
-      : i < activeStep ? "Complete"
-      : i === activeStep ? "Processing..."
-      : "Waiting",
-  }))
+  // ── Auto-mode loop ──
+  useEffect(() => {
+    if (!autoMode || processing) return
+
+    const loop = async () => {
+      setProcessing(true)
+      try {
+        const tick = await autonomousTick()
+        setStatus(tick)
+        log(`[${new Date().toLocaleTimeString()}] ${tick.action}: ${tick.detail}`)
+
+        if (tick.action === "resume") {
+          toast.info("Resuming stuck forge run...")
+          const result = await runOrchestrator({ maxAssets: 2, resumeRunId: undefined })
+          log(`[${new Date().toLocaleTimeString()}] Orchestrator ${result.status}${result.error ? `: ${result.error}` : ""}`)
+        } else if (tick.action === "ready" && tick.budget.remaining > 0.5) {
+          toast.info("Auto-forging new product...")
+          const result = await runOrchestrator({ maxAssets: 1 })
+          log(`[${new Date().toLocaleTimeString()}] Orchestrator ${result.status}${result.error ? `: ${result.error}` : ""}`)
+        } else if (tick.action === "packaged") {
+          toast.success(tick.detail)
+        } else if (tick.action === "paused") {
+          log(`[${new Date().toLocaleTimeString()}] PAUSED: ${tick.detail}`)
+        }
+      } catch (err) {
+        log(`[${new Date().toLocaleTimeString()}] ERROR: ${err}`)
+      } finally {
+        setProcessing(false)
+      }
+    }
+
+    loop()
+    const interval = setInterval(loop, 15000) // Check every 15s
+    return () => clearInterval(interval)
+  }, [autoMode, processing])
+
+  // ── Animate step cycling ──
+  useEffect(() => {
+    const interval = setInterval(() => setStepIndex((p) => (p + 1) % STEPS.length), 2500)
+    return () => clearInterval(interval)
+  }, [])
+
+  const providerDot = (state: string) => (
+    <span className={`size-1.5 rounded-full ${
+      state === "healthy" ? "bg-green-500" : state === "degraded" ? "bg-yellow-400" : "bg-red-500"
+    }`} />
+  )
 
   return (
     <div className="space-y-4">
@@ -84,22 +90,20 @@ export default function MapPage() {
         <div>
           <h1 className="text-2xl font-heading font-bold tracking-tight font-mono">FORGE WORKSTATION</h1>
           <p className="text-muted-foreground mt-1 text-xs font-mono">
-            {stuckStep ? `⚠ Pipeline stuck at "${stuckStep}" — click Resume` : "Live agent workshop — real-time pipeline view"}
+            {autoMode ? "⚡ AUTO MODE — orchestrator managing the forge independently" : "Manual mode — toggle Auto to let the forge run itself"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {stuckStep && (
-            <Badge variant="destructive" className="gap-1 font-mono text-[10px]">
-              <Zap className="size-2.5" />Stuck
-            </Badge>
-          )}
-          <div className="bg-black/80 border border-green-500/30 rounded-md px-3 py-1.5 font-mono text-xs text-green-400 flex items-center gap-2">
-            <span className="relative flex size-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full size-2 bg-green-500" />
-            </span>
-            {genCount > 0 ? "ACTIVE" : "IDLE"}
-          </div>
+        <div className="flex gap-2">
+          <Button
+            variant={autoMode ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setAutoMode(!autoMode)}
+          >
+            {autoMode ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+            {autoMode ? "Stop Auto" : "Auto Mode"}
+          </Button>
+          <div className={`size-2 rounded-full self-center ${autoMode ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"}`} />
         </div>
       </div>
 
@@ -110,99 +114,99 @@ export default function MapPage() {
         <Card className="lg:col-span-2 overflow-hidden" style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.15)" }}>
           <CardContent className="p-4">
             <div className="relative w-full rounded-lg overflow-hidden" style={{ minHeight: "380px", background: "repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(57,255,20,0.04) 31px, rgba(57,255,20,0.04) 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, rgba(57,255,20,0.04) 31px, rgba(57,255,20,0.04) 32px), linear-gradient(180deg, #050505, #0d0d0d)" }}>
-              {/* Conveyor belt */}
-              <div className="absolute top-[45%] left-0 right-0 h-1 overflow-hidden" style={{ background: "rgba(57,255,20,0.08)" }}>
-                <div className="absolute inset-0 animate-[slide_4s_linear_infinite]" style={{ background: "repeating-linear-gradient(90deg, transparent, transparent 12px, rgba(57,255,20,0.3) 12px, rgba(57,255,20,0.3) 16px)" }} />
+              {/* Conveyor */}
+              <div className="absolute top-[48%] left-0 right-0 h-0.5" style={{ background: "rgba(57,255,20,0.06)" }}>
+                {autoMode && (
+                  <div className="absolute inset-0 animate-[slide_3s_linear_infinite]" style={{ background: "repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(57,255,20,0.4) 8px, rgba(57,255,20,0.4) 10px)" }} />
+                )}
               </div>
 
-              {/* Pipeline flow arrows */}
-              <div className="absolute top-[40%] left-0 right-0 flex justify-between px-6 pointer-events-none">
-                {STEPS.map((step, i) => (
-                  <div key={step} className="flex items-center gap-1">
-                    <div className={`size-2 rounded-full ${
-                      i < activeStep ? "bg-green-500" : i === activeStep ? "bg-yellow-400 animate-pulse" : "bg-green-500/20"
-                    }`} />
-                    {i < STEPS.length - 1 && <div className="w-6 h-px bg-green-500/20" />}
+              {/* Agent Desks */}
+              {[
+                { id: "scout", emoji: "🔍", name: "SCOUT", col: 1, row: 1 },
+                { id: "forge", emoji: "⚡", name: "FORGE", col: 2, row: 1 },
+                { id: "curator", emoji: "✅", name: "CURATE", col: 3, row: 1 },
+                { id: "packager", emoji: "📦", name: "PACK", col: 1, row: 2 },
+                { id: "lister", emoji: "🏪", name: "LIST", col: 2, row: 2 },
+                { id: "brain", emoji: "🧠", name: "BRAIN", col: 3, row: 2 },
+              ].map((agent) => {
+                const isActive = autoMode && !status?.isProcessing
+                const isWorking = processing && stepIndex === ["scout", "forge", "curator", "packager", "lister", "brain"].indexOf(agent.id)
+                return (
+                  <div key={agent.id} className="absolute transition-all duration-500" style={{ left: `${(agent.col - 1) * 32 + 4}%`, top: agent.row === 1 ? "12%" : "62%" }}>
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={`w-[68px] h-[52px] rounded-md border-2 flex flex-col items-center justify-center gap-0.5 transition-all ${
+                        isWorking ? "border-yellow-400/60 bg-yellow-400/5 shadow-[0_0_10px_rgba(250,204,21,0.12)]"
+                        : isActive ? "border-green-500/30 bg-green-500/5"
+                        : "border-green-500/10"
+                      }`}>
+                        <span className={`text-2xl leading-none ${isWorking ? "animate-bounce" : ""}`} style={{ animationDuration: "1.2s", filter: "drop-shadow(2px 2px 0 rgba(0,0,0,0.3))" }}>
+                          {agent.emoji}
+                        </span>
+                        <div className={`w-6 h-0.5 rounded-full ${isWorking ? "bg-yellow-400/40" : "bg-green-500/10"}`} />
+                      </div>
+                      <span className="text-[8px] font-mono font-bold tracking-wider" style={{ color: "#39ff14", opacity: isActive ? 1 : 0.35 }}>{agent.name}</span>
+                    </div>
                   </div>
-                ))}
+                )
+              })}
+
+              {/* Status overlay */}
+              <div className="absolute bottom-3 left-4 flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  {providerDot(status?.providers.openai ?? "healthy")}
+                  <span className="text-[8px] font-mono" style={{ color: "#39ff14", opacity: 0.4 }}>OPENAI</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {providerDot(status?.providers.deepseek ?? "healthy")}
+                  <span className="text-[8px] font-mono" style={{ color: "#39ff14", opacity: 0.4 }}>DEEPSEEK</span>
+                </div>
               </div>
-
-              {/* Agent desks */}
-              {agents.map((agent) => (
-                <div
-                  key={agent.id}
-                  className="absolute transition-all duration-1000"
-                  style={{
-                    left: `${(agent.desk.col - 1) * 32 + 4}%`,
-                    top: agent.desk.row === 1 ? "12%" : "62%",
-                  }}
-                >
-                  <div className="flex flex-col items-center gap-1.5">
-                    {/* Desk */}
-                    <div className={`w-[72px] h-[56px] rounded-md border-2 flex flex-col items-center justify-center gap-1 transition-all ${
-                      agent.status === "working" ? "border-yellow-400/60 bg-yellow-400/5 shadow-[0_0_12px_rgba(250,204,21,0.15)]"
-                      : agent.status === "error" ? "border-red-500/60 bg-red-500/5 shadow-[0_0_12px_rgba(239,68,68,0.15)]"
-                      : agent.status === "done" ? "border-green-500/30 bg-green-500/5"
-                      : "border-green-500/10 bg-transparent"
-                    }`} style={{ imageRendering: "pixelated" }}>
-                      {/* Agent */}
-                      <span className={`text-2xl leading-none ${agent.status === "working" ? "animate-bounce" : ""}`}
-                        style={{ animationDuration: "1.5s", filter: "drop-shadow(2px 2px 0 rgba(0,0,0,0.3))" }}>
-                        {agent.emoji}
-                      </span>
-                      {/* Desk tool */}
-                      <div className={`w-8 h-1 rounded-full ${agent.status === "working" ? "bg-yellow-400/40" : "bg-green-500/15"}`} />
-                    </div>
-                    {/* Label */}
-                    <div className="flex flex-col items-center">
-                      <span className="text-[9px] font-mono font-bold tracking-wider" style={{ color: agent.status === "error" ? "#ef4444" : "#39ff14", opacity: agent.status === "idle" ? 0.4 : 1 }}>
-                        {agent.name}
-                      </span>
-                      <span className={`text-[7px] font-mono ${agent.status === "working" ? "text-yellow-400 animate-pulse" : agent.status === "error" ? "text-red-400" : ""}`}
-                        style={{ color: agent.status === "idle" ? "rgba(57,255,20,0.3)" : undefined, opacity: agent.status === "idle" ? 0.5 : 1 }}>
-                        {agent.task}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Item flowing on conveyor */}
-              {genCount > 0 && (
-                <div className="absolute top-[42%] animate-[slide_8s_linear_infinite]" style={{ animationName: "slide", animationDuration: "8s" }}>
-                  <div className="flex items-center gap-1">
-                    <span className="text-lg">📦</span>
-                    <span className="text-[8px] font-mono text-green-500/50">{totalAssets} items</span>
-                  </div>
-                </div>
-              )}
+              <div className="absolute bottom-3 right-4">
+                <span className="text-[8px] font-mono" style={{ color: "#39ff14", opacity: 0.3 }}>
+                  ${status?.budget.remaining.toFixed(2) ?? "10"} remaining
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Terminal Panel */}
+        {/* Live Terminal */}
         <Card className="flex flex-col" style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.15)" }}>
           <CardHeader className="pb-2" style={{ borderBottom: "1px solid rgba(57,255,20,0.1)" }}>
-            <CardTitle className="text-sm font-mono flex items-center gap-2" style={{ color: "#39ff14" }}>
-              <Terminal className="size-4" />SYS.LOG
+            <CardTitle className="text-xs font-mono flex items-center gap-2" style={{ color: "#39ff14" }}>
+              <Terminal className="size-3.5" />LIVE LOG
+              {autoMode && <span className="text-[9px] text-green-400 animate-pulse">● RECORDING</span>}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 p-4 font-mono text-[10px] overflow-y-auto max-h-[340px] space-y-1.5">
-            <p className="opacity-40" style={{ color: "#39ff14" }}>█ FORGE STATION v2.0</p>
-            <p className="opacity-40" style={{ color: "#39ff14" }}>─────────────────────</p>
-            {stuckStep && (
-              <p style={{ color: "#ef4444" }}>⚠ Pipeline stuck at: {stuckStep}</p>
+          <CardContent className="flex-1 p-3 font-mono text-[10px] overflow-y-auto max-h-[340px] space-y-1">
+            <p className="opacity-30" style={{ color: "#39ff14" }}>█ AUTONOMOUS FORGE v3.0</p>
+            <p className="opacity-30" style={{ color: "#39ff14" }}>──────────────────────────</p>
+
+            {status && (
+              <>
+                <p style={{ color: STATUS_COLOR[status.action] === "red" ? "#ef4444" : STATUS_COLOR[status.action] === "yellow" ? "#facc15" : "#22c55e" }}>
+                  ▶ {status.action.toUpperCase()}: {status.detail}
+                </p>
+                <p className="opacity-40" style={{ color: "#39ff14" }}>
+                  Budget: ${status.budget.used.toFixed(2)} / ${status.budget.cap}
+                </p>
+                <p className="opacity-40" style={{ color: "#39ff14" }}>
+                  Backlog: {status.backlog.unlistedAssets} unlisted | {status.backlog.stuckRuns} stuck | {status.backlog.packsNeedingPublish} publish
+                </p>
+                <p className="opacity-30" style={{ color: "#39ff14" }}>──────────────────────────</p>
+              </>
             )}
-            {STEPS.map((step, i) => (
-              <p key={step} style={{ color: i < activeStep ? "#22c55e" : i === activeStep ? "#facc15" : "rgba(57,255,20,0.3)" }}>
-                {i < activeStep ? "✓" : i === activeStep ? "▶" : "○"} {step}
-                {i < activeStep ? " — DONE" : i === activeStep ? " — RUNNING" : ""}
+
+            {activityLog.map((entry, i) => (
+              <p key={i} className="opacity-50" style={{ color: entry.includes("ERROR") ? "#ef4444" : entry.includes("PAUSED") ? "#facc15" : "#39ff14" }}>
+                {entry}
               </p>
             ))}
-            <p className="opacity-40 pt-2" style={{ color: "#39ff14" }}>─────────────────────</p>
-            <p className="opacity-40" style={{ color: "#39ff14" }}>Budget: ${budget?.monthlyUsed.toFixed(2) ?? "0.00"} / ${budget?.monthlyCap.toFixed(2) ?? "10"}</p>
-            <p className="opacity-40" style={{ color: "#39ff14" }}>Assets: {totalAssets} | Packs: {readyPacks} | Active: {activeWorkflows}</p>
-            <p className="opacity-40" style={{ color: "#39ff14" }}>Stuck: {stuckStep ? `YES — ${stuckStep}` : "NONE"}</p>
+
+            {activityLog.length === 0 && (
+              <p className="opacity-20" style={{ color: "#39ff14" }}>Waiting for activity...</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -211,13 +215,19 @@ export default function MapPage() {
       <Card style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.1)" }}>
         <CardContent className="py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Wrench className="size-4 opacity-50" style={{ color: "#39ff14" }} />
+            {autoMode ? (
+              <Zap className="size-4 animate-pulse" style={{ color: "#39ff14" }} />
+            ) : (
+              <Wrench className="size-4 opacity-40" style={{ color: "#39ff14" }} />
+            )}
             <span className="font-mono text-[10px] opacity-40" style={{ color: "#39ff14" }}>
-              {stuckStep ? "Pipeline awaiting resume — go to Dashboard and click Resume Forge" : "All systems nominal — pipeline flowing"}
+              {autoMode
+                ? "AUTO MODE — orchestrator managing forge autonomously every 15s"
+                : "Toggle Auto Mode to let the forge run itself — you just monitor"}
             </span>
           </div>
-          <div className="flex items-center gap-4 font-mono text-[10px]" style={{ color: "#39ff14", opacity: 0.3 }}>
-            <span>V2.0</span><span>6 AGENTS</span><span>{totalAssets} ITEMS</span>
+          <div className="flex items-center gap-4 font-mono text-[10px]" style={{ color: "#39ff14", opacity: 0.25 }}>
+            <span>v3.0</span><span>AUTO</span><span>{new Date().toLocaleTimeString()}</span>
           </div>
         </CardContent>
       </Card>
