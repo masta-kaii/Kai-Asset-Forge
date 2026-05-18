@@ -7,12 +7,13 @@ import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import {
   Sparkles, Package, Activity, TrendingUp, CheckCircle2, Clock, AlertTriangle,
-  Play, Pause, RotateCcw, Zap, Loader2,
+  Play, Pause, RotateCcw, Zap, Loader2, Brain,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
 import { startForgePipeline, getPipelineRun } from "@/app/actions/forge-pipeline"
+import { runOrchestrator } from "@/app/actions/orchestrator"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
 import type { BudgetStatus } from "@/lib/budget/types"
@@ -27,6 +28,33 @@ export default function DashboardPage() {
   const [forgeRunning, setForgeRunning] = useState(false)
   const [forgeSteps, setForgeSteps] = useState<{ step: string; status: string; summary: string }[]>([])
   const [forgeError, setForgeError] = useState<string | null>(null)
+
+  const handleOrchestrator = async () => {
+    if (forgeRunning) return
+    setForgeRunning(true)
+    setForgeError(null)
+    setForgeSteps([])
+    toast.info("Orchestrator running — Scout → Decide → Forge → Curate → Finalize → Reflect")
+
+    try {
+      const result = await runOrchestrator({ theme: "fantasy creatures", maxAssets: 2 })
+      if (result.steps.length > 0) {
+        setForgeSteps(result.steps.map((s) => ({ step: s.step, status: s.status, summary: s.summary })))
+      }
+      if (result.status === "completed") {
+        toast.success(`Orchestrator complete — product ready`)
+      } else {
+        setForgeError(result.error ?? "Orchestrator failed")
+        toast.error(result.error ?? "Orchestrator failed")
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Orchestrator crashed"
+      setForgeError(msg)
+      toast.error(msg)
+    } finally {
+      setForgeRunning(false)
+    }
+  }
 
   const handleAutoForge = async () => {
     if (forgeRunning) return
@@ -91,10 +119,16 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-heading font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Welcome to your AI game asset forge. Ready to create?</p>
         </div>
-        <Button className="gap-2" onClick={handleAutoForge} disabled={forgeRunning}>
-          {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
-          {forgeRunning ? "Forging..." : "Auto Forge"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleOrchestrator} disabled={forgeRunning}>
+            <Brain className="size-4" />
+            Orchestrator
+          </Button>
+          <Button className="gap-2" onClick={handleAutoForge} disabled={forgeRunning}>
+            {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
+            {forgeRunning ? "Running..." : "Auto Forge"}
+          </Button>
+        </div>
       </div>
 
       <Separator />
