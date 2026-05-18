@@ -1,5 +1,3 @@
-import "server-only"
-
 const GUMROAD_API_BASE = "https://api.gumroad.com/v2"
 
 interface UploadResult {

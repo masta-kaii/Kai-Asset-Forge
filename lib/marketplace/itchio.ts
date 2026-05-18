@@ -1,5 +1,3 @@
-import "server-only"
-
 const ITCHIO_API_BASE = "https://itch.io/api/1"
 
 interface ItchIOConfig {

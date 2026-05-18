@@ -43,9 +43,11 @@ export default function MapPage() {
   const [totalAssets, setTotalAssets] = useState(0)
   const [approvedCount, setApprovedCount] = useState(0)
   const [genCount, setGenCount] = useState(0)
+  const [readyPacks, setReadyPacks] = useState(0)
+  const [activeWorkflows, setActiveWorkflows] = useState(0)
+  const [recentAssets, setRecentAssets] = useState<{ type: string; status: string }[]>([])
   const [activeTerminal, setActiveTerminal] = useState<string | null>(null)
   const [terminalData, setTerminalData] = useState<TerminalData | null>(null)
-
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -55,6 +57,9 @@ export default function MapPage() {
       setTotalAssets(data.totalAssets)
       setApprovedCount(data.recentAssets.filter((a) => a.status === "approved").length)
       setGenCount(data.recentGenerations.length)
+      setReadyPacks(data.readyPacks)
+      setActiveWorkflows(data.activeWorkflows)
+      setRecentAssets(data.recentAssets.map((a) => ({ type: a.type, status: a.status })))
     }).catch((e) => {
       console.error("Map load error:", e)
       setError("Systems offline — check Vercel logs")
@@ -81,9 +86,9 @@ export default function MapPage() {
     {
       ...ROOM_TEMPLATES[2],
       row: 1,
-      metric: "0",
-      subtext: "packs listed",
-      pulse: false,
+      metric: `${readyPacks}`,
+      subtext: "packs ready",
+      pulse: readyPacks > 0,
       error: false,
     },
     {
@@ -113,29 +118,34 @@ export default function MapPage() {
         })
         break
       case "armory":
-        setTerminalData({
-          title: "ARMORY — ASSET INVENTORY",
-          headers: ["TYPE", "TOTAL", "APPROVED", "READY %"],
-          rows: [
-            ["creatures", String(Math.floor(totalAssets * 0.4)), String(Math.floor(approvedCount * 0.4)), "—"],
-            ["items", String(Math.floor(totalAssets * 0.3)), String(Math.floor(approvedCount * 0.3)), "—"],
-            ["accessories", String(Math.floor(totalAssets * 0.2)), String(Math.floor(approvedCount * 0.2)), "—"],
-            ["ui-icons", String(Math.floor(totalAssets * 0.1)), String(Math.floor(approvedCount * 0.1)), "—"],
-          ],
-          status: `▶ ${totalAssets} ASSETS IN VAULT`,
-        })
+        {
+          const typeCounts: Record<string, { total: number; approved: number }> = {}
+          for (const a of recentAssets) {
+            if (!typeCounts[a.type]) typeCounts[a.type] = { total: 0, approved: 0 }
+            typeCounts[a.type].total++
+            if (a.status === "approved") typeCounts[a.type].approved++
+          }
+          const rows = Object.entries(typeCounts).slice(0, 6).map(([type, counts]) => [
+            type, String(counts.total), String(counts.approved), counts.total > 0 ? ((counts.approved / counts.total) * 100).toFixed(0) + "%" : "—"
+          ])
+          if (rows.length === 0) rows.push(["—", "0", "0", "—"])
+          setTerminalData({
+            title: "ARMORY — ASSET INVENTORY",
+            headers: ["TYPE", "TOTAL", "APPROVED", "READY %"],
+            rows,
+            status: `▶ ${totalAssets} ASSETS IN VAULT`,
+          })
+        }
         break
       case "storefront":
         setTerminalData({
           title: "STORE — LISTING MANAGEMENT",
           headers: ["PLATFORM", "LISTED", "SALES", "REVENUE"],
           rows: [
-            ["itch.io", "0", "0", "$0.00"],
+            ["itch.io", readyPacks > 0 ? String(readyPacks) : "0", "0", "$0.00"],
             ["Gumroad", "0", "0", "$0.00"],
-            ["—", "—", "—", "—"],
-            ["—", "—", "—", "—"],
           ],
-          status: "⚠ STORE OFFLINE — API KEYS NOT CONFIGURED",
+          status: readyPacks > 0 ? `▶ ${readyPacks} PACKS READY TO PUBLISH` : "⚠ STORE OFFLINE — CREATE A PACK FIRST",
         })
         break
       case "command":
@@ -145,10 +155,10 @@ export default function MapPage() {
           rows: [
             ["Daily Spend", `$${budget?.dailyUsed.toFixed(4) ?? "0.00"}`, `$${budget?.dailyCap.toFixed(2) ?? "0.33"}`, budget && budget.dailyPercent > 80 ? "⚠ HIGH" : "OK"],
             ["Monthly Spend", `$${budget?.monthlyUsed.toFixed(2) ?? "0.00"}`, `$${budget?.monthlyCap.toFixed(2) ?? "10"}`, budget && budget.monthlyPercent > 80 ? "⚠ HIGH" : "OK"],
-            ["Active Agents", "0/7", "7", "IDLE"],
-            ["Pipeline", "STOPPED", "—", "READY"],
+            ["Active Workflows", String(activeWorkflows), "—", activeWorkflows > 0 ? "RUNNING" : "IDLE"],
+            ["Pipeline", activeWorkflows > 0 ? "ACTIVE" : "STOPPED", "—", activeWorkflows > 0 ? "▶" : "READY"],
           ],
-          status: budget?.isExceeded ? "⛔ BUDGET EXCEEDED" : "▶ SYSTEMS NOMINAL",
+          status: budget?.isExceeded ? "⛔ BUDGET EXCEEDED" : activeWorkflows > 0 ? "▶ PIPELINE ACTIVE" : "▶ SYSTEMS NOMINAL",
         })
         break
     }

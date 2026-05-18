@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
-import { startForgePipeline, getPipelineRun } from "@/app/actions/forge-pipeline"
 import { runOrchestrator } from "@/app/actions/orchestrator"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { toast } from "sonner"
@@ -56,39 +55,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleAutoForge = async () => {
-    if (forgeRunning) return
-    setForgeRunning(true)
-    setForgeError(null)
-    setForgeSteps([])
-    toast.info("Forge pipeline started — runs server-side, survives refresh")
-
-    try {
-      const result = await startForgePipeline({ theme: "fantasy creatures" })
-      if (result.error) {
-        setForgeError(result.error)
-        toast.error(result.error)
-        setForgeRunning(false)
-        return
-      }
-      const run = await getPipelineRun(result.runId)
-      if (run) {
-        setForgeSteps(run.steps.map((s) => ({ step: s.step, status: s.status, summary: s.summary })))
-        if (run.status === "completed") toast.success(`Forge complete! ${run.steps.length} steps`)
-        if (run.status === "failed") {
-          setForgeError(run.error ?? "Pipeline failed")
-          toast.error(run.error ?? "Pipeline failed")
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Pipeline failed"
-      setForgeError(msg)
-      toast.error(msg)
-    } finally {
-      setForgeRunning(false)
-    }
-  }
-
   useEffect(() => {
     getDashboardData().then((data) => {
       setTotalCount(data.totalAssets)
@@ -119,16 +85,10 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-heading font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Welcome to your AI game asset forge. Ready to create?</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleOrchestrator} disabled={forgeRunning}>
-            <Brain className="size-4" />
-            Orchestrator
-          </Button>
-          <Button className="gap-2" onClick={handleAutoForge} disabled={forgeRunning}>
-            {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
-            {forgeRunning ? "Running..." : "Auto Forge"}
-          </Button>
-        </div>
+        <Button className="gap-2" onClick={handleOrchestrator} disabled={forgeRunning}>
+          {forgeRunning ? <Loader2 className="size-4 animate-spin" /> : <Brain className="size-4" />}
+          {forgeRunning ? "Running..." : "Launch Orchestrator"}
+        </Button>
       </div>
 
       <Separator />
@@ -138,7 +98,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               {forgeRunning ? <Loader2 className="size-5 animate-spin text-primary" /> : <Zap className="size-5 text-primary" />}
-              Auto Forge {forgeRunning ? "in Progress" : forgeError ? "Failed" : "Complete"}
+              Orchestrator {forgeRunning ? "Running" : forgeError ? "Failed" : "Complete"}
             </CardTitle>
           </CardHeader>
           <CardContent>

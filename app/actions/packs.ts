@@ -1,8 +1,7 @@
 "use server"
 
-import { createPack, getPacks } from "@/lib/firebase/packs"
-import { fetchAssetsByStatus } from "@/app/actions/assets"
-import type { AssetPack, Asset } from "@/lib/types"
+import { createPack, getPacks, updatePackAssets } from "@/lib/firebase/packs"
+import type { AssetPack } from "@/lib/types"
 
 export async function fetchPacks(): Promise<AssetPack[]> {
   return getPacks()
@@ -23,4 +22,8 @@ export async function createNewPack(data: {
     status: "review",
     previewUrl: data.previewUrl,
   })
+}
+
+export async function markPackPublished(packId: string): Promise<void> {
+  await updatePackAssets(packId, [])
 }

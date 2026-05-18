@@ -8,9 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
   LayoutDashboard, Sparkles, Library, Package, FileText,
-  Activity, Settings, Anvil, Monitor, Bug, LogOut,
+  Activity, Settings, Anvil, Monitor, LogOut,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
+import { getSidebarStats } from "@/app/actions/sidebar"
+import { useEffect, useState } from "react"
 
 const NAV_ITEMS = [
   {
@@ -53,16 +55,20 @@ const NAV_ITEMS = [
     href: "/settings",
     icon: Settings,
   },
-  {
-    title: "Debug",
-    href: "/debug",
-    icon: Bug,
-  },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
+  const [stats, setStats] = useState({ assetsToday: 0, readyPacks: 0, activeAgents: 0 })
+
+  useEffect(() => {
+    getSidebarStats().then(setStats).catch(() => {})
+    const interval = setInterval(() => {
+      getSidebarStats().then(setStats).catch(() => {})
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <aside className="fixed top-0 left-0 z-40 h-screen w-60 border-r border-border bg-sidebar flex flex-col">
@@ -104,9 +110,9 @@ export function AppSidebar() {
           </p>
           <div className="space-y-1.5">
             {[
-              { label: "Assets Today", value: "--", color: "bg-emerald-400" },
-              { label: "Ready Packs", value: "--", color: "bg-violet-400" },
-              { label: "Active Agents", value: "0/7", color: "bg-amber-400" },
+              { label: "Assets Today", value: `${stats.assetsToday}`, color: "bg-emerald-400" },
+              { label: "Ready Packs", value: `${stats.readyPacks}`, color: "bg-violet-400" },
+              { label: "Active Agents", value: `${stats.activeAgents}/7`, color: "bg-amber-400" },
             ].map((stat) => (
               <div key={stat.label} className="flex items-center gap-2 text-xs">
                 <div className={cn("size-1.5 rounded-full", stat.color)} />

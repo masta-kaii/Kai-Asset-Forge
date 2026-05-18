@@ -7,16 +7,13 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
-  Activity,
-  Play,
-  Pause,
-  RotateCw,
-  Clock,
-  AlertTriangle,
+  Activity, Play, Pause, RotateCw, Clock, AlertTriangle, Loader2, Brain,
 } from "lucide-react"
 import { AGENTS, PIPELINE_STEPS } from "@/lib/agents/agent-types"
-import { fetchRecentWorkflows, fetchActiveWorkflows, startWorkflow, failWorkflow } from "@/app/actions/workflows"
-import type { Workflow, AgentName, WorkflowType, WorkflowStatus } from "@/lib/types"
+import { fetchRecentWorkflows, fetchActiveWorkflows } from "@/app/actions/workflows"
+import { runOrchestrator } from "@/app/actions/orchestrator"
+import { toast } from "sonner"
+import type { Workflow, WorkflowType, WorkflowStatus } from "@/lib/types"
 
 interface AgentStatus {
   status: "idle" | "working" | "error"
@@ -77,53 +74,32 @@ export default function AgentsPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  const [isOrchestrating, setIsOrchestrating] = useState(false)
+
   const startPipeline = async () => {
-    const pipelineOrder: { type: WorkflowType; agent: AgentName }[] = [
-      { type: "trend-research", agent: "trend-researcher" },
-      { type: "art-direction", agent: "art-director" },
-      { type: "asset-generation", agent: "asset-generator" },
-      { type: "quality-review", agent: "quality-controller" },
-      { type: "packaging", agent: "packager" },
-      { type: "store-listing", agent: "store-lister" },
-      { type: "marketing", agent: "marketer" },
-    ]
-
+    setIsOrchestrating(true)
+    setError(null)
+    toast.info("Orchestrator launched — all 8 agents running")
     try {
-      for (const step of pipelineOrder) {
-        await startWorkflow({
-          workflowType: step.type,
-          agent: step.agent,
-        })
+      const result = await runOrchestrator({ theme: "fantasy creatures", maxAssets: 2 })
+      if (result.status === "completed") {
+        toast.success(`Orchestrator complete — ${result.steps.length} steps finished`)
+      } else {
+        setError(result.error ?? "Orchestrator failed")
+        toast.error(result.error ?? "Orchestrator failed")
       }
-      loadData()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start pipeline")
+      const msg = err instanceof Error ? err.message : "Pipeline failed"
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setIsOrchestrating(false)
+      loadData()
     }
   }
 
-  const pausePipeline = async () => {
-    try {
-      const active = await fetchActiveWorkflows()
-      await Promise.all(
-        active.map((w) => failWorkflow(w.id))
-      )
-      loadData()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to pause pipeline")
-    }
-  }
-
-  const resetPipeline = async () => {
-    try {
-      const active = await fetchActiveWorkflows()
-      await Promise.all(
-        active.map((w) => failWorkflow(w.id))
-      )
-      loadData()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset pipeline")
-    }
-  }
+  const pausePipeline = () => {}
+  const resetPipeline = async () => { loadData() }
 
   const pipelineSteps = PIPELINE_STEPS.map((label) => {
     const stepWorkflows = workflows.filter((w) => {
@@ -162,9 +138,9 @@ export default function AgentsPage() {
             <Pause className="size-3.5" />
             Pause All
           </Button>
-          <Button size="sm" className="gap-2" onClick={startPipeline}>
-            <Play className="size-3.5" />
-            Start Pipeline
+          <Button size="sm" className="gap-2" onClick={startPipeline} disabled={isOrchestrating}>
+            {isOrchestrating ? <Loader2 className="size-3.5 animate-spin" /> : <Brain className="size-3.5" />}
+            {isOrchestrating ? "Running..." : "Launch Orchestrator"}
           </Button>
         </div>
       </div>
@@ -225,12 +201,9 @@ export default function AgentsPage() {
                     variant="outline"
                     size="sm"
                     className="flex-1 h-7 text-xs gap-1"
-                    onClick={() =>
-                      startWorkflow({
-                        workflowType: "asset-generation",
-                        agent: agent.name,
-                      }).then(() => loadData())
-                    }
+                    onClick={() => {
+                      startPipeline()
+                    }}
                   >
                     <Play className="size-3" />
                     Run
