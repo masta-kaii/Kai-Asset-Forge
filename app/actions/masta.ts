@@ -11,6 +11,7 @@ import { scoutTrends } from "@/app/actions/scout"
 import { runReflection } from "@/app/actions/reflection"
 import { buildPackDeliverable } from "@/app/actions/pack-builder"
 import { generatePackItchListing, markPackUploaded } from "@/app/actions/itchio-listing"
+import { buildMastaDigest } from "@/app/actions/digest"
 import { getPackById, getPacks } from "@/lib/firebase/packs"
 
 export interface MastaToolEvent {
@@ -228,6 +229,15 @@ function tools(): OpenAI.Chat.Completions.ChatCompletionTool[] {
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "build_digest",
+        description:
+          "Build a fresh 24-hour digest right now (runs / assets / packs / budget / what-needs-you) without waiting for the daily cron.",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    },
   ]
 }
 
@@ -340,6 +350,10 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const storeUrl = typeof args.storeUrl === "string" ? args.storeUrl : ""
       if (!packId || !storeUrl) return { success: false, error: "packId and storeUrl required" }
       return await markPackUploaded(packId, storeUrl)
+    }
+    case "build_digest": {
+      const d = await buildMastaDigest()
+      return { body: d.body, snapshot: d.snapshot }
     }
     default:
       return { error: `Unknown tool: ${name}` }

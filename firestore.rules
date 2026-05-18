@@ -40,6 +40,18 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // === Masta Daily Digests (cron-written) ===
+    // NOTE: cron writes via the client SDK like the rest of the app, so
+    // tighten this to an Admin-SDK setup before going to production.
+    match /masta_digests/{digestId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // === Cron audit log ===
+    match /cron_runs/{runId} {
+      allow read, write: if request.auth != null;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;
