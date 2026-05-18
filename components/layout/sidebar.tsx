@@ -40,7 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { title: "Listing Generator", href: "/products/listings", icon: FileText },
   { title: "Agent Monitor", href: "/agents", icon: Activity },
-  { title: "Base Map", href: "/workspace", icon: Monitor },
+  { title: "Workshop", href: "/workspace", icon: Monitor },
   { title: "Settings", href: "/settings", icon: Settings },
 ]
 

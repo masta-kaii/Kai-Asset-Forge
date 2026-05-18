@@ -1,237 +1,451 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { autonomousTick, type AutonomousStatus } from "@/app/actions/autonomous-agent"
+import { Badge } from "@/components/ui/badge"
+import {
+  getWorkshopActivity,
+  type WorkshopActivity,
+  type WorkshopAgentId,
+  type WorkshopStep,
+} from "@/app/actions/workshop-activity"
 import { runOrchestrator } from "@/app/actions/orchestrator"
+import { Crown, Play, Loader2, Pause, RefreshCw, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
-import { Terminal, Wrench, Zap, Play, Pause, Loader2 } from "lucide-react"
 
-const STEPS = ["Budget", "Ledger", "Scout", "Decision", "Forge", "Curator", "Finalize", "Reflection"]
-
-const STATUS_COLOR: Record<string, string> = {
-  idle: "green", ready: "green", working: "yellow", done: "green", error: "red",
-  packaged: "green", resume: "yellow", paused: "orange",
+interface AgentDef {
+  id: WorkshopAgentId
+  name: string
+  emoji: string
+  role: string
+  /** Position in the scene as percentages. */
+  x: number
+  y: number
 }
 
-export default function MapPage() {
-  const [status, setStatus] = useState<AutonomousStatus | null>(null)
-  const [autoMode, setAutoMode] = useState(false)
-  const [processing, setProcessing] = useState(false)
-  const [stepIndex, setStepIndex] = useState(0)
-  const [activityLog, setActivityLog] = useState<string[]>([])
+const AGENTS: AgentDef[] = [
+  // Masta sits at the top center as the boss
+  { id: "masta", name: "Masta", emoji: "👑", role: "Boss", x: 50, y: 14 },
+  // First row of workers
+  { id: "scout", name: "Scout", emoji: "🔍", role: "Trends", x: 14, y: 44 },
+  { id: "director", name: "Director", emoji: "🎨", role: "Art direction", x: 32, y: 44 },
+  { id: "forge", name: "Forge", emoji: "⚡", role: "Generator", x: 50, y: 44 },
+  { id: "curator", name: "Curator", emoji: "✅", role: "Quality", x: 68, y: 44 },
+  { id: "reflector", name: "Reflector", emoji: "🧠", role: "Learn", x: 86, y: 44 },
+  // Second row — packaging side
+  { id: "packager", name: "Packer", emoji: "📦", role: "Pack & ZIP", x: 36, y: 78 },
+  { id: "lister", name: "Lister", emoji: "🏪", role: "Listings", x: 64, y: 78 },
+]
 
-  const log = (msg: string) => setActivityLog((prev) => [msg, ...prev].slice(0, 20))
+interface ActiveBubble {
+  /** Bubble id — incremented for animation key. */
+  id: number
+  agent: WorkshopAgentId
+  text: string
+  variant: "say" | "did" | "fail" | "boss"
+  /** Wall-clock expiry timestamp. */
+  expiresAt: number
+}
 
-  // ── Poll autonomous agent ──
-  useEffect(() => {
-    const tick = () => {
-      autonomousTick().then(setStatus).catch(() => {})
+const BUBBLE_TTL_MS = 7000
+const MASTA_BUBBLE_TTL_MS = 10000
+
+const MASTA_LINES: Record<string, string[]> = {
+  forging: ["Forge crew, keep it moving.", "Push the next batch through."],
+  packaging: ["Wrap that pack — let's ship it.", "Boxing up assets."],
+  publishing: ["Final polish. Time to list.", "Get it on the shelf."],
+  blocked: ["We're blocked. Need a fix.", "Stop everything — check the providers."],
+  paused: ["Holding the line until we resume."],
+  scanning: ["Sweeping the workshop.", "Checking the backlog."],
+  idle: ["Crew's ready. What's next?", "All quiet. Awaiting orders."],
+}
+
+function bubbleVariantFor(status: WorkshopStep["status"]): ActiveBubble["variant"] {
+  if (status === "failed") return "fail"
+  if (status === "completed") return "did"
+  return "say"
+}
+
+function truncate(s: string, n = 90): string {
+  if (!s) return ""
+  return s.length <= n ? s : s.slice(0, n - 1) + "…"
+}
+
+export default function WorkshopPage() {
+  const [activity, setActivity] = useState<WorkshopActivity | null>(null)
+  const [bubbles, setBubbles] = useState<ActiveBubble[]>([])
+  const [forging, setForging] = useState(false)
+  const [autoPolling, setAutoPolling] = useState(true)
+  const bubbleId = useRef(0)
+  const stepFingerprint = useRef<Map<string, string>>(new Map()) // step -> status
+  const lastAction = useRef<string | null>(null)
+
+  const pushBubble = useCallback((b: Omit<ActiveBubble, "id" | "expiresAt">, ttl = BUBBLE_TTL_MS) => {
+    bubbleId.current += 1
+    const next: ActiveBubble = {
+      ...b,
+      id: bubbleId.current,
+      expiresAt: Date.now() + ttl,
     }
-    tick()
-    const interval = setInterval(tick, 5000)
-    return () => clearInterval(interval)
+    setBubbles((prev) => {
+      // Keep at most one bubble per agent — newest wins.
+      const without = prev.filter((p) => p.agent !== b.agent)
+      return [...without, next]
+    })
   }, [])
 
-  // ── Auto-mode loop ──
-  useEffect(() => {
-    if (!autoMode || processing) return
+  const pickMastaLine = (action: string): string => {
+    const lines = MASTA_LINES[action] ?? MASTA_LINES.idle
+    return lines[Math.floor(Math.random() * lines.length)]
+  }
 
-    const loop = async () => {
-      setProcessing(true)
-      try {
-        const tick = await autonomousTick()
-        setStatus(tick)
-        log(`[${new Date().toLocaleTimeString()}] ${tick.action.toUpperCase()}: ${tick.detail}`)
+  const load = useCallback(async () => {
+    try {
+      const a = await getWorkshopActivity()
+      setActivity(a)
 
-        if (tick.shouldForge) {
-          const result = await runOrchestrator({ maxAssets: 1 })
-          log(`[${new Date().toLocaleTimeString()}] ⚡ Forge: ${result.status}${result.error ? ` (${result.error})` : " ✓"}`)
-          if (result.status === "completed") toast.success("Product forged!")
-          else if (result.status.includes("paused") || result.status.includes("awaiting")) toast.info(result.error ?? "Run paused")
-          else toast.error(result.error ?? "Forge failed")
+      // Diff steps to emit bubbles only on transitions.
+      for (const step of a.steps) {
+        const key = `${a.runId}:${step.step}`
+        const prev = stepFingerprint.current.get(key)
+        if (prev !== step.status) {
+          stepFingerprint.current.set(key, step.status)
+          if (step.status === "running" || step.status === "completed" || step.status === "failed") {
+            pushBubble({
+              agent: step.agent,
+              text: truncate(step.summary || step.step, 90),
+              variant: bubbleVariantFor(step.status),
+            })
+          }
         }
-      } catch (err) {
-        log(`[${new Date().toLocaleTimeString()}] ERROR: ${err}`)
-      } finally {
-        setProcessing(false)
       }
+
+      // Masta speaks on action changes.
+      if (a.autonomous.action !== lastAction.current) {
+        lastAction.current = a.autonomous.action
+        const line = pickMastaLine(a.autonomous.action)
+        pushBubble({ agent: "masta", text: line, variant: "boss" }, MASTA_BUBBLE_TTL_MS)
+      }
+    } catch (e) {
+      console.error("workshop activity:", e)
     }
+  }, [pushBubble])
 
-    loop()
-    const interval = setInterval(loop, 15000) // Check every 15s
-    return () => clearInterval(interval)
-  }, [autoMode, processing])
-
-  // ── Animate step cycling ──
+  // Initial + polled refresh.
   useEffect(() => {
-    const interval = setInterval(() => setStepIndex((p) => (p + 1) % STEPS.length), 2500)
+    load()
+    if (!autoPolling) return
+    const interval = setInterval(load, 4000)
+    return () => clearInterval(interval)
+  }, [load, autoPolling])
+
+  // Expire bubbles on a timer.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now()
+      setBubbles((prev) => prev.filter((b) => b.expiresAt > now))
+    }, 500)
     return () => clearInterval(interval)
   }, [])
 
-  const providerDot = (state: string) => (
-    <span className={`size-1.5 rounded-full ${
-      state === "healthy" ? "bg-green-500" : state === "degraded" ? "bg-yellow-400" : "bg-red-500"
-    }`} />
+  const startForgeRun = async () => {
+    if (forging) return
+    setForging(true)
+    pushBubble({ agent: "masta", text: "New batch. Crew — go.", variant: "boss" })
+    try {
+      const r = await runOrchestrator({ theme: "fantasy creatures", maxAssets: 2 })
+      if (r.status === "completed") {
+        toast.success("Run complete")
+        pushBubble({ agent: "masta", text: "Good work, team. That's a pack.", variant: "boss" }, MASTA_BUBBLE_TTL_MS)
+      } else {
+        toast.error(r.error ?? "Run stopped")
+        pushBubble({ agent: "masta", text: r.error ?? "Run stopped — pause for fixes.", variant: "boss" }, MASTA_BUBBLE_TTL_MS)
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Run crashed")
+    } finally {
+      setForging(false)
+      load()
+    }
+  }
+
+  const activeAgents = new Set(
+    (activity?.steps ?? [])
+      .filter((s) => s.status === "running")
+      .map((s) => s.agent),
   )
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 -mx-2 sm:mx-0">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-heading font-bold tracking-tight font-mono">FORGE WORKSTATION</h1>
-          <p className="text-muted-foreground mt-1 text-xs font-mono">
-            {autoMode ? "⚡ AUTO MODE — orchestrator managing the forge independently" : "Manual mode — toggle Auto to let the forge run itself"}
+          <h1 className="text-2xl font-heading font-bold tracking-tight">Workshop</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Watch the crew work. Bubbles update from the live orchestrator.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={autoMode ? "default" : "outline"}
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setAutoMode(!autoMode)}
-          >
-            {autoMode ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-            {autoMode ? "Stop Auto" : "Auto Mode"}
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <Link href="/masta">
+              <Crown className="size-3.5" /> Talk to Masta
+            </Link>
           </Button>
-          <div className={`size-2 rounded-full self-center ${autoMode ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setAutoPolling((p) => !p)}
+            title={autoPolling ? "Pause live updates" : "Resume live updates"}
+          >
+            {autoPolling ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+            {autoPolling ? "Pause" : "Live"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={load}
+          >
+            <RefreshCw className="size-3.5" />
+            Refresh
+          </Button>
+          <Button onClick={startForgeRun} disabled={forging || activity?.autonomous.action === "blocked"} className="gap-2">
+            {forging ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+            {forging ? "Running..." : "New run"}
+          </Button>
         </div>
       </div>
 
       <Separator />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Workshop Grid */}
-        <Card className="lg:col-span-2 overflow-hidden" style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.15)" }}>
-          <CardContent className="p-4">
-            <div className="relative w-full rounded-lg overflow-hidden" style={{ minHeight: "380px", background: "repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(57,255,20,0.04) 31px, rgba(57,255,20,0.04) 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, rgba(57,255,20,0.04) 31px, rgba(57,255,20,0.04) 32px), linear-gradient(180deg, #050505, #0d0d0d)" }}>
-              {/* Conveyor */}
-              <div className="absolute top-[48%] left-0 right-0 h-0.5" style={{ background: "rgba(57,255,20,0.06)" }}>
-                {autoMode && (
-                  <div className="absolute inset-0 animate-[slide_3s_linear_infinite]" style={{ background: "repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(57,255,20,0.4) 8px, rgba(57,255,20,0.4) 10px)" }} />
-                )}
-              </div>
+      <Card className="overflow-hidden border-amber-900/20">
+        <CardContent className="p-0">
+          {/* Scene */}
+          <div
+            className="relative w-full aspect-[16/9] min-h-[420px] workshop-floor overflow-hidden"
+          >
+            {/* Sun rays / mood */}
+            <div className="absolute inset-0 pointer-events-none workshop-vignette" />
 
-              {/* Agent Desks */}
-              {[
-                { id: "scout", emoji: "🔍", name: "SCOUT", col: 1, row: 1 },
-                { id: "forge", emoji: "⚡", name: "FORGE", col: 2, row: 1 },
-                { id: "curator", emoji: "✅", name: "CURATE", col: 3, row: 1 },
-                { id: "packager", emoji: "📦", name: "PACK", col: 1, row: 2 },
-                { id: "lister", emoji: "🏪", name: "LIST", col: 2, row: 2 },
-                { id: "brain", emoji: "🧠", name: "BRAIN", col: 3, row: 2 },
-              ].map((agent) => {
-                const isActive = autoMode && !status?.isProcessing
-                const isWorking = processing && stepIndex === ["scout", "forge", "curator", "packager", "lister", "brain"].indexOf(agent.id)
-                return (
-                  <div key={agent.id} className="absolute transition-all duration-500" style={{ left: `${(agent.col - 1) * 32 + 4}%`, top: agent.row === 1 ? "12%" : "62%" }}>
-                    <div className="flex flex-col items-center gap-1">
-                      <div className={`w-[68px] h-[52px] rounded-md border-2 flex flex-col items-center justify-center gap-0.5 transition-all ${
-                        isWorking ? "border-yellow-400/60 bg-yellow-400/5 shadow-[0_0_10px_rgba(250,204,21,0.12)]"
-                        : isActive ? "border-green-500/30 bg-green-500/5"
-                        : "border-green-500/10"
-                      }`}>
-                        <span className={`text-2xl leading-none ${isWorking ? "animate-bounce" : ""}`} style={{ animationDuration: "1.2s", filter: "drop-shadow(2px 2px 0 rgba(0,0,0,0.3))" }}>
-                          {agent.emoji}
-                        </span>
-                        <div className={`w-6 h-0.5 rounded-full ${isWorking ? "bg-yellow-400/40" : "bg-green-500/10"}`} />
-                      </div>
-                      <span className="text-[8px] font-mono font-bold tracking-wider" style={{ color: "#39ff14", opacity: isActive ? 1 : 0.35 }}>{agent.name}</span>
+            {/* Wall (back) */}
+            <div className="absolute inset-x-0 top-0 h-[28%] workshop-wall" />
+
+            {/* Boss platform behind Masta */}
+            <div
+              className="absolute workshop-platform"
+              style={{ left: "calc(50% - 70px)", top: "8%", width: 140, height: 24 }}
+            />
+
+            {/* Agents */}
+            {AGENTS.map((a) => {
+              const isWorking = activeAgents.has(a.id)
+              const isMasta = a.id === "masta"
+              const bubble = bubbles.find((b) => b.agent === a.id)
+              return (
+                <div
+                  key={a.id}
+                  className="absolute"
+                  style={{ left: `${a.x}%`, top: `${a.y}%`, transform: "translate(-50%, -50%)" }}
+                >
+                  {bubble && (
+                    <SpeechBubble
+                      key={bubble.id}
+                      text={bubble.text}
+                      variant={bubble.variant}
+                      above={!isMasta}
+                    />
+                  )}
+                  <div className="flex flex-col items-center select-none">
+                    <div
+                      className={`relative ${isMasta ? "workshop-boss" : "workshop-agent"} ${
+                        isWorking ? "workshop-working" : "workshop-idle"
+                      }`}
+                      title={`${a.name} — ${a.role}`}
+                    >
+                      <span
+                        className={`block ${
+                          isMasta ? "text-5xl" : "text-4xl"
+                        } leading-none drop-shadow-md`}
+                        style={{ filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.25))" }}
+                      >
+                        {a.emoji}
+                      </span>
+                      {isWorking && (
+                        <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-amber-400 ring-2 ring-white/80 dark:ring-black/40 animate-pulse" />
+                      )}
+                    </div>
+                    {/* Desk under each worker */}
+                    {!isMasta && <div className="workshop-desk mt-0.5" />}
+                    <div className="mt-1 flex flex-col items-center gap-0.5">
+                      <span
+                        className={`text-[10px] font-semibold tracking-wider uppercase ${
+                          isMasta ? "text-amber-200" : "text-stone-100"
+                        }`}
+                      >
+                        {a.name}
+                      </span>
+                      <span className="text-[9px] text-stone-300/70 font-mono">{a.role}</span>
                     </div>
                   </div>
-                )
-              })}
+                </div>
+              )
+            })}
 
-              {/* Status overlay */}
-              <div className="absolute bottom-3 left-4 flex items-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  {providerDot(status?.providers.openai ?? "healthy")}
-                  <span className="text-[8px] font-mono" style={{ color: "#39ff14", opacity: 0.4 }}>OPENAI</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {providerDot(status?.providers.deepseek ?? "healthy")}
-                  <span className="text-[8px] font-mono" style={{ color: "#39ff14", opacity: 0.4 }}>DEEPSEEK</span>
-                </div>
+            {/* Floor sign / status banner */}
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono pointer-events-none">
+              <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-black/40 text-amber-100 backdrop-blur-sm">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="uppercase tracking-wider">
+                  {activity?.runStatus ?? "ready"}
+                </span>
+                <span className="opacity-70">·</span>
+                <span className="opacity-80">{activity?.autonomous.detail ?? "watching..."}</span>
               </div>
-              <div className="absolute bottom-3 right-4">
-                <span className="text-[8px] font-mono" style={{ color: "#39ff14", opacity: 0.3 }}>
-                  ${status?.budget.remaining.toFixed(2) ?? "10"} remaining
+              <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-black/40 text-amber-100 backdrop-blur-sm">
+                <span className="opacity-70">budget</span>
+                <span
+                  className={`tabular-nums ${
+                    (activity?.budgetPercent ?? 0) >= 90
+                      ? "text-red-400"
+                      : (activity?.budgetPercent ?? 0) >= 70
+                      ? "text-amber-300"
+                      : "text-emerald-300"
+                  }`}
+                >
+                  {activity?.budgetPercent ?? 0}%
                 </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Live Terminal */}
-        <Card className="flex flex-col" style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.15)" }}>
-          <CardHeader className="pb-2" style={{ borderBottom: "1px solid rgba(57,255,20,0.1)" }}>
-            <CardTitle className="text-xs font-mono flex items-center gap-2" style={{ color: "#39ff14" }}>
-              <Terminal className="size-3.5" />LIVE LOG
-              {autoMode && <span className="text-[9px] text-green-400 animate-pulse">● RECORDING</span>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 p-3 font-mono text-[10px] overflow-y-auto max-h-[340px] space-y-1">
-            <p className="opacity-30" style={{ color: "#39ff14" }}>█ AUTONOMOUS FORGE v3.0</p>
-            <p className="opacity-30" style={{ color: "#39ff14" }}>──────────────────────────</p>
-
-            {status && (
-              <>
-                <p style={{ color: STATUS_COLOR[status.action] === "red" ? "#ef4444" : STATUS_COLOR[status.action] === "yellow" ? "#facc15" : "#22c55e" }}>
-                  ▶ {status.action.toUpperCase()}: {status.detail}
-                </p>
-                <p className="opacity-40" style={{ color: "#39ff14" }}>
-                  Budget: ${status.budget.used.toFixed(2)} / ${status.budget.cap}
-                </p>
-                <p className="opacity-40" style={{ color: "#39ff14" }}>
-                  Backlog: {status.backlog.unlistedAssets} unlisted | {status.backlog.stuckRuns} stuck | {status.backlog.packsToPublish} publish
-                </p>
-                <p className="opacity-30" style={{ color: "#39ff14" }}>──────────────────────────</p>
-              </>
-            )}
-
-            {activityLog.map((entry, i) => (
-              <p key={i} className="opacity-50" style={{ color: entry.includes("ERROR") ? "#ef4444" : entry.includes("PAUSED") ? "#facc15" : "#39ff14" }}>
-                {entry}
-              </p>
-            ))}
-
-            {activityLog.length === 0 && (
-              <p className="opacity-20" style={{ color: "#39ff14" }}>Waiting for activity...</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Footer */}
-      <Card style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.1)" }}>
-        <CardContent className="py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {autoMode ? (
-              <Zap className="size-4 animate-pulse" style={{ color: "#39ff14" }} />
-            ) : (
-              <Wrench className="size-4 opacity-40" style={{ color: "#39ff14" }} />
-            )}
-            <span className="font-mono text-[10px] opacity-40" style={{ color: "#39ff14" }}>
-              {autoMode
-                ? "AUTO MODE — orchestrator managing forge autonomously every 15s"
-                : "Toggle Auto Mode to let the forge run itself — you just monitor"}
-            </span>
           </div>
-          <div className="flex items-center gap-4 font-mono text-[10px]" style={{ color: "#39ff14", opacity: 0.25 }}>
-            <span>v3.0</span><span>AUTO</span><span>{new Date().toLocaleTimeString()}</span>
+
+          {/* Activity log strip */}
+          <div className="border-t border-border bg-card px-4 py-3 flex items-start gap-3 max-h-32 overflow-y-auto">
+            <div className="text-xs font-mono text-muted-foreground shrink-0 pt-0.5">LOG</div>
+            <div className="flex-1 space-y-0.5">
+              {!activity || activity.steps.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Crew is idle. Start a run to see chatter.</p>
+              ) : (
+                activity.steps
+                  .slice()
+                  .reverse()
+                  .map((s, i) => {
+                    const agent = AGENTS.find((a) => a.id === s.agent)
+                    const tint =
+                      s.status === "failed"
+                        ? "text-red-500"
+                        : s.status === "completed"
+                        ? "text-emerald-500"
+                        : s.status === "running"
+                        ? "text-blue-500"
+                        : "text-muted-foreground"
+                    return (
+                      <p key={`${s.step}-${i}`} className="text-xs flex items-center gap-2">
+                        <span className="text-base">{agent?.emoji ?? "•"}</span>
+                        <span className={`font-mono ${tint}`}>{s.step}</span>
+                        <span className="text-muted-foreground truncate">{s.summary}</span>
+                      </p>
+                    )
+                  })
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <style jsx global>{`
-        @keyframes slide {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(1200%); }
-        }
-      `}</style>
+      {activity?.autonomous.action === "blocked" && (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardContent className="p-3 flex items-center gap-2 text-sm">
+            <AlertTriangle className="size-4 text-red-500" />
+            <span className="font-medium">Crew is blocked.</span>
+            <span className="text-muted-foreground">{activity.autonomous.detail}</span>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <LegendDot color="bg-blue-500" label="running" />
+          <LegendDot color="bg-emerald-500" label="completed" />
+          <LegendDot color="bg-red-500" label="failed" />
+        </div>
+        <Badge variant="secondary" className="text-[10px]">
+          live · {autoPolling ? "every 4s" : "paused"}
+        </Badge>
+      </div>
+    </div>
+  )
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`size-1.5 rounded-full ${color}`} />
+      {label}
+    </span>
+  )
+}
+
+function SpeechBubble({
+  text,
+  variant,
+  above,
+}: {
+  text: string
+  variant: ActiveBubble["variant"]
+  above: boolean
+}) {
+  const bg =
+    variant === "fail"
+      ? "bg-red-50 dark:bg-red-950/85"
+      : variant === "did"
+      ? "bg-emerald-50 dark:bg-emerald-950/85"
+      : variant === "boss"
+      ? "bg-amber-50 dark:bg-amber-950/85"
+      : "bg-white dark:bg-stone-900/85"
+  const textColor =
+    variant === "fail"
+      ? "text-red-900 dark:text-red-100"
+      : variant === "did"
+      ? "text-emerald-900 dark:text-emerald-100"
+      : variant === "boss"
+      ? "text-amber-900 dark:text-amber-100"
+      : "text-stone-900 dark:text-stone-100"
+  const border =
+    variant === "fail"
+      ? "border-red-200 dark:border-red-800"
+      : variant === "did"
+      ? "border-emerald-200 dark:border-emerald-800"
+      : variant === "boss"
+      ? "border-amber-300 dark:border-amber-700"
+      : "border-stone-200 dark:border-stone-700"
+  return (
+    <div
+      className={`absolute left-1/2 ${
+        above ? "-top-2 -translate-y-full" : "-bottom-2 translate-y-full"
+      } -translate-x-1/2 z-10 min-w-[120px] max-w-[200px]`}
+    >
+      <div
+        className={`relative rounded-xl px-3 py-2 text-[11px] font-medium leading-snug border shadow-md workshop-bubble ${bg} ${textColor} ${border}`}
+      >
+        {text}
+      </div>
+      <span
+        className={`absolute left-1/2 -translate-x-1/2 ${bg} ${
+          above ? "top-full" : "bottom-full"
+        }`}
+        style={{
+          width: 14,
+          height: 8,
+          clipPath: above
+            ? "polygon(50% 100%, 0 0, 100% 0)"
+            : "polygon(50% 0, 0 100%, 100% 100%)",
+          marginTop: above ? -1 : 0,
+          marginBottom: above ? 0 : -1,
+        }}
+      />
     </div>
   )
 }
