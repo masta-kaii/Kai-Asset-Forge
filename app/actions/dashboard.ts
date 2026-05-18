@@ -32,7 +32,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         getRecentEntries(10).catch(() => [] as CostEntry[]),
       ])
 
-    const budget = getBudgetStatus()
+    const budget = await getBudgetStatus()
 
     return {
       totalAssets,

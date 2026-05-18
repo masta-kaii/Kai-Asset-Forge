@@ -22,7 +22,7 @@ export async function scoutTrends(input: {
   provider?: AIProvider
 }): Promise<{ success: boolean; proposal?: ScoutProposal; error?: string }> {
   const provider = input.provider ?? "deepseek"
-  const guard = guardTextGen(provider, 2000)
+  const guard = await guardTextGen(provider, 2000)
   if (!guard.allowed) return { success: false, error: guard.error }
 
   const ledgerEntries = await getRecentEntries(20).catch(() => [])

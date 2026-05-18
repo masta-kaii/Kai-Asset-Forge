@@ -1,0 +1,64 @@
+version: "3.8"
+
+# KAI Asset Forge — Hermes Agent Fleet
+# Run: docker compose up -d
+# Stop: docker compose down
+# Status: docker compose ps
+
+services:
+  # ─── Central Orchestrator ───
+  kai-orchestrator:
+    image: anthropics/claude-code:latest
+    container_name: kai-orchestrator
+    working_dir: /workspace
+    volumes:
+      - ./brain.md:/workspace/brain.md:ro
+      - ./agents/kai-orchestrator/runbook.md:/workspace/runbook.md:ro
+      - ./departments:/workspace/departments:ro
+      - ./task-bus:/srv/agent-bus
+    environment:
+      - CLAUDE_PROJECT=brain.md
+      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge.vercel.app}
+      - KAI_API_TOKEN=${KAI_API_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+    profiles: [full]
+
+  # ─── Sales: Lister ───
+  lister:
+    image: anthropics/claude-code:latest
+    container_name: kai-lister
+    working_dir: /workspace
+    volumes:
+      - ./agents/lister/runbook.md:/workspace/runbook.md:ro
+      - ./brain.md:/workspace/brain.md:ro
+      - ./task-bus/sales:/srv/agent-bus/sales
+    environment:
+      - CLAUDE_PROJECT=runbook.md
+      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge.vercel.app}
+      - KAI_API_TOKEN=${KAI_API_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+    profiles: [full]
+
+  # ─── Ops: Monitor ───
+  monitor:
+    image: alpine:latest
+    container_name: kai-monitor
+    command: >
+      sh -c '
+        apk add --no-cache curl jq;
+        while true; do
+          echo "[$$(date -Iseconds)] Checking health..." > /srv/agent-bus/ops/outbox/status.md;
+          curl -s -H "Authorization: Bearer $$KAI_API_TOKEN" "$$KAI_API_BASE/api/agents/health" |
+            jq . > /srv/agent-bus/ops/outbox/health-$$(date +%H%M).json 2>/dev/null;
+          sleep 300;
+        done
+      '
+    volumes:
+      - ./task-bus/ops:/srv/agent-bus/ops
+    environment:
+      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge.vercel.app}
+      - KAI_API_TOKEN=${KAI_API_TOKEN}
+    restart: unless-stopped
+    profiles: [full]

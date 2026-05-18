@@ -35,7 +35,7 @@ async function getUnlistedApprovedAssets(): Promise<{ id: string; type: string; 
 }
 
 export async function autonomousTick(): Promise<AutonomousStatus> {
-  const budget = getBudgetStatus()
+  const budget = await getBudgetStatus()
   const openaiOk = (await getProviderStatus("openai")) !== "down"
   const deepseekOk = (await getProviderStatus("deepseek")) !== "down"
 

@@ -133,7 +133,7 @@ export async function runOrchestrator(input?: {
 
     // ═══ Step 1: Budget Check ═══
     if (!isDone("Budget Check")) {
-      const budget = getBudgetStatus()
+      const budget = await getBudgetStatus()
       if (budget.isExceeded) {
         await log({ step: "Budget Check", status: "failed", summary: `Budget exceeded: $${budget.monthlyUsed.toFixed(2)}/$${budget.monthlyCap.toFixed(2)}` })
         await updateDoc(ref, { status: "awaiting_resume", error: "Budget exceeded" })
@@ -167,7 +167,7 @@ export async function runOrchestrator(input?: {
     if (!isDone("Decision") && !cachedWinning && cachedProposals.length > 0) {
       const ledgerEntries = await getRecentEntries(30).catch(() => [])
       const pastTypes = [...new Set(ledgerEntries.filter(e => e.operation === "image_gen").map(e => e.metadata?.assetType).filter(Boolean))]
-      const budget = getBudgetStatus()
+      const budget = await getBudgetStatus()
       const decision = await generateText({
         prompt: `Pick the BEST proposal from this list. Consider: trending score, avoid recently tried types (${pastTypes.join(", ")}), budget remaining ($${budget.monthlyRemaining.toFixed(2)}). Return ONLY the number (1-${cachedProposals.length}) of the best proposal:\n\n${cachedProposals.map((p, i) => `${i + 1}. Theme: "${p.theme}", Score: ${p.trendingScore}/10, Rationale: ${p.rationale}`).join("\n")}`,
         provider: "deepseek",
