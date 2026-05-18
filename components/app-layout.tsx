@@ -10,7 +10,7 @@ import { type ReactNode } from "react"
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const isAuthPage = pathname === "/login" || pathname === "/signup"
+  const isAuthPage = pathname === "/login"
 
   return (
     <AuthProvider>

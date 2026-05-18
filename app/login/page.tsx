@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -84,10 +83,7 @@ export default function LoginPage() {
           </form>
           <Separator className="my-4" />
           <p className="text-xs text-center text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-primary hover:underline font-medium">
-              Create one
-            </Link>
+            Private forge — operator access only
           </p>
         </CardContent>
       </Card>

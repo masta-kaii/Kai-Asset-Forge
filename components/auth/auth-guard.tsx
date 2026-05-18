@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { useEffect, type ReactNode } from "react"
 import { Loader2, Anvil } from "lucide-react"
 
-const PUBLIC_PATHS = ["/login", "/signup"]
+const PUBLIC_PATHS = ["/login"]
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
