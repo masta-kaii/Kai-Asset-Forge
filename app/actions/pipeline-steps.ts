@@ -71,7 +71,7 @@ export async function forgeStepGenerate(input: {
   style: AssetStyle
   imageProvider?: AIProvider
 }): Promise<StepResult> {
-  const provider = input.imageProvider ?? "gemini"
+  const provider = input.imageProvider ?? "openai"
   try {
     const prompt = `Art direction: ${input.artDirection}\n\nGenerate a ${input.assetType} game asset following this art direction. Game-ready, detailed, pixel art style.`
     const imgResult = await generateImage({ prompt, provider, n: 1, size: "1024x1024", quality: "auto" })

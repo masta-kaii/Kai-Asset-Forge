@@ -42,7 +42,7 @@ export default function AssetGeneratorPage() {
   const [style, setStyle] = useState<AssetStyle>("pastel-cyber-fantasy")
   const [batchCount, setBatchCount] = useState(4)
   const [prompt, setPrompt] = useState("")
-  const [provider, setProvider] = useState<AIProvider>("gemini")
+  const [provider, setProvider] = useState<AIProvider>("openai")
   const { isGenerating, error, results, generate } = useGeneration()
 
   const handleGenerate = () => {

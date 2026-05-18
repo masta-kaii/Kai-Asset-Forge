@@ -51,7 +51,7 @@ export async function generateAssets(input: GenerateInput): Promise<GenerateResu
 async function generateAssetsInternal(input: GenerateInput): Promise<GenerateResult> {
   const { prompt, assetType, style, batchCount, quality, provider } = input
 
-  const imageProvider = provider ?? "gemini"
+  const imageProvider = provider ?? "openai"
   const guard = guardImageGen(imageProvider, batchCount)
   if (!guard.allowed) {
     return { success: false, assets: [], error: guard.error }

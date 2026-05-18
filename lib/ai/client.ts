@@ -24,12 +24,23 @@ function parseSize(size: string): { width: number; height: number } {
 
 export async function generateImage(params: ImageGenParams): Promise<ImageGenResponse> {
   const provider = params.provider ?? "openai"
-  switch (provider) {
-    case "gemini":
-      return generateImageWithGemini(params)
-    default:
+
+  // Try primary provider, fall back to the other
+  if (provider === "gemini") {
+    const geminiResult = await generateImageWithGemini(params)
+    if (!geminiResult.success && geminiResult.error?.includes("paid plan")) {
       return generateImageWithOpenAI(params)
+    }
+    return geminiResult
   }
+
+  // OpenAI primary → fall back to Gemini
+  const openaiResult = await generateImageWithOpenAI(params)
+  if (!openaiResult.success) {
+    const geminiResult = await generateImageWithGemini(params)
+    if (geminiResult.success) return geminiResult
+  }
+  return openaiResult
 }
 
 async function generateImageWithOpenAI(params: ImageGenParams): Promise<ImageGenResponse> {

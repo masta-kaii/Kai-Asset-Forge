@@ -84,7 +84,7 @@ export default function DashboardPage() {
         artDirection,
         assetType,
         style: (proposal?.style as AssetStyle) ?? "pixel-art",
-        imageProvider: "gemini",
+        imageProvider: "openai",
       })
       report(s3)
       const assetId = (s3.data as Record<string, unknown>)?.assetId as string
