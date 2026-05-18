@@ -4,6 +4,7 @@ import { generateImage } from "@/lib/ai/client"
 import { createAsset } from "@/lib/firebase/assets"
 import { createGeneration } from "@/lib/firebase/generations"
 import { uploadAssetBuffer } from "@/lib/firebase/storage"
+import { postProcessPixelArt } from "@/app/actions/postprocess"
 import type { AssetType, AssetStyle } from "@/lib/types"
 import type { ImageGenParams, AIProvider } from "@/lib/ai/types"
 import { guardImageGen, logImageCost } from "@/app/actions/budget-guard"
@@ -58,7 +59,7 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
   }
 
   const params: ImageGenParams = {
-    prompt,
+    prompt: `pixel art game asset, ${style.replace(/-/g, " ")}, ${prompt}. 32x32 true pixel art style, limited 16-color palette, sharp pixel edges, no anti-aliasing, no smooth shading, blocky retro aesthetic, transparent background, game-ready sprite.`,
     provider,
     size: "1024x1024",
     n: batchCount,
@@ -81,8 +82,21 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
       let storageUrl = ""
       try {
         const rawBuffer = img.buffer ?? new Uint8Array(await downloadImageBuffer(img.url))
-        const path = `assets/${assetType}/${timestamp}-${i + 1}.png`
-        storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
+
+        // Post-process into pixel art: downscale + quantize
+        const pxUrl = await postProcessPixelArt(rawBuffer, {
+          targetSize: 128,
+          assetType,
+          identifier: `${timestamp}-${i + 1}`,
+        })
+
+        if (pxUrl) {
+          storageUrl = pxUrl
+        } else {
+          // Post-processing failed, upload original
+          const path = `assets/${assetType}/${timestamp}-${i + 1}.png`
+          storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
+        }
       } catch (uploadErr) {
         console.error(`Storage upload failed for ${name}:`, uploadErr)
         storageErrors++
