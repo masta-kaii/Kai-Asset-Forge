@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Package, Plus, ImageIcon, Check, Sparkles } from "lucide-react"
+import { Package, Plus, ImageIcon, Check, Sparkles, Globe, Loader2 } from "lucide-react"
 import { fetchAssetsByStatus } from "@/app/actions/assets"
 import { fetchPacks, createNewPack } from "@/app/actions/packs"
+import { publishPack } from "@/app/actions/marketplace"
 import type { Asset, AssetPack } from "@/lib/types"
 
 export default function ProductBuilderPage() {
@@ -25,6 +26,20 @@ export default function ProductBuilderPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [publishingId, setPublishingId] = useState<string | null>(null)
+  const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set())
+
+  const handlePublishPack = async (pack: AssetPack) => {
+    setPublishingId(pack.id)
+    try {
+      const results = await publishPack(pack)
+      results.forEach((r) => {
+        if (r.success) setPublishedIds((prev) => new Set([...prev, pack.id]))
+      })
+    } finally {
+      setPublishingId(null)
+    }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -276,12 +291,31 @@ export default function ProductBuilderPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{pack.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {pack.assets.length} assets · ${pack.price.toFixed(2)} · {pack.status}
+                      {pack.assets.length} assets · ${pack.price.toFixed(2)}
+                      {publishedIds.has(pack.id) && " · published"}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="text-xs shrink-0">
-                    {pack.status}
-                  </Badge>
+                  {publishedIds.has(pack.id) ? (
+                    <Badge className="text-xs shrink-0 bg-green-500/10 text-green-500 border-green-500/20 gap-1">
+                      <Globe className="size-2.5" />
+                      Live
+                    </Badge>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1 shrink-0"
+                      onClick={() => handlePublishPack(pack)}
+                      disabled={publishingId === pack.id}
+                    >
+                      {publishingId === pack.id ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Globe className="size-3" />
+                      )}
+                      Publish
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
