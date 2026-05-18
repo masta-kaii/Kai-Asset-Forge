@@ -8,8 +8,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
   LayoutDashboard, Sparkles, Library, Package, FileText,
-  Activity, Settings, Anvil, Monitor, Bug,
+  Activity, Settings, Anvil, Monitor, Bug, LogOut,
 } from "lucide-react"
+import { useAuth } from "@/lib/auth/auth-context"
 
 const NAV_ITEMS = [
   {
@@ -61,6 +62,7 @@ const NAV_ITEMS = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { user, signOut } = useAuth()
 
   return (
     <aside className="fixed top-0 left-0 z-40 h-screen w-60 border-r border-border bg-sidebar flex flex-col">
@@ -115,6 +117,20 @@ export function AppSidebar() {
           </div>
         </div>
       </ScrollArea>
+      {user && (
+        <div className="border-t border-border p-3 flex items-center gap-2">
+          <div className="size-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">
+            {user.email?.charAt(0).toUpperCase() ?? "?"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium truncate">{user.email}</p>
+            <p className="text-[10px] text-muted-foreground">Forge Operator</p>
+          </div>
+          <button onClick={signOut} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" title="Sign out">
+            <LogOut className="size-3.5" />
+          </button>
+        </div>
+      )}
     </aside>
   )
 }
