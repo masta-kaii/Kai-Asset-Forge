@@ -77,14 +77,17 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
     result.images.map(async (img, i) => {
       const name = `${assetType}-${style}-${timestamp}-${i + 1}`
 
-      let storageUrl = img.url
+      let storageUrl = ""
       try {
         const rawBuffer = img.buffer ?? new Uint8Array(await downloadImageBuffer(img.url))
         const path = `assets/${assetType}/${timestamp}-${i + 1}.png`
         storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
       } catch {
-        // fall back to OpenAI CDN URL if storage upload fails
+        // Skip asset if storage upload fails — data URLs are too large for Firestore
+        return null
       }
+
+      if (!storageUrl) return null
 
       const asset = await createAsset({
         name,
@@ -117,7 +120,7 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
         status: asset.status,
       }
     })
-  )
+  ).then((results) => results.filter((a): a is NonNullable<typeof a> => a !== null))
 
   logImageCost(imageProvider, "default", result.images.length, params.size ?? "1024x1024", {
     assetType,

@@ -82,12 +82,20 @@ export async function forgeStepGenerate(input: {
 
     const img = imgResult.images[0]
     const name = `${input.assetType}-forge-${Date.now()}`
-    let storageUrl = img.url
+
+    // Upload to Firebase Storage — data URLs are too large for Firestore
+    let storageUrl = ""
     try {
       const rawBuffer = img.buffer ?? Buffer.from(await (await fetch(img.url)).arrayBuffer())
       const path = `assets/${input.assetType}/forge-${Date.now()}.png`
       storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
-    } catch { /* fallback to CDN URL */ }
+    } catch {
+      return { step: "Asset Generation", status: "failed", summary: "Storage upload failed", error: "Could not upload asset to Firebase Storage" }
+    }
+
+    if (!storageUrl) {
+      return { step: "Asset Generation", status: "failed", summary: "No storage URL", error: "Storage upload returned empty URL" }
+    }
 
     const asset = await createAsset({
       name,
