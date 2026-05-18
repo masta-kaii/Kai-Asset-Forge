@@ -21,6 +21,15 @@ interface UIMessage extends StoredMastaMessage {
   toolEventsFull?: MastaToolEvent[]
 }
 
+const QUICK_ACTIONS: { label: string; prompt: string }[] = [
+  { label: "Status", prompt: "What's our status right now?" },
+  { label: "What's ready to ship?", prompt: "Show me packs that are ready to upload." },
+  { label: "Scout a niche", prompt: "Scout a new pixel-art game asset niche that's trending on itch.io." },
+  { label: "Run a pack", prompt: "Run a new forge pack on cozy farming creatures, 3 assets." },
+  { label: "Resume stuck run", prompt: "Resume any stuck orchestrator run." },
+  { label: "How can we do better?", prompt: "Reflect on recent runs and tell me what to improve." },
+]
+
 export default function MastaPage() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<UIMessage[]>([])
@@ -139,16 +148,27 @@ export default function MastaPage() {
 
         {!loading && messages.length === 0 && (
           <Card className="border-dashed">
-            <CardContent className="py-8 text-center space-y-3">
-              <Crown className="size-8 text-primary mx-auto" />
+            <CardContent className="py-10 text-center space-y-4 max-w-md mx-auto">
+              <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                <Crown className="size-6 text-primary" />
+              </div>
               <div>
-                <p className="text-sm font-medium">Talk to Masta</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Try: <span className="font-mono">status</span>,{" "}
-                  <span className="font-mono">scout a new niche</span>,{" "}
-                  <span className="font-mono">run a pack on cozy farming</span>,{" "}
-                  <span className="font-mono">resume stuck run</span>.
+                <p className="text-base font-medium">Masta is your master agent</p>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Tell me what you want done. I'll delegate to Scout, the orchestrator,
+                  the curator, or kick off a new pack — and report back.
                 </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 justify-center pt-2">
+                {QUICK_ACTIONS.map((q) => (
+                  <button
+                    key={q.label}
+                    onClick={() => setInput(q.prompt)}
+                    className="text-xs px-2.5 py-1 rounded-full border border-border bg-background hover:bg-accent hover:border-primary/30 transition-colors"
+                  >
+                    {q.label}
+                  </button>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -198,7 +218,20 @@ export default function MastaPage() {
       </div>
 
       <Separator />
-      <div className="px-6 py-4 shrink-0">
+      <div className="px-6 py-4 shrink-0 space-y-2">
+        {messages.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+            {QUICK_ACTIONS.map((q) => (
+              <button
+                key={q.label}
+                onClick={() => setInput(q.prompt)}
+                className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-background hover:bg-accent hover:border-primary/30 transition-colors whitespace-nowrap shrink-0"
+              >
+                {q.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 items-end">
           <Textarea
             value={input}
@@ -214,7 +247,7 @@ export default function MastaPage() {
             Send
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2 font-mono">
+        <p className="text-[10px] text-muted-foreground font-mono">
           Enter to send · Shift+Enter for newline
         </p>
       </div>

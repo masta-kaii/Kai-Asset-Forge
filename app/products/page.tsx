@@ -104,11 +104,9 @@ export default function ProductBuilderPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold tracking-tight">
-            Product Builder
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Create commercial asset packs for marketplace selling
+          <h1 className="text-2xl font-heading font-bold tracking-tight">Packs</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Bundle approved assets into commercial packs and prepare them for itch.io.
           </p>
         </div>
       </div>
@@ -201,14 +199,15 @@ export default function ProductBuilderPage() {
                   const asset = approvedAssets.find((a) => a.id === id)
                   if (!asset) return null
                   return (
-                    <div key={id} className="aspect-square bg-muted rounded-md overflow-hidden relative">
+                    <div key={id} className="aspect-square pixel-bg rounded-md overflow-hidden relative ring-1 ring-border">
                       {asset.previewUrl && (
                         <Image
                           src={asset.previewUrl}
                           alt={asset.name}
                           fill
-                          className="object-cover"
+                          className="object-contain pixel-img p-1"
                           sizes="25vw"
+                          unoptimized
                         />
                       )}
                       <div className="absolute top-1 right-1">
@@ -252,7 +251,7 @@ export default function ProductBuilderPage() {
                 <button
                   key={asset.id}
                   onClick={() => toggleAsset(asset.id)}
-                  className={`aspect-square bg-muted rounded-md overflow-hidden relative border-2 transition-colors ${
+                  className={`aspect-square pixel-bg rounded-md overflow-hidden relative ring-1 ring-border border-2 transition-colors ${
                     selectedIds.has(asset.id)
                       ? "border-primary ring-2 ring-primary/20"
                       : "border-transparent hover:border-muted-foreground/30"
@@ -263,8 +262,9 @@ export default function ProductBuilderPage() {
                       src={asset.previewUrl}
                       alt={asset.name}
                       fill
-                      className="object-cover"
+                      className="object-contain pixel-img p-1"
                       sizes="12.5vw"
+                      unoptimized
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full">
@@ -304,7 +304,7 @@ export default function ProductBuilderPage() {
             <div className="space-y-3">
               {packs.map((pack) => (
                 <div key={pack.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                  <div className="size-10 bg-muted rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+                  <div className="size-10 pixel-bg rounded-md flex items-center justify-center shrink-0 overflow-hidden ring-1 ring-border">
                     {pack.previewUrl ? (
                       <Image src={pack.previewUrl} alt={pack.title} width={40} height={40} className="object-cover" />
                     ) : (

@@ -117,6 +117,32 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Checkered backdrop for transparent pixel-art assets. */
+.pixel-bg {
+  background-color: oklch(0.97 0 0);
+  background-image:
+    linear-gradient(45deg, oklch(0.92 0 0) 25%, transparent 25%),
+    linear-gradient(-45deg, oklch(0.92 0 0) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, oklch(0.92 0 0) 75%),
+    linear-gradient(-45deg, transparent 75%, oklch(0.92 0 0) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.dark .pixel-bg {
+  background-color: oklch(0.18 0 0);
+  background-image:
+    linear-gradient(45deg, oklch(0.22 0 0) 25%, transparent 25%),
+    linear-gradient(-45deg, oklch(0.22 0 0) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, oklch(0.22 0 0) 75%),
+    linear-gradient(-45deg, transparent 75%, oklch(0.22 0 0) 75%);
+}
+
+/* Crisp pixel rendering for upscaled previews. */
+.pixel-img {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

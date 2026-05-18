@@ -54,18 +54,19 @@ export function PreviewGallery({ assets, isGenerating, error }: PreviewGalleryPr
   return (
     <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
       {assets.map((asset) => (
-        <Card key={asset.id} className="overflow-hidden group">
+        <Card key={asset.id} className="overflow-hidden group p-0">
           <CardContent className="p-0">
-            <div className="aspect-square bg-muted relative">
+            <div className="aspect-square pixel-bg relative">
               <Image
                 src={asset.previewUrl}
                 alt={asset.name}
                 fill
-                className="object-cover"
+                className="object-contain pixel-img p-2"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                unoptimized
               />
             </div>
-            <div className="p-2">
+            <div className="p-2 border-t border-border">
               <p className="text-xs font-medium truncate">{asset.name}</p>
               <p className="text-[10px] text-muted-foreground capitalize">{asset.type} · {asset.style.replace(/-/g, " ")}</p>
             </div>

@@ -154,38 +154,60 @@ export default function AssetLibraryPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3">
           {filteredAssets.map((asset) => (
             <Card
               key={asset.id}
-              className="overflow-hidden group cursor-pointer hover:border-primary/50 transition-colors"
+              className="overflow-hidden group hover:border-primary/50 transition-colors p-0"
             >
-              <div className="aspect-square bg-muted relative">
+              <div className="aspect-square pixel-bg relative">
                 {asset.previewUrl ? (
                   <Image
                     src={asset.previewUrl}
                     alt={asset.name}
                     fill
-                    className="object-cover"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                    className="object-contain pixel-img p-1"
+                    sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
+                    unoptimized
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <Sparkles className="size-8 text-muted-foreground/30" />
                   </div>
                 )}
-                <div className="absolute top-2 right-2">
-                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusColor[asset.status] ?? ""}`}>
+                <div className="absolute top-1 left-1 right-1 flex items-start justify-between gap-1">
+                  <div className="flex flex-col gap-1">
+                    {asset.pixelSize && (
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] px-1 py-0 h-4 font-mono bg-background/80 backdrop-blur-sm border-border"
+                      >
+                        {asset.pixelSize}px
+                      </Badge>
+                    )}
+                    {asset.paletteSize ? (
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] px-1 py-0 h-4 font-mono bg-background/80 backdrop-blur-sm border-border"
+                      >
+                        {asset.paletteSize}c
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`text-[9px] px-1 py-0 h-4 ${statusColor[asset.status] ?? ""}`}
+                  >
                     {asset.status}
                   </Badge>
                 </div>
                 {asset.status === "review" && (
-                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-background/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-center">
+                  <div className="absolute bottom-0 left-0 right-0 p-1.5 flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-background/95 via-background/70 to-transparent">
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="h-7 text-xs gap-1 bg-green-500/20 hover:bg-green-500/30 text-green-500"
-                      onClick={(e) => { e.stopPropagation(); handleApprove(asset.id) }}
+                      className="h-6 text-[10px] gap-1 bg-green-500/20 hover:bg-green-500/30 text-green-500 flex-1"
+                      onClick={() => handleApprove(asset.id)}
                     >
                       <Check className="size-3" />
                       Approve
@@ -193,18 +215,17 @@ export default function AssetLibraryPage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="h-7 text-xs gap-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
-                      onClick={(e) => { e.stopPropagation(); handleReject(asset.id) }}
+                      className="h-6 text-[10px] gap-1 bg-red-500/20 hover:bg-red-500/30 text-red-500 flex-1"
+                      onClick={() => handleReject(asset.id)}
                     >
                       <X className="size-3" />
-                      Reject
                     </Button>
                   </div>
                 )}
               </div>
-              <CardContent className="p-3">
-                <p className="text-xs font-medium truncate">{asset.name}</p>
-                <p className="text-[10px] text-muted-foreground capitalize">{asset.type} · {asset.style}</p>
+              <CardContent className="p-2 border-t border-border">
+                <p className="text-[11px] font-medium truncate leading-tight">{asset.name}</p>
+                <p className="text-[9px] text-muted-foreground capitalize">{asset.type}</p>
               </CardContent>
             </Card>
           ))}

@@ -1,18 +1,40 @@
 "use server"
 
-import { getAssetCount } from "@/lib/firebase/assets"
-import { getReadyPacks } from "@/lib/firebase/packs"
+import { getAssetCount, getAssetsByStatus } from "@/lib/firebase/assets"
+import { getPacks } from "@/lib/firebase/packs"
 import { getActiveWorkflows } from "@/lib/firebase/workflows"
+import { findIncompleteRun } from "@/app/actions/orchestrator"
+import { getBudgetStatus } from "@/lib/budget/budget"
 
-export async function getSidebarStats(): Promise<{
-  assetsToday: number
-  readyPacks: number
-  activeAgents: number
-}> {
-  const [totalAssets, readyPacks, active] = await Promise.all([
+export interface SidebarBadges {
+  totalAssets: number
+  pendingReview: number
+  readyToUpload: number
+  liveOnStore: number
+  stuckRun: boolean
+  budgetExceeded: boolean
+  monthlyPercent: number
+}
+
+export async function getSidebarStats(): Promise<SidebarBadges> {
+  const [totalAssets, review, packs, active, stuck] = await Promise.all([
     getAssetCount().catch(() => 0),
-    getReadyPacks().catch(() => 0),
+    getAssetsByStatus("review").catch(() => []),
+    getPacks().catch(() => []),
     getActiveWorkflows().then((w) => w.length).catch(() => 0),
+    findIncompleteRun().catch(() => null),
   ])
-  return { assetsToday: totalAssets, readyPacks, activeAgents: active }
+  const readyToUpload = packs.filter((p) => p.zipUrl && !p.storeUrl).length
+  const liveOnStore = packs.filter((p) => !!p.storeUrl).length
+  const budget = getBudgetStatus()
+  void active
+  return {
+    totalAssets,
+    pendingReview: review.length,
+    readyToUpload,
+    liveOnStore,
+    stuckRun: !!stuck,
+    budgetExceeded: budget.isExceeded,
+    monthlyPercent: Math.round(budget.monthlyPercent ?? 0),
+  }
 }

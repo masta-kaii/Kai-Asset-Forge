@@ -2,11 +2,13 @@
 
 import { getAssetCount, getRecentAssets } from "@/lib/firebase/assets"
 import { getRecentGenerations } from "@/lib/firebase/generations"
-import { getReadyPacks } from "@/lib/firebase/packs"
+import { getReadyPacks, getPacks } from "@/lib/firebase/packs"
 import { getActiveWorkflows } from "@/lib/firebase/workflows"
 import { getBudgetStatus } from "@/lib/budget/budget"
 import { getRecentEntries } from "@/lib/firebase/ledger"
-import type { Asset, GenerationRecord } from "@/lib/types"
+import { autonomousTick, type AutonomousStatus } from "@/app/actions/autonomous-agent"
+import { findIncompleteRun } from "@/app/actions/orchestrator"
+import type { Asset, AssetPack, GenerationRecord } from "@/lib/types"
 import type { BudgetStatus, CostEntry } from "@/lib/budget/types"
 
 export interface DashboardData {
@@ -59,6 +61,63 @@ export async function getDashboardData(): Promise<DashboardData> {
       recentCosts: [],
       error: message,
     }
+  }
+}
+
+export interface CockpitData {
+  autonomous: AutonomousStatus
+  budget: BudgetStatus
+  totalAssets: number
+  pendingReview: number
+  approvedAssets: number
+  recentAssets: Asset[]
+  packsReadyToUpload: AssetPack[]
+  packsLive: AssetPack[]
+  packsInProgress: AssetPack[]
+  stuckRunId: string | null
+  stuckRunStepsDone: number
+  recentCosts: CostEntry[]
+}
+
+export async function getCockpitData(): Promise<CockpitData> {
+  const [autonomous, totalAssets, recentAssets, packs, stuck, recentCosts] = await Promise.all([
+    autonomousTick().catch((): AutonomousStatus => ({
+      action: "idle",
+      detail: "Scan error",
+      timestamp: new Date().toISOString(),
+      backlog: { unlistedAssets: 0, stuckRuns: 0, packsToPublish: 0 },
+      providers: { openai: "healthy", deepseek: "healthy" },
+      budget: { used: 0, cap: 10, remaining: 10 },
+      shouldForge: false,
+      isProcessing: false,
+    })),
+    getAssetCount().catch(() => 0),
+    getRecentAssets(12).catch(() => [] as Asset[]),
+    getPacks().catch(() => [] as AssetPack[]),
+    findIncompleteRun().catch(() => null),
+    getRecentEntries(8).catch(() => [] as CostEntry[]),
+  ])
+
+  const pendingReview = recentAssets.filter((a) => a.status === "review").length
+  const approvedAssets = recentAssets.filter((a) => a.status === "approved").length
+
+  const packsReadyToUpload = packs.filter((p) => p.zipUrl && !p.storeUrl)
+  const packsLive = packs.filter((p) => !!p.storeUrl)
+  const packsInProgress = packs.filter((p) => !p.zipUrl)
+
+  return {
+    autonomous,
+    budget: getBudgetStatus(),
+    totalAssets,
+    pendingReview,
+    approvedAssets,
+    recentAssets,
+    packsReadyToUpload,
+    packsLive,
+    packsInProgress,
+    stuckRunId: stuck?.runId ?? null,
+    stuckRunStepsDone: stuck?.completedSteps.length ?? 0,
+    recentCosts,
   }
 }
 
