@@ -36,8 +36,14 @@ export default function DashboardPage() {
     toast.info("Forge pipeline started — runs server-side, survives refresh")
 
     try {
-      const { runId } = await startForgePipeline({ theme: "fantasy creatures" })
-      const run = await getPipelineRun(runId)
+      const result = await startForgePipeline({ theme: "fantasy creatures" })
+      if (result.error) {
+        setForgeError(result.error)
+        toast.error(result.error)
+        setForgeRunning(false)
+        return
+      }
+      const run = await getPipelineRun(result.runId)
       if (run) {
         setForgeSteps(run.steps.map((s) => ({ step: s.step, status: s.status, summary: s.summary })))
         if (run.status === "completed") toast.success(`Forge complete! ${run.steps.length} steps`)

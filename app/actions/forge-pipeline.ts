@@ -28,26 +28,25 @@ export interface PipelineRun {
 
 export async function startForgePipeline(input: {
   theme?: string
-}): Promise<{ runId: string }> {
-  const theme = input.theme ?? "fantasy creatures"
-  const runId = `forge-${Date.now()}`
-  const db = getDb()
+}): Promise<{ runId: string; error?: string }> {
+  try {
+    const theme = input.theme ?? "fantasy creatures"
+    const runId = `forge-${Date.now()}`
+    const db = getDb()
 
-  const run: PipelineRun = {
-    id: runId,
-    status: "running",
-    theme,
-    startedAt: new Date().toISOString(),
-    totalCost: 0,
-    steps: [],
+    const run: PipelineRun = {
+      id: runId, status: "running", theme,
+      startedAt: new Date().toISOString(), totalCost: 0, steps: [],
+    }
+
+    await setDoc(doc(db, COLLECTION, runId), run)
+    await runForgePipeline(runId, theme)
+    return { runId }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Pipeline crashed"
+    console.error("startForgePipeline error:", msg)
+    return { runId: "", error: msg }
   }
-
-  await setDoc(doc(db, COLLECTION, runId), run)
-
-  // Run synchronously so Vercel keeps the function alive
-  await runForgePipeline(runId, theme)
-
-  return { runId }
 }
 
 async function runForgePipeline(runId: string, theme: string) {
