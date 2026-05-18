@@ -14,7 +14,8 @@ import { AGENTS } from "@/lib/agents/agent-types"
 import { usePipeline } from "@/hooks/use-pipeline"
 import { runOrchestrator, findIncompleteRun } from "@/app/actions/orchestrator"
 import { getDashboardData } from "@/app/actions/dashboard"
-import { pause as pauseKill, resume as resumeKill, isPaused } from "@/lib/budget/kill-switch"
+import { pause as pauseKill, resume as resumeKill } from "@/lib/budget/kill-switch"
+import { autonomousTick } from "@/app/actions/autonomous-agent"
 import { toast } from "sonner"
 import type { BudgetStatus } from "@/lib/budget/types"
 import type { Asset } from "@/lib/types"
@@ -50,6 +51,23 @@ export default function DashboardPage() {
         toast.info(`Found incomplete forge run. ${run.completedSteps.length} steps done. Resume to continue.`, { duration: 8000 })
       }
     }).catch(() => {})
+
+    // Auto-start the forge on every page load if ready
+    const autoStart = async () => {
+      const tick = await autonomousTick().catch(() => null)
+      if (tick?.shouldForge && tick.action !== "blocked") {
+        setForgeRunning(true)
+        toast.info("Forge auto-started — system is ready")
+        const result = await runOrchestrator({ maxAssets: 1 }).catch(() => null)
+        if (result) {
+          setForgeSteps(result.steps.map((s) => ({ step: s.step, status: s.status, summary: s.summary })))
+          if (result.status === "completed") toast.success("Product forged!")
+          else if (result.error) setForgeError(result.error)
+        }
+        setForgeRunning(false)
+      }
+    }
+    autoStart()
   }, [])
 
   const handleOrchestrator = async () => {
