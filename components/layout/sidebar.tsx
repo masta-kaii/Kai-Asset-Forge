@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
   LayoutDashboard, Sparkles, Library, Package, FileText,
-  Activity, Settings, Anvil, Monitor, LogOut,
+  Activity, Settings, Anvil, Monitor, LogOut, Eye,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
 import { getSidebarStats } from "@/app/actions/sidebar"
@@ -29,6 +29,11 @@ const NAV_ITEMS = [
     title: "Asset Library",
     href: "/assets/library",
     icon: Library,
+  },
+  {
+    title: "Review Queue",
+    href: "/assets/review",
+    icon: Eye,
   },
   {
     title: "Product Builder",
