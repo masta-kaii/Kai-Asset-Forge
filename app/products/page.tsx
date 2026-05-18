@@ -11,10 +11,11 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
-import { Package, Plus, ImageIcon, Check, Sparkles, Download, Loader2, Wrench, ArrowUpRight, CheckCircle2 } from "lucide-react"
+import { Package, Plus, ImageIcon, Check, Sparkles, Download, Loader2, Wrench, ArrowUpRight, CheckCircle2, Boxes } from "lucide-react"
 import { fetchAssetsByStatus } from "@/app/actions/assets"
 import { fetchPacks, createNewPack } from "@/app/actions/packs"
 import { buildPackDeliverable } from "@/app/actions/pack-builder"
+import { autoPackApproved } from "@/app/actions/auto-pack"
 import { toast } from "sonner"
 import type { Asset, AssetPack } from "@/lib/types"
 
@@ -29,6 +30,30 @@ export default function ProductBuilderPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [buildingId, setBuildingId] = useState<string | null>(null)
+  const [autoPacking, setAutoPacking] = useState(false)
+
+  const handleAutoPack = async () => {
+    if (autoPacking) return
+    setAutoPacking(true)
+    toast.info("Auto-packing approved assets...")
+    try {
+      const result = await autoPackApproved()
+      if (result.created.length === 0) {
+        toast.message(result.skipped[0]?.reason ?? "Nothing to pack — need more approved assets")
+      } else {
+        const refreshed = await fetchPacks().catch(() => packs)
+        setPacks(refreshed)
+        const ready = result.created.filter((c) => c.ready).length
+        toast.success(
+          `Auto-packed ${result.created.length}${ready < result.created.length ? ` (${ready} fully ready)` : ""}`,
+        )
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Auto-pack failed")
+    } finally {
+      setAutoPacking(false)
+    }
+  }
 
   const handleBuildDeliverable = async (pack: AssetPack) => {
     setBuildingId(pack.id)
@@ -102,13 +127,23 @@ export default function ProductBuilderPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-heading font-bold tracking-tight">Packs</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Bundle approved assets into commercial packs and prepare them for itch.io.
           </p>
         </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleAutoPack}
+          disabled={autoPacking || approvedAssets.length === 0}
+          title="Group approved assets by type+style and ship as many packs as possible"
+        >
+          {autoPacking ? <Loader2 className="size-4 animate-spin" /> : <Boxes className="size-4" />}
+          {autoPacking ? "Packing..." : "Auto-pack approved"}
+        </Button>
       </div>
 
       <Separator />

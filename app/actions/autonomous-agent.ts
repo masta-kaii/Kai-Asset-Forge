@@ -4,9 +4,10 @@ import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/client"
 import { getBudgetStatus } from "@/lib/budget/budget"
 import { getAssetsByStatus, updateAssetStatus } from "@/lib/firebase/assets"
-import { createPack, getPacks } from "@/lib/firebase/packs"
+import { getPacks } from "@/lib/firebase/packs"
 import { findIncompleteRun } from "@/app/actions/orchestrator"
 import { buildPackDeliverable } from "@/app/actions/pack-builder"
+import { autoPackApproved } from "@/app/actions/auto-pack"
 
 export interface AutonomousStatus {
   action: "scanning" | "paused" | "packaging" | "publishing" | "forging" | "blocked" | "idle"
@@ -52,25 +53,31 @@ export async function autonomousTick(): Promise<AutonomousStatus> {
       return { action: "forging", detail: `Auto-resuming stuck run (${stuck.completedSteps.length}/8 steps done)`, timestamp: new Date().toISOString(), backlog: { unlistedAssets: 0, stuckRuns: 1, packsToPublish: 0 }, providers: { openai: openaiOk ? "healthy" : "degraded", deepseek: deepseekOk ? "healthy" : "degraded" }, budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining }, shouldForge: true, isProcessing: true }
     }
 
-    // 2. Auto-package unlisted approved assets
+    // 2. Auto-pack approved assets — group by (type, style), min batch enforced.
+    //    Builds the ZIP and drafts the itch.io listing in the same step so each
+    //    new pack lands as "ready to upload" on the cockpit without further
+    //    operator clicks. See auto-pack.ts for the AUTO_PACK_* env knobs.
     const unlisted = await getUnlistedApprovedAssets()
     if (unlisted.length >= 1) {
-      const batch = unlisted.slice(0, 4)
       try {
-        const pack = await createPack({
-          title: `${batch[0].type.charAt(0).toUpperCase() + batch[0].type.slice(1)} Pack`,
-          description: `Auto-packaged ${batch.length} approved ${batch[0].type} assets.`,
-          assets: batch.map((a) => a.id), price: 4.99, status: "review",
-          previewUrl: batch[0].previewUrl ?? "",
-        })
-        for (const a of batch) await updateAssetStatus(a.id, "draft").catch(() => {})
-        const built = await buildPackDeliverable(pack.id).catch(() => null)
-        const detail = built?.success
-          ? `Packaged ${batch.length} assets → "${pack.title}" ZIP ready`
-          : `Packaged ${batch.length} assets → "${pack.title}" (ZIP build failed)`
-        return { action: "packaging", detail, timestamp: new Date().toISOString(), backlog: { unlistedAssets: unlisted.length - batch.length, stuckRuns: 0, packsToPublish: 1 }, providers: { openai: "healthy", deepseek: "healthy" }, budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining }, shouldForge: false, isProcessing: true }
+        const result = await autoPackApproved()
+        if (result.created.length > 0) {
+          const titles = result.created.map((c) => `"${c.title}"`).join(", ")
+          const readyCount = result.created.filter((c) => c.ready).length
+          const detail = `Auto-packed ${result.created.length}: ${titles}${readyCount === result.created.length ? " — ready to upload" : ""}`
+          return {
+            action: "packaging",
+            detail,
+            timestamp: new Date().toISOString(),
+            backlog: { unlistedAssets: Math.max(0, unlisted.length - result.created.reduce((s, c) => s + c.assetCount, 0)), stuckRuns: 0, packsToPublish: readyCount },
+            providers: { openai: openaiOk ? "healthy" : "degraded", deepseek: deepseekOk ? "healthy" : "degraded" },
+            budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
+            shouldForge: false,
+            isProcessing: true,
+          }
+        }
       } catch (err) {
-        console.error("Auto-package failed:", err)
+        console.error("Auto-pack failed:", err)
       }
     }
 

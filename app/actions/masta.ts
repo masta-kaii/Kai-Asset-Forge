@@ -12,6 +12,7 @@ import { runReflection } from "@/app/actions/reflection"
 import { buildPackDeliverable } from "@/app/actions/pack-builder"
 import { generatePackItchListing, markPackUploaded } from "@/app/actions/itchio-listing"
 import { buildMastaDigest } from "@/app/actions/digest"
+import { autoPackApproved } from "@/app/actions/auto-pack"
 import { getPackById, getPacks } from "@/lib/firebase/packs"
 
 export interface MastaToolEvent {
@@ -238,6 +239,15 @@ function tools(): OpenAI.Chat.Completions.ChatCompletionTool[] {
         parameters: { type: "object", properties: {}, additionalProperties: false },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "auto_pack",
+        description:
+          "Scan approved assets and ship as many packs as possible right now — groups by type+style, enforces min batch, builds the ZIP, drafts the itch.io listing. Use when the operator says 'pack everything you can'.",
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    },
   ]
 }
 
@@ -354,6 +364,9 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     case "build_digest": {
       const d = await buildMastaDigest()
       return { body: d.body, snapshot: d.snapshot }
+    }
+    case "auto_pack": {
+      return await autoPackApproved()
     }
     default:
       return { error: `Unknown tool: ${name}` }
