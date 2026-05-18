@@ -5,11 +5,12 @@ import { generateImage } from "@/lib/ai/client"
 import { createAsset, updateAssetStatus } from "@/lib/firebase/assets"
 import { createGeneration } from "@/lib/firebase/generations"
 import { createPack } from "@/lib/firebase/packs"
-import { uploadAssetBuffer } from "@/lib/firebase/storage"
 import { scoutTrends } from "@/app/actions/scout"
 import { curatorScore } from "@/app/actions/curator"
 import { publishPack } from "@/app/actions/marketplace"
 import { runReflection } from "@/app/actions/reflection"
+import { defaultTargetSize } from "@/lib/pixel/post-process"
+import { postProcessPixelArt } from "@/app/actions/postprocess"
 import type { AssetType, AssetStyle, AssetPack } from "@/lib/types"
 import type { AIProvider } from "@/lib/ai/types"
 
@@ -73,7 +74,14 @@ export async function forgeStepGenerate(input: {
 }): Promise<StepResult> {
   const provider = input.imageProvider ?? "openai"
   try {
-    const prompt = `Art direction: ${input.artDirection}\n\nGenerate a ${input.assetType} game asset following this art direction. Game-ready, detailed, pixel art style.`
+    const targetSize = defaultTargetSize(input.assetType)
+    const prompt = `Art direction: ${input.artDirection}
+
+Generate a single ${input.assetType} game asset, centered, filling the frame.
+Flat solid white background (#FFFFFF), no scenery, no shadows, no gradients.
+Bold simple shapes, limited color palette, clear silhouette, hard edges.
+Target style: ${targetSize}px pixel-art sprite — chunky pixels, no anti-aliasing, no fine detail.`
+
     const imgResult = await generateImage({ prompt, provider, n: 1, size: "1024x1024", quality: "auto" })
 
     if (!imgResult.success || imgResult.images.length === 0) {
@@ -83,31 +91,50 @@ export async function forgeStepGenerate(input: {
     const img = imgResult.images[0]
     const name = `${input.assetType}-forge-${Date.now()}`
 
-    // Upload to Firebase Storage — data URLs are too large for Firestore
-    let storageUrl = ""
+    // Fetch the original buffer from the AI provider.
+    let originalBuffer: Buffer
     try {
-      const rawBuffer = img.buffer ?? Buffer.from(await (await fetch(img.url)).arrayBuffer())
-      const path = `assets/${input.assetType}/forge-${Date.now()}.png`
-      storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
-    } catch (uploadErr) {
-      console.error("Pipeline storage upload failed:", uploadErr)
-      return { step: "Asset Generation", status: "failed", summary: "Storage upload failed — check Firebase Storage rules", error: String(uploadErr) }
+      originalBuffer = img.buffer ?? Buffer.from(await (await fetch(img.url)).arrayBuffer())
+    } catch (fetchErr) {
+      return {
+        step: "Asset Generation",
+        status: "failed",
+        summary: "Could not fetch generated image",
+        error: String(fetchErr),
+      }
     }
 
-    if (!storageUrl) {
-      return { step: "Asset Generation", status: "failed", summary: "No storage URL", error: "Storage upload returned empty URL" }
+    // Post-process: real pixel art (downscale + quantize + transparent bg) + display preview.
+    const processed = await postProcessPixelArt(new Uint8Array(originalBuffer), {
+      assetType: input.assetType,
+      identifier: `forge-${Date.now()}`,
+      targetSize,
+    })
+
+    if (!processed) {
+      return {
+        step: "Asset Generation",
+        status: "failed",
+        summary: "Post-processing or storage upload failed",
+        error: "postProcessPixelArt returned null — check Firebase Storage rules",
+      }
     }
+
+    const { rawAssetUrl, previewUrl, pixelSize, paletteSize, isTransparent } = processed
 
     const asset = await createAsset({
       name,
       type: input.assetType,
       style: input.style,
-      previewUrl: storageUrl,
-      thumbnailUrl: storageUrl,
+      previewUrl,
+      thumbnailUrl: previewUrl,
+      rawAssetUrl,
+      pixelSize,
+      paletteSize,
       status: "review",
-      tags: [input.assetType, input.style, "auto-forge"],
-      dimensions: { width: img.width, height: img.height },
-      isTransparent: false,
+      tags: [input.assetType, input.style, "auto-forge", `${pixelSize}px`],
+      dimensions: { width: pixelSize, height: pixelSize },
+      isTransparent,
       qualityScore: 0,
     })
     await createGeneration({
@@ -116,10 +143,15 @@ export async function forgeStepGenerate(input: {
       promptId: "",
       generationTime: "1",
       qualityScore: 0,
-      outputUrl: storageUrl,
+      outputUrl: rawAssetUrl,
     })
 
-    return { step: "Asset Generation", status: "completed", summary: `Generated ${name}`, data: { assetId: asset.id } }
+    return {
+      step: "Asset Generation",
+      status: "completed",
+      summary: `Generated ${name} — ${pixelSize}px, ${paletteSize} colors${isTransparent ? ", transparent bg" : ""}`,
+      data: { assetId: asset.id, pixelSize, paletteSize, isTransparent },
+    }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Generation failed"
     return { step: "Asset Generation", status: "failed", summary: msg, error: msg }

@@ -11,6 +11,9 @@ export interface Asset {
   style: AssetStyle
   previewUrl: string
   thumbnailUrl: string
+  rawAssetUrl?: string
+  pixelSize?: number
+  paletteSize?: number
   status: AssetStatus
   tags: string[]
   dimensions: { width: number; height: number }

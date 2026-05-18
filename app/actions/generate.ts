@@ -3,7 +3,6 @@
 import { generateImage } from "@/lib/ai/client"
 import { createAsset } from "@/lib/firebase/assets"
 import { createGeneration } from "@/lib/firebase/generations"
-import { uploadAssetBuffer } from "@/lib/firebase/storage"
 import { postProcessPixelArt } from "@/app/actions/postprocess"
 import type { AssetType, AssetStyle } from "@/lib/types"
 import type { ImageGenParams, AIProvider } from "@/lib/ai/types"
@@ -70,7 +69,12 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
   }
 
   const params: ImageGenParams = {
-    prompt: `pixel art game asset, ${style.replace(/-/g, " ")}, ${prompt}. 32x32 true pixel art style, limited 16-color palette, sharp pixel edges, no anti-aliasing, no smooth shading, blocky retro aesthetic, transparent background, game-ready sprite.`,
+    prompt: `${prompt}.
+
+Subject: single ${assetType.replace(/-/g, " ")}, ${style.replace(/-/g, " ")}, centered, filling the frame.
+Flat solid white background (#FFFFFF), no scenery, no shadows, no gradients.
+Bold simple shapes, limited color palette, clear silhouette, hard edges.
+Pixel-art sprite style — chunky pixels, no anti-aliasing, no fine detail.`,
     provider,
     size: "1024x1024",
     n: batchCount,
@@ -94,32 +98,22 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
     result.images.map(async (img, i) => {
       const name = `${assetType}-${style}-${timestamp}-${i + 1}`
 
-      let storageUrl = ""
+      let rawBuffer: Uint8Array
       try {
-        const rawBuffer = img.buffer ?? new Uint8Array(await downloadImageBuffer(img.url))
-
-        // Post-process into pixel art: downscale + quantize
-        const pxUrl = await postProcessPixelArt(rawBuffer, {
-          targetSize: 128,
-          assetType,
-          identifier: `${timestamp}-${i + 1}`,
-        })
-
-        if (pxUrl) {
-          storageUrl = pxUrl
-        } else {
-          // Post-processing failed, upload original
-          const path = `assets/${assetType}/${timestamp}-${i + 1}.png`
-          storageUrl = await uploadAssetBuffer(rawBuffer, path, "image/png")
-        }
-      } catch (uploadErr) {
-        console.error(`Storage upload failed for ${name}:`, uploadErr)
+        rawBuffer = img.buffer ?? new Uint8Array(await downloadImageBuffer(img.url))
+      } catch (fetchErr) {
+        console.error(`Image fetch failed for ${name}:`, fetchErr)
         storageErrors++
         return null
       }
 
-      if (!storageUrl) {
-        console.error(`Storage upload returned empty URL for ${name}`)
+      const processed = await postProcessPixelArt(rawBuffer, {
+        assetType,
+        identifier: `${timestamp}-${i + 1}`,
+      })
+
+      if (!processed) {
+        console.error(`Post-process / upload failed for ${name}`)
         storageErrors++
         return null
       }
@@ -128,12 +122,15 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
         name,
         type: assetType,
         style,
-        previewUrl: storageUrl,
-        thumbnailUrl: storageUrl,
+        previewUrl: processed.previewUrl,
+        thumbnailUrl: processed.previewUrl,
+        rawAssetUrl: processed.rawAssetUrl,
+        pixelSize: processed.pixelSize,
+        paletteSize: processed.paletteSize,
         status: "review",
-        tags: [assetType, style],
-        dimensions: { width: img.width, height: img.height },
-        isTransparent: false,
+        tags: [assetType, style, `${processed.pixelSize}px`],
+        dimensions: { width: processed.pixelSize, height: processed.pixelSize },
+        isTransparent: processed.isTransparent,
         qualityScore: 0,
       })
 
@@ -143,7 +140,7 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
         promptId: "",
         generationTime: `${result.images.length}`,
         qualityScore: 0,
-        outputUrl: storageUrl,
+        outputUrl: processed.rawAssetUrl,
       })
 
       return {
@@ -154,7 +151,7 @@ async function generateAssetsInternal(input: GenerateInput): Promise<GenerateRes
         previewUrl: asset.previewUrl,
         status: asset.status,
       }
-    })
+    }),
   )
 
   const succeeded = assets.filter((a): a is NonNullable<typeof a> => a !== null)
