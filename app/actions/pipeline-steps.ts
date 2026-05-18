@@ -10,7 +10,7 @@ import { scoutTrends } from "@/app/actions/scout"
 import { curatorScore } from "@/app/actions/curator"
 import { publishPack } from "@/app/actions/marketplace"
 import { runReflection } from "@/app/actions/reflection"
-import type { AssetType, AssetStyle } from "@/lib/types"
+import type { AssetType, AssetStyle, AssetPack } from "@/lib/types"
 import type { AIProvider } from "@/lib/ai/types"
 
 interface StepResult {
@@ -158,14 +158,25 @@ export async function forgeStepFinalize(input: {
       maxTokens: 150,
     })
 
+    // Auto-publish to marketplace
+    let publishSummary = ""
+    try {
+      const pubResults = await publishPack(pack)
+      const published = pubResults.filter((r) => r.success)
+      if (published.length > 0) {
+        publishSummary = ` | Published to ${published.map((r) => r.platform).join(", ")}`
+      }
+    } catch { /* marketplace optional */ }
+
     return {
       step: "Finalize",
       status: "completed",
-      summary: `Pack "${packTitle}" ready — ${input.assetIds.length} assets, listed for $${pack.price}`,
+      summary: `Pack "${packTitle}" ready — ${input.assetIds.length} assets, $${pack.price}${publishSummary}`,
       data: {
         packId: pack.id,
         packTitle,
         listing: listingResult.success ? listingResult.text : "",
+        published: publishSummary.length > 0,
       },
     }
   } catch (error) {

@@ -14,6 +14,7 @@ import { Package, Plus, ImageIcon, Check, Sparkles, Globe, Loader2 } from "lucid
 import { fetchAssetsByStatus } from "@/app/actions/assets"
 import { fetchPacks, createNewPack } from "@/app/actions/packs"
 import { publishPack } from "@/app/actions/marketplace"
+import { toast } from "sonner"
 import type { Asset, AssetPack } from "@/lib/types"
 
 export default function ProductBuilderPage() {
@@ -33,9 +34,16 @@ export default function ProductBuilderPage() {
     setPublishingId(pack.id)
     try {
       const results = await publishPack(pack)
-      results.forEach((r) => {
-        if (r.success) setPublishedIds((prev) => new Set([...prev, pack.id]))
-      })
+      const successPlatforms = results.filter((r) => r.success).map((r) => r.platform)
+      if (successPlatforms.length > 0) {
+        setPublishedIds((prev) => new Set([...prev, pack.id]))
+        toast.success(`Published to ${successPlatforms.join(", ")}`)
+      } else {
+        const errors = results.map((r) => r.error).filter(Boolean).join("; ")
+        toast.error(errors || "Publish failed")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Publish failed")
     } finally {
       setPublishingId(null)
     }
