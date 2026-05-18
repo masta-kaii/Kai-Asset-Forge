@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -15,49 +16,111 @@ import {
 import { runOrchestrator } from "@/app/actions/orchestrator"
 import { Crown, Play, Loader2, Pause, RefreshCw, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
+import { AgentSprite, type SpriteVariant } from "@/components/workshop/agent-sprite"
+import { AgentSidePanel } from "@/components/workshop/agent-side-panel"
 
 interface AgentDef {
-  id: WorkshopAgentId
+  id: SpriteVariant & WorkshopAgentId
   name: string
-  emoji: string
   role: string
+  description: string
   /** Position in the scene as percentages. */
   x: number
   y: number
 }
 
 const AGENTS: AgentDef[] = [
-  // Masta sits at the top center as the boss
-  { id: "masta", name: "Masta", emoji: "👑", role: "Boss", x: 50, y: 14 },
-  // First row of workers
-  { id: "scout", name: "Scout", emoji: "🔍", role: "Trends", x: 14, y: 44 },
-  { id: "director", name: "Director", emoji: "🎨", role: "Art direction", x: 32, y: 44 },
-  { id: "forge", name: "Forge", emoji: "⚡", role: "Generator", x: 50, y: 44 },
-  { id: "curator", name: "Curator", emoji: "✅", role: "Quality", x: 68, y: 44 },
-  { id: "reflector", name: "Reflector", emoji: "🧠", role: "Learn", x: 86, y: 44 },
-  // Second row — packaging side
-  { id: "packager", name: "Packer", emoji: "📦", role: "Pack & ZIP", x: 36, y: 78 },
-  { id: "lister", name: "Lister", emoji: "🏪", role: "Listings", x: 64, y: 78 },
+  {
+    id: "masta",
+    name: "Masta",
+    role: "Boss",
+    description:
+      "Your master agent. Hands the crew their orders, watches the budget, and reports back to you. Talk to Masta when you want anything bigger than one step.",
+    x: 50, y: 14,
+  },
+  {
+    id: "scout",
+    name: "Scout",
+    role: "Trends",
+    description:
+      "Looks at the ledger and proposes the next sellable niche — theme, asset type, art-style anchor, price band, trending score.",
+    x: 12, y: 44,
+  },
+  {
+    id: "director",
+    name: "Director",
+    role: "Art direction",
+    description: "Turns the Scout's pick into a concrete art-direction brief that the Forge uses as its prompt anchor.",
+    x: 30, y: 44,
+  },
+  {
+    id: "forge",
+    name: "Forge",
+    role: "Generator",
+    description: "Generates the raw illustration via gpt-image-1, then runs it through pixelize() — downscale, palette quantize, transparent background.",
+    x: 50, y: 44,
+  },
+  {
+    id: "curator",
+    name: "Curator",
+    role: "Quality",
+    description: "Scores each generated asset. Failures get rejected before they reach a pack.",
+    x: 70, y: 44,
+  },
+  {
+    id: "reflector",
+    name: "Reflector",
+    role: "Learn",
+    description: "After each run, analyzes the ledger and proposes improvements to prompts and strategy.",
+    x: 88, y: 44,
+  },
+  {
+    id: "packer",
+    name: "Packer",
+    role: "Pack & ZIP",
+    description: "Bundles approved assets into a buyer-facing ZIP: organized folders, README, license, preview grid, itch.io cover.",
+    x: 36, y: 78,
+  },
+  {
+    id: "lister",
+    name: "Lister",
+    role: "Listings",
+    description: "Drafts an itch.io-shaped listing — title, description, tags, suggested price — ready for you to paste into the upload form.",
+    x: 64, y: 78,
+  },
 ]
 
 interface ActiveBubble {
-  /** Bubble id — incremented for animation key. */
   id: number
   agent: WorkshopAgentId
   text: string
   variant: "say" | "did" | "fail" | "boss"
-  /** Wall-clock expiry timestamp. */
   expiresAt: number
+}
+
+interface Parcel {
+  id: number
+  fromId: WorkshopAgentId
+  toId: WorkshopAgentId
+  /** Starting position in scene percentages. */
+  fromX: number
+  fromY: number
+  /** Travel delta in scene pixels (computed at launch time from the scene's bounding rect). */
+  dxPx: number
+  dyPx: number
+  startedAt: number
+  durationMs: number
 }
 
 const BUBBLE_TTL_MS = 7000
 const MASTA_BUBBLE_TTL_MS = 10000
+const PARCEL_DURATION = 1600
 
 const MASTA_LINES: Record<string, string[]> = {
   forging: ["Forge crew, keep it moving.", "Push the next batch through."],
   packaging: ["Wrap that pack — let's ship it.", "Boxing up assets."],
   publishing: ["Final polish. Time to list.", "Get it on the shelf."],
-  blocked: ["We're blocked. Need a fix.", "Stop everything — check the providers."],
+  blocked: ["We're blocked. Need a fix.", "Stop everything — check providers."],
   paused: ["Holding the line until we resume."],
   scanning: ["Sweeping the workshop.", "Checking the backlog."],
   idle: ["Crew's ready. What's next?", "All quiet. Awaiting orders."],
@@ -75,26 +138,60 @@ function truncate(s: string, n = 90): string {
 }
 
 export default function WorkshopPage() {
+  const router = useRouter()
   const [activity, setActivity] = useState<WorkshopActivity | null>(null)
   const [bubbles, setBubbles] = useState<ActiveBubble[]>([])
+  const [parcels, setParcels] = useState<Parcel[]>([])
   const [forging, setForging] = useState(false)
   const [autoPolling, setAutoPolling] = useState(true)
-  const bubbleId = useRef(0)
-  const stepFingerprint = useRef<Map<string, string>>(new Map()) // step -> status
+  const [selectedAgent, setSelectedAgent] = useState<AgentDef | null>(null)
+  const idCounter = useRef(0)
+  const stepFingerprint = useRef<Map<string, string>>(new Map())
   const lastAction = useRef<string | null>(null)
+  const lastRunningAgent = useRef<WorkshopAgentId | null>(null)
 
-  const pushBubble = useCallback((b: Omit<ActiveBubble, "id" | "expiresAt">, ttl = BUBBLE_TTL_MS) => {
-    bubbleId.current += 1
-    const next: ActiveBubble = {
-      ...b,
-      id: bubbleId.current,
-      expiresAt: Date.now() + ttl,
-    }
-    setBubbles((prev) => {
-      // Keep at most one bubble per agent — newest wins.
-      const without = prev.filter((p) => p.agent !== b.agent)
-      return [...without, next]
-    })
+  const nextId = () => {
+    idCounter.current += 1
+    return idCounter.current
+  }
+
+  const pushBubble = useCallback(
+    (b: Omit<ActiveBubble, "id" | "expiresAt">, ttl = BUBBLE_TTL_MS) => {
+      const next: ActiveBubble = { ...b, id: nextId(), expiresAt: Date.now() + ttl }
+      setBubbles((prev) => {
+        const without = prev.filter((p) => p.agent !== b.agent)
+        return [...without, next]
+      })
+    },
+    [],
+  )
+
+  const sceneRef = useRef<HTMLDivElement>(null)
+
+  const sendParcel = useCallback((fromId: WorkshopAgentId, toId: WorkshopAgentId) => {
+    if (fromId === toId) return
+    const from = AGENTS.find((a) => a.id === fromId)
+    const to = AGENTS.find((a) => a.id === toId)
+    if (!from || !to) return
+    const sceneRect = sceneRef.current?.getBoundingClientRect()
+    const w = sceneRect?.width ?? 800
+    const h = sceneRect?.height ?? 450
+    const dxPx = ((to.x - from.x) / 100) * w
+    const dyPx = ((to.y - from.y) / 100) * h
+    setParcels((prev) => [
+      ...prev,
+      {
+        id: nextId(),
+        fromId,
+        toId,
+        fromX: from.x,
+        fromY: from.y,
+        dxPx,
+        dyPx,
+        startedAt: Date.now(),
+        durationMs: PARCEL_DURATION,
+      },
+    ])
   }, [])
 
   const pickMastaLine = (action: string): string => {
@@ -107,7 +204,9 @@ export default function WorkshopPage() {
       const a = await getWorkshopActivity()
       setActivity(a)
 
-      // Diff steps to emit bubbles only on transitions.
+      // Track which agent is currently running to detect work hand-offs.
+      const currentRunning = a.steps.find((s) => s.status === "running")?.agent ?? null
+
       for (const step of a.steps) {
         const key = `${a.runId}:${step.step}`
         const prev = stepFingerprint.current.get(key)
@@ -120,10 +219,20 @@ export default function WorkshopPage() {
               variant: bubbleVariantFor(step.status),
             })
           }
+          // When a step transitions to running and the prior running agent
+          // was someone else, launch a parcel from the prior to the new agent.
+          if (
+            step.status === "running" &&
+            lastRunningAgent.current &&
+            lastRunningAgent.current !== step.agent
+          ) {
+            sendParcel(lastRunningAgent.current, step.agent)
+          }
         }
       }
 
-      // Masta speaks on action changes.
+      if (currentRunning) lastRunningAgent.current = currentRunning
+
       if (a.autonomous.action !== lastAction.current) {
         lastAction.current = a.autonomous.action
         const line = pickMastaLine(a.autonomous.action)
@@ -132,9 +241,8 @@ export default function WorkshopPage() {
     } catch (e) {
       console.error("workshop activity:", e)
     }
-  }, [pushBubble])
+  }, [pushBubble, sendParcel])
 
-  // Initial + polled refresh.
   useEffect(() => {
     load()
     if (!autoPolling) return
@@ -142,12 +250,13 @@ export default function WorkshopPage() {
     return () => clearInterval(interval)
   }, [load, autoPolling])
 
-  // Expire bubbles on a timer.
+  // Expire bubbles + parcels.
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now()
       setBubbles((prev) => prev.filter((b) => b.expiresAt > now))
-    }, 500)
+      setParcels((prev) => prev.filter((p) => p.startedAt + p.durationMs + 400 > now))
+    }, 400)
     return () => clearInterval(interval)
   }, [])
 
@@ -172,11 +281,22 @@ export default function WorkshopPage() {
     }
   }
 
+  const onAskMasta = (prompt: string) => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("masta:preset", prompt)
+    }
+    setSelectedAgent(null)
+    router.push("/masta")
+  }
+
   const activeAgents = new Set(
-    (activity?.steps ?? [])
-      .filter((s) => s.status === "running")
-      .map((s) => s.agent),
+    (activity?.steps ?? []).filter((s) => s.status === "running").map((s) => s.agent),
   )
+
+  // History for the side panel: filter the current run's steps by the selected agent.
+  const historyForSelected = selectedAgent
+    ? (activity?.steps ?? []).filter((s) => s.agent === selectedAgent.id).slice().reverse()
+    : []
 
   return (
     <div className="space-y-4 -mx-2 sm:mx-0">
@@ -184,7 +304,7 @@ export default function WorkshopPage() {
         <div>
           <h1 className="text-2xl font-heading font-bold tracking-tight">Workshop</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Watch the crew work. Bubbles update from the live orchestrator.
+            Watch the crew work. Click any character to see what they're doing.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -203,16 +323,15 @@ export default function WorkshopPage() {
             {autoPolling ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
             {autoPolling ? "Pause" : "Live"}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={load}
-          >
+          <Button variant="outline" size="sm" className="gap-2" onClick={load}>
             <RefreshCw className="size-3.5" />
             Refresh
           </Button>
-          <Button onClick={startForgeRun} disabled={forging || activity?.autonomous.action === "blocked"} className="gap-2">
+          <Button
+            onClick={startForgeRun}
+            disabled={forging || activity?.autonomous.action === "blocked"}
+            className="gap-2"
+          >
             {forging ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
             {forging ? "Running..." : "New run"}
           </Button>
@@ -225,30 +344,33 @@ export default function WorkshopPage() {
         <CardContent className="p-0">
           {/* Scene */}
           <div
-            className="relative w-full aspect-[16/9] min-h-[420px] workshop-floor overflow-hidden"
+            ref={sceneRef}
+            className="relative w-full aspect-[16/9] min-h-[440px] workshop-floor overflow-hidden"
           >
-            {/* Sun rays / mood */}
             <div className="absolute inset-0 pointer-events-none workshop-vignette" />
-
-            {/* Wall (back) */}
             <div className="absolute inset-x-0 top-0 h-[28%] workshop-wall" />
-
-            {/* Boss platform behind Masta */}
             <div
               className="absolute workshop-platform"
               style={{ left: "calc(50% - 70px)", top: "8%", width: 140, height: 24 }}
             />
 
             {/* Agents */}
-            {AGENTS.map((a) => {
+            {AGENTS.map((a, idx) => {
               const isWorking = activeAgents.has(a.id)
               const isMasta = a.id === "masta"
               const bubble = bubbles.find((b) => b.agent === a.id)
+              // Face: workers in the left half face right, right half face left, so
+              // they all face the center where most of the action happens.
+              const facing: 1 | -1 = a.x < 50 ? 1 : -1
               return (
                 <div
                   key={a.id}
                   className="absolute"
-                  style={{ left: `${a.x}%`, top: `${a.y}%`, transform: "translate(-50%, -50%)" }}
+                  style={{
+                    left: `${a.x}%`,
+                    top: `${a.y}%`,
+                    transform: "translate(-50%, -50%)",
+                  }}
                 >
                   {bubble && (
                     <SpeechBubble
@@ -258,27 +380,29 @@ export default function WorkshopPage() {
                       above={!isMasta}
                     />
                   )}
-                  <div className="flex flex-col items-center select-none">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAgent(a)}
+                    className="flex flex-col items-center select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 rounded-md hover:brightness-110 transition"
+                  >
                     <div
                       className={`relative ${isMasta ? "workshop-boss" : "workshop-agent"} ${
                         isWorking ? "workshop-working" : "workshop-idle"
                       }`}
                       title={`${a.name} — ${a.role}`}
+                      style={{ animationDelay: `${idx * 0.2}s` }}
                     >
-                      <span
-                        className={`block ${
-                          isMasta ? "text-5xl" : "text-4xl"
-                        } leading-none drop-shadow-md`}
-                        style={{ filter: "drop-shadow(0 2px 0 rgba(0,0,0,0.25))" }}
-                      >
-                        {a.emoji}
-                      </span>
+                      <AgentSprite
+                        variant={a.id}
+                        size={isMasta ? 64 : 56}
+                        facing={facing}
+                        working={isWorking}
+                      />
                       {isWorking && (
-                        <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-amber-400 ring-2 ring-white/80 dark:ring-black/40 animate-pulse" />
+                        <span className="absolute top-0 right-0 size-2.5 rounded-full bg-amber-400 ring-2 ring-white/80 dark:ring-black/40 animate-pulse" />
                       )}
                     </div>
-                    {/* Desk under each worker */}
-                    {!isMasta && <div className="workshop-desk mt-0.5" />}
+                    {!isMasta && <div className="workshop-desk -mt-1" />}
                     <div className="mt-1 flex flex-col items-center gap-0.5">
                       <span
                         className={`text-[10px] font-semibold tracking-wider uppercase ${
@@ -289,18 +413,21 @@ export default function WorkshopPage() {
                       </span>
                       <span className="text-[9px] text-stone-300/70 font-mono">{a.role}</span>
                     </div>
-                  </div>
+                  </button>
                 </div>
               )
             })}
 
-            {/* Floor sign / status banner */}
+            {/* Parcels — small papers/boxes flying from one agent to another */}
+            {parcels.map((p) => (
+              <Parcel key={p.id} parcel={p} />
+            ))}
+
+            {/* Status banner */}
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono pointer-events-none">
               <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-black/40 text-amber-100 backdrop-blur-sm">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="uppercase tracking-wider">
-                  {activity?.runStatus ?? "ready"}
-                </span>
+                <span className="uppercase tracking-wider">{activity?.runStatus ?? "ready"}</span>
                 <span className="opacity-70">·</span>
                 <span className="opacity-80">{activity?.autonomous.detail ?? "watching..."}</span>
               </div>
@@ -343,7 +470,8 @@ export default function WorkshopPage() {
                         : "text-muted-foreground"
                     return (
                       <p key={`${s.step}-${i}`} className="text-xs flex items-center gap-2">
-                        <span className="text-base">{agent?.emoji ?? "•"}</span>
+                        <span className={`font-mono ${tint}`}>{agent?.name ?? "•"}</span>
+                        <span className="text-muted-foreground">·</span>
                         <span className={`font-mono ${tint}`}>{s.step}</span>
                         <span className="text-muted-foreground truncate">{s.summary}</span>
                       </p>
@@ -375,6 +503,14 @@ export default function WorkshopPage() {
           live · {autoPolling ? "every 4s" : "paused"}
         </Badge>
       </div>
+
+      <AgentSidePanel
+        open={!!selectedAgent}
+        onOpenChange={(open) => !open && setSelectedAgent(null)}
+        agent={selectedAgent}
+        history={historyForSelected}
+        onAskMasta={onAskMasta}
+      />
     </div>
   )
 }
@@ -385,6 +521,28 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       <span className={`size-1.5 rounded-full ${color}`} />
       {label}
     </span>
+  )
+}
+
+function Parcel({ parcel }: { parcel: Parcel }) {
+  // Start position is a scene-percentage; travel delta is in pixels (computed
+  // when the parcel was launched). The CSS keyframes translate by that pixel
+  // delta so the path stays correct at any scene size.
+  return (
+    <div
+      className="absolute pointer-events-none workshop-parcel"
+      style={
+        {
+          left: `${parcel.fromX}%`,
+          top: `${parcel.fromY}%`,
+          ["--parcel-dx" as string]: `${parcel.dxPx}px`,
+          ["--parcel-dy" as string]: `${parcel.dyPx}px`,
+          animationDuration: `${parcel.durationMs}ms`,
+        } as React.CSSProperties
+      }
+    >
+      <div className="parcel-inner">📄</div>
+    </div>
   )
 }
 
@@ -425,7 +583,7 @@ function SpeechBubble({
     <div
       className={`absolute left-1/2 ${
         above ? "-top-2 -translate-y-full" : "-bottom-2 translate-y-full"
-      } -translate-x-1/2 z-10 min-w-[120px] max-w-[200px]`}
+      } -translate-x-1/2 z-10 min-w-[120px] max-w-[200px] pointer-events-none`}
     >
       <div
         className={`relative rounded-xl px-3 py-2 text-[11px] font-medium leading-snug border shadow-md workshop-bubble ${bg} ${textColor} ${border}`}

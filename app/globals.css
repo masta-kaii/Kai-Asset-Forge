@@ -215,6 +215,58 @@
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* Sprite leg/arm sway when walking — applied via the sprite's own classes. */
+.workshop-sprite-walking .workshop-leg-l { animation: leg-l 0.7s linear infinite; transform-origin: 50% 0; }
+.workshop-sprite-walking .workshop-leg-r { animation: leg-r 0.7s linear infinite; transform-origin: 50% 0; }
+.workshop-sprite-walking .workshop-arm-l { animation: arm-l 0.7s linear infinite; transform-origin: 50% 0; }
+.workshop-sprite-walking .workshop-arm-r { animation: arm-r 0.7s linear infinite; transform-origin: 50% 0; }
+.workshop-sprite-working .workshop-arm-r { animation: arm-work 0.55s ease-in-out infinite; transform-origin: 50% 0; }
+@keyframes leg-l {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(18deg); }
+}
+@keyframes leg-r {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-18deg); }
+}
+@keyframes arm-l {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-14deg); }
+}
+@keyframes arm-r {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(14deg); }
+}
+@keyframes arm-work {
+  0%, 100% { transform: rotate(-8deg); }
+  50%      { transform: rotate(25deg); }
+}
+
+/* Parcels — small "work item" that flies between agents. */
+.workshop-parcel {
+  position: absolute;
+  z-index: 5;
+  animation-name: parcel-fly;
+  animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  animation-fill-mode: forwards;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  filter: drop-shadow(0 2px 0 rgba(0,0,0,0.4));
+}
+.workshop-parcel .parcel-inner {
+  animation: parcel-spin 0.9s linear infinite;
+}
+@keyframes parcel-fly {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  15%  { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  85%  { transform: translate(calc(-50% + var(--parcel-dx)), calc(-50% + var(--parcel-dy))) scale(1.05); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--parcel-dx)), calc(-50% + var(--parcel-dy))) scale(0.4); opacity: 0; }
+}
+@keyframes parcel-spin {
+  0%, 100% { transform: rotate(-12deg); }
+  50%      { transform: rotate(12deg); }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

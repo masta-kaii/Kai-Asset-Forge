@@ -46,6 +46,16 @@ export default function MastaPage() {
       .finally(() => setLoading(false))
   }, [user])
 
+  // Pick up a preset prompt handed off from another page (e.g. workshop side panel).
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const preset = window.sessionStorage.getItem("masta:preset")
+    if (preset) {
+      setInput(preset)
+      window.sessionStorage.removeItem("masta:preset")
+    }
+  }, [])
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
   }, [messages, sending])
