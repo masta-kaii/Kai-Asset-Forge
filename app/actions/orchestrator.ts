@@ -15,6 +15,15 @@ import type { AssetStyle, AssetType } from "@/lib/types"
 
 const COLLECTION = "orchestrator_runs"
 
+async function markProviderDown(provider: string, error: string) {
+  try {
+    const db = getDb()
+    await updateDoc(doc(db, "provider_health", provider), {
+      status: "degraded", lastError: error, failCount: 1, lastChecked: new Date().toISOString(),
+    } as Record<string, unknown>)
+  } catch {}
+}
+
 interface OrchestratorStep {
   step: string
   status: "pending" | "running" | "completed" | "failed" | "skipped"
@@ -179,6 +188,7 @@ export async function runOrchestrator(input?: {
     // ═══ Step 5: Forge ═══
     if (!isDone("Forge") && cachedAssetIds.length === 0) {
       const forgePrompt = `${cachedWinning.theme}. ${cachedWinning.styleAnchor}. Pixel art game asset.`
+      let lastError = ""
       for (let i = 0; i < Math.min(maxAssets, cachedWinning.count); i++) {
         const gen = await forgeStepGenerate({
           artDirection: forgePrompt,
@@ -189,11 +199,20 @@ export async function runOrchestrator(input?: {
         if (gen.status === "completed") {
           const assetId = (gen.data as Record<string, unknown>)?.assetId as string
           if (assetId) cachedAssetIds.push(assetId)
+        } else {
+          lastError = gen.error ?? gen.summary
         }
       }
       if (cachedAssetIds.length === 0) {
-        await log({ step: "Forge", status: "failed", summary: "No assets generated" })
-        await updateDoc(ref, { status: "awaiting_resume", error: "Generation failed" })
+        const isProviderErr = /billing|limit|401|403|quota|exceeded/i.test(lastError)
+        if (isProviderErr) {
+          await markProviderDown("openai", lastError)
+          await log({ step: "Forge", status: "failed", summary: `OpenAI unavailable: ${lastError}` })
+          await updateDoc(ref, { status: "paused_provider", error: lastError })
+          return { runId, status: "paused_provider", steps: [], isResume: true, error: `OpenAI: ${lastError}. Top up at platform.openai.com.` }
+        }
+        await log({ step: "Forge", status: "failed", summary: lastError || "No assets generated" })
+        await updateDoc(ref, { status: "awaiting_resume", error: lastError || "Generation failed" })
         return { runId, status: "awaiting_resume", steps: [], isResume: true, error: "Asset generation failed. Resume to retry." }
       }
       await log({ step: "Forge", status: "completed", summary: `Generated ${cachedAssetIds.length} ${cachedWinning.assetType} assets` })

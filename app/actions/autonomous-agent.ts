@@ -120,9 +120,26 @@ export async function autonomousTick(): Promise<AutonomousStatus> {
   const budget = getBudgetStatus()
 
   try {
-    // ═══ 1. Stuck runs — need manual resume on dashboard ═══
+    // ═══ 1. Stuck run — check if it's paused due to provider ═══
     const stuck = await findIncompleteRun()
     if (stuck) {
+      // Check if the stuck run is due to provider issues
+      const db = getDb()
+      const stuckSnap = await getDoc(doc(db, "orchestrator_runs", stuck.runId)).catch(() => null)
+      const stuckStatus = (stuckSnap?.data() as Record<string, unknown>)?.status
+      
+      if (stuckStatus === "paused_provider") {
+        return {
+          action: "paused", detail: "Forge paused — OpenAI at billing limit. Top up at platform.openai.com then click Resume on Dashboard.",
+          timestamp: new Date().toISOString(),
+          backlog: { unlistedAssets: 0, stuckRuns: 1, packsNeedingPublish: 0 },
+          providers: { openai: "degraded", deepseek: (await getOrCreateProviderHealth("deepseek")).status },
+          budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining },
+          lastAction: "Provider limit — paused",
+          isProcessing: false,
+        }
+      }
+      
       return {
         action: "resume", detail: `Stuck run found with ${stuck.completedSteps.length} steps done — click Resume on dashboard`,
         timestamp: new Date().toISOString(),
