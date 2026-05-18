@@ -7,15 +7,8 @@ import { buttonVariants } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
-  LayoutDashboard,
-  Sparkles,
-  Library,
-  Package,
-  FileText,
-  Activity,
-  Settings,
-  Anvil,
-  Monitor,
+  LayoutDashboard, Sparkles, Library, Package, FileText,
+  Activity, Settings, Anvil, Monitor, Bug,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -58,6 +51,11 @@ const NAV_ITEMS = [
     title: "Settings",
     href: "/settings",
     icon: Settings,
+  },
+  {
+    title: "Debug",
+    href: "/debug",
+    icon: Bug,
   },
 ]
 
