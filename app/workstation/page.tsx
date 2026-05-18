@@ -101,7 +101,7 @@ function AgentSprite({ agentId, frame, size, facing, className }: {
   const def = AGENTS.find((a) => a.id === agentId)
   if (!def) return null
   const w = size; const h = size * 1.75
-  const src = `/sprites/agents/${def.sprite}/idle_f${frame % 4}.png`
+  const src = `/sprites/agents/${agentId}/idle_f${frame % 4}.png`
   return (
     <div className={className} style={{ width: w, height: h, transform: facing === "left" ? "scaleX(-1)" : undefined }}>
       <Image src={src} alt={def.label} width={w} height={h} className="pixelated" unoptimized priority />
