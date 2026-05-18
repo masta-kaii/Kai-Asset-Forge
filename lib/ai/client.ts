@@ -3,16 +3,16 @@ import { GoogleGenAI } from "@google/genai"
 import type { ImageGenParams, ImageGenResponse, ImageGenResult, TextGenParams, TextGenResponse, AIProvider } from "./types"
 
 function getClient(provider?: AIProvider): OpenAI {
-  if (provider === "deepseek") {
-    const apiKey = process.env.DEEPSEEK_API_KEY
-    if (!apiKey) {
-      throw new Error("DEEPSEEK_API_KEY is not configured")
-    }
-    return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" })
-  }
-  const apiKey = process.env.OPENAI_API_KEY
+  const isDeepseek = provider === "deepseek"
+  const apiKey = isDeepseek ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY
+  const keyName = isDeepseek ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY"
+
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured")
+    throw new Error(`${keyName} is missing. Add it in Vercel → Settings → Environment Variables (all environments: Production + Preview + Development).`)
+  }
+
+  if (isDeepseek) {
+    return new OpenAI({ apiKey, baseURL: "https://api.deepseek.com/v1" })
   }
   return new OpenAI({ apiKey })
 }
