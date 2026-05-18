@@ -7,7 +7,7 @@ function getClient(provider?: AIProvider): OpenAI {
   const keyName = isDeepseek ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY"
 
   if (!apiKey) {
-    throw new Error(`${keyName} is missing. Add it in Vercel → Settings → Environment Variables (all environments: Production + Preview + Development).`)
+    throw new Error(`${keyName} is missing. Add it in Vercel → Settings → Environment Variables.`)
   }
 
   if (isDeepseek) {
@@ -22,27 +22,6 @@ function parseSize(size: string): { width: number; height: number } {
 }
 
 export async function generateImage(params: ImageGenParams): Promise<ImageGenResponse> {
-  const provider = params.provider ?? "openai"
-
-  // Try primary provider, fall back to the other
-  if (provider === "gemini") {
-    const geminiResult = await generateImageWithGemini(params)
-    if (!geminiResult.success && geminiResult.error?.includes("paid plan")) {
-      return generateImageWithOpenAI(params)
-    }
-    return geminiResult
-  }
-
-  // OpenAI primary → fall back to Gemini
-  const openaiResult = await generateImageWithOpenAI(params)
-  if (!openaiResult.success) {
-    const geminiResult = await generateImageWithGemini(params)
-    if (geminiResult.success) return geminiResult
-  }
-  return openaiResult
-}
-
-async function generateImageWithOpenAI(params: ImageGenParams): Promise<ImageGenResponse> {
   const client = getClient()
   const size = params.size ?? "1024x1024"
   const n = params.n ?? 1
@@ -75,66 +54,6 @@ async function generateImageWithOpenAI(params: ImageGenParams): Promise<ImageGen
         ...parseSize(size),
       }
     })
-
-    return { success: true, images }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error"
-    return { success: false, images: [], error: message }
-  }
-}
-
-async function generateImageWithGemini(params: ImageGenParams): Promise<ImageGenResponse> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return { success: false, images: [], error: "GEMINI_API_KEY is not configured" }
-  }
-
-  let ai: InstanceType<typeof import("@google/genai").GoogleGenAI>
-  try {
-    const { GoogleGenAI } = await import("@google/genai")
-    ai = new GoogleGenAI({ apiKey })
-  } catch {
-    return { success: false, images: [], error: "Gemini SDK failed to load" }
-  }
-  const model = params.model ?? "imagen-4.0-generate-001"
-  const n = params.n ?? 1
-
-  try {
-    const response = await ai.models.generateImages({
-      model,
-      prompt: params.prompt,
-      config: {
-        numberOfImages: n,
-        aspectRatio: params.aspectRatio ?? "1:1",
-        negativePrompt: params.negativePrompt,
-        guidanceScale: params.guidanceScale,
-        seed: params.seed,
-      },
-    })
-
-    const generatedImages = response.generatedImages ?? []
-    if (generatedImages.length === 0) {
-      return { success: false, images: [], error: "No images generated" }
-    }
-
-    const images: ImageGenResult[] = generatedImages
-      .filter((g) => g.image?.imageBytes)
-      .map((g) => {
-        const b64 = g.image!.imageBytes!
-        const buffer = Buffer.from(b64, "base64")
-        return {
-          url: `data:image/png;base64,${b64}`,
-          buffer,
-          provider: "gemini",
-          model,
-          width: 1024,
-          height: 1024,
-        }
-      })
-
-    if (images.length === 0) {
-      return { success: false, images: [], error: "All generated images were filtered by safety checks" }
-    }
 
     return { success: true, images }
   } catch (error) {

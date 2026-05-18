@@ -33,7 +33,6 @@ const TYPES: { value: AssetType; label: string }[] = [
 ]
 
 const PROVIDERS: { value: AIProvider; label: string }[] = [
-  { value: "gemini", label: "Gemini (Imagen)" },
   { value: "openai", label: "OpenAI (GPT Image)" },
 ]
 

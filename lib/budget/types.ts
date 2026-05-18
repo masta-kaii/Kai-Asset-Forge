@@ -43,9 +43,6 @@ export const DEFAULT_BUDGET: BudgetConfig = {
 
 // Approximate costs per operation (USD)
 export const COST_RATES = {
-  gemini: {
-    imagen_generate_1k: 0.0025,
-  },
   openai: {
     gpt_image_1k: 0.004,
     gpt4o_prompt: 2.5 / 1_000_000,

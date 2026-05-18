@@ -3,8 +3,6 @@ import type { AIProvider } from "@/lib/ai/types"
 
 export function calculateImageCost(provider: AIProvider, count: number): number {
   switch (provider) {
-    case "gemini":
-      return count * COST_RATES.gemini.imagen_generate_1k
     case "openai":
       return count * COST_RATES.openai.gpt_image_1k
     default:
