@@ -22,10 +22,9 @@ Invoke-Item "$env:USERPROFILE\hermes"
 ```
 
 Now manually copy these from `C:\Workspace\Kai Asset Forge\hermes\`:
-- `brain.md`
+- `Dockerfile`
+- `agent.js`
 - `docker-compose.yml`
-- The `agents\` folder (everything inside)
-- The `departments\` folder (everything inside)
 - The `task-bus\` folder (everything inside)
 
 Into: `C:\Users\YOURNAME\hermes\`
@@ -57,30 +56,28 @@ New-Item -Force -Path .env
 notepad .env
 ```
 
-Paste this into Notepad, replacing the placeholders:
+Paste exactly these 2 lines into Notepad, replacing the placeholders:
 
-```
-ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
 KAI_API_BASE=https://kai-asset-forge-hub.vercel.app
 KAI_API_TOKEN=hermes-secret-abc123
-```
 
-- `ANTHROPIC_API_KEY`: Get from https://console.anthropic.com/settings/keys
+> **IMPORTANT:** Do NOT include any backticks (\`\`\`) in the .env file — only the 2 lines above.
+
 - `KAI_API_TOKEN`: Use the same value you set as `AGENT_API_TOKEN` in Vercel
 
 Save and close Notepad.
 
-## Step 5: Launch the Fleet
+## Step 5: Build & Launch the Fleet
 
 ```powershell
 cd "$env:USERPROFILE\hermes"
-docker compose up -d
+docker compose --profile full build
+docker compose --profile full up -d
 ```
 
 You should see:
 ```
-[+] Running 4/4
- ✔ Network hermes_default  Created
+[+] Running 3/3
  ✔ Container kai-orchestrator  Started
  ✔ Container kai-lister         Started
  ✔ Container kai-monitor        Started
@@ -88,7 +85,7 @@ You should see:
 
 Check if they're running:
 ```powershell
-docker compose ps
+docker compose --profile full ps
 ```
 
 ## Step 6: Send Your First Command
@@ -114,7 +111,7 @@ Get-Content "task-bus\orchestrator\outbox\*" -Wait
 
 ```powershell
 cd "$env:USERPROFILE\hermes"
-docker compose down
+docker compose --profile full down
 ```
 
 ## Troubleshooting
@@ -123,6 +120,7 @@ docker compose down
 |---------|-----|
 | Docker not starting | Open Docker Desktop first, wait for green |
 | "docker not found" | Restart PowerShell after Docker install |
-| Containers exit immediately | Check: `docker compose logs` |
+| Build fails | Check your internet connection — Docker needs to pull `node:22-alpine` |
+| Containers exit immediately | Check: `docker compose --profile full logs` |
 | API calls failing | Verify `KAI_API_TOKEN` in `.env` matches `AGENT_API_TOKEN` in Vercel |
-| Claude key not working | Check Anthropic console for your API key |
+| "pull access denied" | Use `docker compose --profile full build` first (not `up`) |

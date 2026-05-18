@@ -1,43 +1,36 @@
-version: "3.8"
-
 # KAI Asset Forge — Hermes Agent Fleet
-# Run: docker compose up -d
-# Stop: docker compose down
-# Status: docker compose ps
+# Run: docker compose --profile full build
+#       docker compose --profile full up -d
+# Stop: docker compose --profile full down
+# Status: docker compose --profile full ps
 
 services:
   # ─── Central Orchestrator ───
   kai-orchestrator:
-    image: anthropics/claude-code:latest
+    build: .
     container_name: kai-orchestrator
-    working_dir: /workspace
     volumes:
-      - ./brain.md:/workspace/brain.md:ro
-      - ./agents/kai-orchestrator/runbook.md:/workspace/runbook.md:ro
-      - ./departments:/workspace/departments:ro
       - ./task-bus:/srv/agent-bus
     environment:
-      - CLAUDE_PROJECT=brain.md
+      - ROLE=orchestrator
       - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge-hub.vercel.app}
       - KAI_API_TOKEN=${KAI_API_TOKEN}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - POLL_SECONDS=10
+      - HEARTBEAT_MINUTES=30
     restart: unless-stopped
     profiles: [full]
 
   # ─── Sales: Lister ───
   lister:
-    image: anthropics/claude-code:latest
+    build: .
     container_name: kai-lister
-    working_dir: /workspace
     volumes:
-      - ./agents/lister/runbook.md:/workspace/runbook.md:ro
-      - ./brain.md:/workspace/brain.md:ro
-      - ./task-bus/sales:/srv/agent-bus/sales
+      - ./task-bus:/srv/agent-bus
     environment:
-      - CLAUDE_PROJECT=runbook.md
+      - ROLE=lister
       - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge-hub.vercel.app}
       - KAI_API_TOKEN=${KAI_API_TOKEN}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - POLL_SECONDS=10
     restart: unless-stopped
     profiles: [full]
 
