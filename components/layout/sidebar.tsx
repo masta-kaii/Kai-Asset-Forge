@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
   LayoutDashboard, Sparkles, Library, Package, FileText,
-  Activity, Settings, Anvil, Monitor, LogOut, Eye,
+  Activity, Settings, Anvil, Monitor, LogOut, Eye, Cpu,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
 import { getSidebarStats } from "@/app/actions/sidebar"
@@ -49,6 +49,11 @@ const NAV_ITEMS = [
     title: "Agent Monitor",
     href: "/agents",
     icon: Activity,
+  },
+  {
+    title: "Sim Workstation",
+    href: "/workstation",
+    icon: Cpu,
   },
   {
     title: "Base Map",
