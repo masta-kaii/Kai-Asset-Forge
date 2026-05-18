@@ -30,7 +30,7 @@ New-Item -ItemType Directory -Force -Path "task-bus\support\inbox"
 # Create .env file
 @'
 ANTHROPIC_API_KEY=sk-ant-your-key-here
-KAI_API_BASE=https://kai-asset-forge.vercel.app
+KAI_API_BASE=https://kai-asset-forge-hub.vercel.app
 KAI_API_TOKEN=your-agent-token-from-vercel-env
 '@ | Out-File -FilePath .env -Encoding utf8
 ```

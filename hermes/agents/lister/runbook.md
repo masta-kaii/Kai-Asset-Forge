@@ -30,7 +30,7 @@ You are the **Lister**, the marketplace listing agent for KAI Asset Forge.
 ```
 
 ## Environment
-- `KAI_API_BASE=https://kai-asset-forge.vercel.app`
+- `KAI_API_BASE=https://kai-asset-forge-hub.vercel.app`
 - `KAI_API_TOKEN` — Bearer token for API bridge
 
 ## Quality Checklist

@@ -26,7 +26,7 @@ When operator says "list pack X":
 - **Archive:** Move completed tasks to `archive/`
 
 ## Environment
-- `KAI_API_BASE=https://kai-asset-forge.vercel.app`
+- `KAI_API_BASE=https://kai-asset-forge-hub.vercel.app`
 - `KAI_API_TOKEN` — Bearer token for API bridge
 - `OPENAI_API_KEY` — fallback (API bridge uses its own)
 - `DEEPSEEK_API_KEY` — fallback (API bridge uses its own)

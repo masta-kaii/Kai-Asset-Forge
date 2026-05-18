@@ -18,7 +18,7 @@ services:
       - ./task-bus:/srv/agent-bus
     environment:
       - CLAUDE_PROJECT=brain.md
-      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge.vercel.app}
+      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge-hub.vercel.app}
       - KAI_API_TOKEN=${KAI_API_TOKEN}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     restart: unless-stopped
@@ -35,7 +35,7 @@ services:
       - ./task-bus/sales:/srv/agent-bus/sales
     environment:
       - CLAUDE_PROJECT=runbook.md
-      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge.vercel.app}
+      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge-hub.vercel.app}
       - KAI_API_TOKEN=${KAI_API_TOKEN}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     restart: unless-stopped
@@ -58,7 +58,7 @@ services:
     volumes:
       - ./task-bus/ops:/srv/agent-bus/ops
     environment:
-      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge.vercel.app}
+      - KAI_API_BASE=${KAI_API_BASE:-https://kai-asset-forge-hub.vercel.app}
       - KAI_API_TOKEN=${KAI_API_TOKEN}
     restart: unless-stopped
     profiles: [full]
