@@ -42,3 +42,4 @@ next-env.d.ts
 
 # Memory core - local only, do not push to git
 .memory/
+Agent Sprite & Workstation Tileset/
