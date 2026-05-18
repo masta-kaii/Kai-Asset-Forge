@@ -102,19 +102,23 @@ interface Parcel {
   id: number
   fromId: WorkshopAgentId
   toId: WorkshopAgentId
+  /** Which sprite renders as the walker (the sender, doing the hand-off). */
+  fromVariant: SpriteVariant
   /** Starting position in scene percentages. */
   fromX: number
   fromY: number
   /** Travel delta in scene pixels (computed at launch time from the scene's bounding rect). */
   dxPx: number
   dyPx: number
+  /** Walker facing direction along travel axis. */
+  facing: 1 | -1
   startedAt: number
   durationMs: number
 }
 
 const BUBBLE_TTL_MS = 7000
 const MASTA_BUBBLE_TTL_MS = 10000
-const PARCEL_DURATION = 1600
+const PARCEL_DURATION = 2200
 
 const MASTA_LINES: Record<string, string[]> = {
   forging: ["Forge crew, keep it moving.", "Push the next batch through."],
@@ -184,10 +188,12 @@ export default function WorkshopPage() {
         id: nextId(),
         fromId,
         toId,
+        fromVariant: fromId as SpriteVariant,
         fromX: from.x,
         fromY: from.y,
         dxPx,
         dyPx,
+        facing: dxPx >= 0 ? 1 : -1,
         startedAt: Date.now(),
         durationMs: PARCEL_DURATION,
       },
@@ -525,12 +531,13 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 }
 
 function Parcel({ parcel }: { parcel: Parcel }) {
-  // Start position is a scene-percentage; travel delta is in pixels (computed
-  // when the parcel was launched). The CSS keyframes translate by that pixel
-  // delta so the path stays correct at any scene size.
+  // The "parcel" is a courier walker: a mini sprite of the sender carrying
+  // the work item over to the receiving agent. Travel distance is precomputed
+  // in scene pixels; the keyframes translate by that delta and the walker's
+  // own legs/arms swing via the sprite's walking class.
   return (
     <div
-      className="absolute pointer-events-none workshop-parcel"
+      className="absolute pointer-events-none workshop-walker"
       style={
         {
           left: `${parcel.fromX}%`,
@@ -541,7 +548,15 @@ function Parcel({ parcel }: { parcel: Parcel }) {
         } as React.CSSProperties
       }
     >
-      <div className="parcel-inner">📄</div>
+      <div className="walker-inner">
+        <AgentSprite variant={parcel.fromVariant} size={36} facing={parcel.facing} walking />
+        <span
+          className="walker-cargo"
+          style={{ left: parcel.facing === 1 ? "calc(50% + 14px)" : "calc(50% - 26px)" }}
+        >
+          📄
+        </span>
+      </div>
     </div>
   )
 }

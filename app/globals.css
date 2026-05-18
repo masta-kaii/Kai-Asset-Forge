@@ -242,29 +242,43 @@
   50%      { transform: rotate(25deg); }
 }
 
-/* Parcels — small "work item" that flies between agents. */
-.workshop-parcel {
+/* Courier walker — a mini sender sprite delivering work between desks. */
+.workshop-walker {
   position: absolute;
   z-index: 5;
-  animation-name: parcel-fly;
+  animation-name: walker-walk;
   animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
   animation-fill-mode: forwards;
   transform: translate(-50%, -50%);
-  font-size: 18px;
-  filter: drop-shadow(0 2px 0 rgba(0,0,0,0.4));
+  filter: drop-shadow(0 3px 2px rgba(0,0,0,0.35));
 }
-.workshop-parcel .parcel-inner {
-  animation: parcel-spin 0.9s linear infinite;
+.workshop-walker .walker-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: walker-bob 0.45s ease-in-out infinite;
 }
-@keyframes parcel-fly {
-  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
-  15%  { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
-  85%  { transform: translate(calc(-50% + var(--parcel-dx)), calc(-50% + var(--parcel-dy))) scale(1.05); opacity: 1; }
-  100% { transform: translate(calc(-50% + var(--parcel-dx)), calc(-50% + var(--parcel-dy))) scale(0.4); opacity: 0; }
+.workshop-walker .walker-cargo {
+  position: absolute;
+  top: 38%;
+  font-size: 14px;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.4));
+  animation: walker-cargo-wobble 0.45s ease-in-out infinite;
 }
-@keyframes parcel-spin {
-  0%, 100% { transform: rotate(-12deg); }
-  50%      { transform: rotate(12deg); }
+@keyframes walker-walk {
+  0%   { transform: translate(-50%, -50%); opacity: 0; }
+  10%  { transform: translate(-50%, -50%); opacity: 1; }
+  90%  { transform: translate(calc(-50% + var(--parcel-dx)), calc(-50% + var(--parcel-dy))); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--parcel-dx)), calc(-50% + var(--parcel-dy))); opacity: 0; }
+}
+@keyframes walker-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
+}
+@keyframes walker-cargo-wobble {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(6deg); }
 }
 
 @layer base {
