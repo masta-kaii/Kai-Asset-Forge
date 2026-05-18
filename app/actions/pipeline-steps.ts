@@ -7,10 +7,10 @@ import { createGeneration } from "@/lib/firebase/generations"
 import { createPack } from "@/lib/firebase/packs"
 import { scoutTrends } from "@/app/actions/scout"
 import { curatorScore } from "@/app/actions/curator"
-import { publishPack } from "@/app/actions/marketplace"
 import { runReflection } from "@/app/actions/reflection"
 import { defaultTargetSize } from "@/lib/pixel/post-process"
 import { postProcessPixelArt } from "@/app/actions/postprocess"
+import { buildPackDeliverable } from "@/app/actions/pack-builder"
 import type { AssetType, AssetStyle, AssetPack } from "@/lib/types"
 import type { AIProvider } from "@/lib/ai/types"
 
@@ -175,40 +175,36 @@ export async function forgeStepFinalize(input: {
     const packTitle = `${input.theme.charAt(0).toUpperCase() + input.theme.slice(1)} Forge Pack`
     const pack = await createPack({
       title: packTitle,
-      description: `Auto-forged ${input.theme} asset pack with ${input.assetIds.length} game-ready assets.`,
+      description: `Auto-forged ${input.theme} asset pack with ${input.assetIds.length} game-ready pixel-art assets.`,
       assets: input.assetIds,
       price: 3.99,
       status: "review",
       previewUrl: "",
     })
 
-    // Generate listing
-    const listingResult = await generateText({
-      prompt: `Generate a quick store title and 4 tags for a game asset pack: "${packTitle}", ${input.assetIds.length} ${input.theme} assets, $${pack.price}. Return JSON: {"title":"...","tags":["..."]}. No markdown.`,
-      provider,
-      temperature: 0.8,
-      maxTokens: 150,
-    })
-
-    // Auto-publish to marketplace
-    let publishSummary = ""
-    try {
-      const pubResults = await publishPack(pack)
-      const published = pubResults.filter((r) => r.success)
-      if (published.length > 0) {
-        publishSummary = ` | Published to ${published.map((r) => r.platform).join(", ")}`
+    // Build buyer-facing deliverable (ZIP + cover + preview grid).
+    const built = await buildPackDeliverable(pack.id)
+    if (!built.success) {
+      return {
+        step: "Finalize",
+        status: "failed",
+        summary: `Pack created but deliverable build failed: ${built.error}`,
+        error: built.error,
+        data: { packId: pack.id },
       }
-    } catch { /* marketplace optional */ }
+    }
 
     return {
       step: "Finalize",
       status: "completed",
-      summary: `Pack "${packTitle}" ready — ${input.assetIds.length} assets, $${pack.price}${publishSummary}`,
+      summary: `Pack "${packTitle}" ready — ${input.assetIds.length} assets, $${pack.price} — ZIP built`,
       data: {
         packId: pack.id,
         packTitle,
-        listing: listingResult.success ? listingResult.text : "",
-        published: publishSummary.length > 0,
+        zipUrl: built.zipUrl,
+        coverUrl: built.coverUrl,
+        previewGridUrl: built.previewGridUrl,
+        slug: built.slug,
       },
     }
   } catch (error) {

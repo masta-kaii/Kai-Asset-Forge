@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, limit, where, doc, updateDoc, getDoc } from "firebase/firestore"
 import { getDb } from "./client"
 import type { Asset, AssetStatus } from "@/lib/types"
 
@@ -46,4 +46,11 @@ export async function updateAssetStatus(assetId: string, status: AssetStatus): P
   const db = getDb()
   const ref = doc(db, COLLECTION, assetId)
   await updateDoc(ref, { status, updatedAt: new Date().toISOString() })
+}
+
+export async function getAssetById(assetId: string): Promise<Asset | null> {
+  const db = getDb()
+  const snap = await getDoc(doc(db, COLLECTION, assetId))
+  if (!snap.exists()) return null
+  return { id: snap.id, ...snap.data() } as Asset
 }

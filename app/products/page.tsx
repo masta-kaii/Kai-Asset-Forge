@@ -10,10 +10,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Package, Plus, ImageIcon, Check, Sparkles, Globe, Loader2 } from "lucide-react"
+import { Package, Plus, ImageIcon, Check, Sparkles, Download, Loader2, Wrench } from "lucide-react"
 import { fetchAssetsByStatus } from "@/app/actions/assets"
 import { fetchPacks, createNewPack } from "@/app/actions/packs"
-import { publishPack } from "@/app/actions/marketplace"
+import { buildPackDeliverable } from "@/app/actions/pack-builder"
 import { toast } from "sonner"
 import type { Asset, AssetPack } from "@/lib/types"
 
@@ -27,25 +27,35 @@ export default function ProductBuilderPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [publishingId, setPublishingId] = useState<string | null>(null)
-  const [publishedIds, setPublishedIds] = useState<Set<string>>(new Set())
+  const [buildingId, setBuildingId] = useState<string | null>(null)
 
-  const handlePublishPack = async (pack: AssetPack) => {
-    setPublishingId(pack.id)
+  const handleBuildDeliverable = async (pack: AssetPack) => {
+    setBuildingId(pack.id)
     try {
-      const results = await publishPack(pack)
-      const successPlatforms = results.filter((r) => r.success).map((r) => r.platform)
-      if (successPlatforms.length > 0) {
-        setPublishedIds((prev) => new Set([...prev, pack.id]))
-        toast.success(`Published to ${successPlatforms.join(", ")}`)
+      const result = await buildPackDeliverable(pack.id)
+      if (result.success && result.zipUrl) {
+        setPacks((prev) =>
+          prev.map((p) =>
+            p.id === pack.id
+              ? {
+                  ...p,
+                  zipUrl: result.zipUrl,
+                  coverUrl: result.coverUrl,
+                  previewGridUrl: result.previewGridUrl,
+                  previewUrl: result.previewGridUrl ?? p.previewUrl,
+                  slug: result.slug,
+                }
+              : p,
+          ),
+        )
+        toast.success(`ZIP built — ${result.assetCount} assets packaged`)
       } else {
-        const errors = results.map((r) => r.error).filter(Boolean).join("; ")
-        toast.error(errors || "Publish failed")
+        toast.error(result.error ?? "Build failed")
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Publish failed")
+      toast.error(err instanceof Error ? err.message : "Build failed")
     } finally {
-      setPublishingId(null)
+      setBuildingId(null)
     }
   }
 
@@ -293,35 +303,46 @@ export default function ProductBuilderPage() {
             <div className="space-y-3">
               {packs.map((pack) => (
                 <div key={pack.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                  <div className="size-10 bg-muted rounded-md flex items-center justify-center shrink-0">
-                    <Package className="size-4 text-muted-foreground" />
+                  <div className="size-10 bg-muted rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+                    {pack.previewUrl ? (
+                      <Image src={pack.previewUrl} alt={pack.title} width={40} height={40} className="object-cover" />
+                    ) : (
+                      <Package className="size-4 text-muted-foreground" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{pack.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {pack.assets.length} assets · ${pack.price.toFixed(2)}
-                      {publishedIds.has(pack.id) && " · published"}
+                      {pack.zipUrl && " · ZIP ready"}
                     </p>
                   </div>
-                  {publishedIds.has(pack.id) ? (
-                    <Badge className="text-xs shrink-0 bg-green-500/10 text-green-500 border-green-500/20 gap-1">
-                      <Globe className="size-2.5" />
-                      Live
-                    </Badge>
+                  {pack.zipUrl ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1 shrink-0"
+                    >
+                      <a href={pack.zipUrl} download={`${pack.slug ?? pack.title}.zip`}>
+                        <Download className="size-3" />
+                        Download
+                      </a>
+                    </Button>
                   ) : (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-7 text-xs gap-1 shrink-0"
-                      onClick={() => handlePublishPack(pack)}
-                      disabled={publishingId === pack.id}
+                      onClick={() => handleBuildDeliverable(pack)}
+                      disabled={buildingId === pack.id || !pack.assets.length}
                     >
-                      {publishingId === pack.id ? (
+                      {buildingId === pack.id ? (
                         <Loader2 className="size-3 animate-spin" />
                       ) : (
-                        <Globe className="size-3" />
+                        <Wrench className="size-3" />
                       )}
-                      Publish
+                      Build ZIP
                     </Button>
                   )}
                 </div>

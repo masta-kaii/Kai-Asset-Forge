@@ -6,7 +6,7 @@ import { getBudgetStatus } from "@/lib/budget/budget"
 import { getAssetsByStatus, updateAssetStatus } from "@/lib/firebase/assets"
 import { createPack, getPacks } from "@/lib/firebase/packs"
 import { findIncompleteRun } from "@/app/actions/orchestrator"
-import { publishPack } from "@/app/actions/marketplace"
+import { buildPackDeliverable } from "@/app/actions/pack-builder"
 
 export interface AutonomousStatus {
   action: "scanning" | "paused" | "packaging" | "publishing" | "forging" | "blocked" | "idle"
@@ -64,21 +64,24 @@ export async function autonomousTick(): Promise<AutonomousStatus> {
           previewUrl: batch[0].previewUrl ?? "",
         })
         for (const a of batch) await updateAssetStatus(a.id, "draft").catch(() => {})
-        await publishPack(pack).catch(() => {})
-        return { action: "packaging", detail: `Packaged ${batch.length} assets → published "${pack.title}"`, timestamp: new Date().toISOString(), backlog: { unlistedAssets: unlisted.length - batch.length, stuckRuns: 0, packsToPublish: 1 }, providers: { openai: "healthy", deepseek: "healthy" }, budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining }, shouldForge: false, isProcessing: true }
+        const built = await buildPackDeliverable(pack.id).catch(() => null)
+        const detail = built?.success
+          ? `Packaged ${batch.length} assets → "${pack.title}" ZIP ready`
+          : `Packaged ${batch.length} assets → "${pack.title}" (ZIP build failed)`
+        return { action: "packaging", detail, timestamp: new Date().toISOString(), backlog: { unlistedAssets: unlisted.length - batch.length, stuckRuns: 0, packsToPublish: 1 }, providers: { openai: "healthy", deepseek: "healthy" }, budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining }, shouldForge: false, isProcessing: true }
       } catch (err) {
         console.error("Auto-package failed:", err)
       }
     }
 
-    // 3. Publish any unpublished packs
+    // 3. Build the deliverable ZIP for any pack that's missing one.
     const packs = await getPacks().catch(() => [])
-    const unpub = packs.find((p) => !p.storeUrl)
-    if (unpub) {
-      try {
-        await publishPack(unpub)
-        return { action: "publishing", detail: `Published "${unpub.title}" to marketplace`, timestamp: new Date().toISOString(), backlog: { unlistedAssets: unlisted.length, stuckRuns: 0, packsToPublish: packs.filter((p) => !p.storeUrl).length }, providers: { openai: "healthy", deepseek: "healthy" }, budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining }, shouldForge: false, isProcessing: true }
-      } catch {}
+    const unbuilt = packs.find((p) => !p.zipUrl && p.assets && p.assets.length > 0)
+    if (unbuilt) {
+      const built = await buildPackDeliverable(unbuilt.id).catch(() => null)
+      if (built?.success) {
+        return { action: "packaging", detail: `Built deliverable for "${unbuilt.title}" — ready to upload`, timestamp: new Date().toISOString(), backlog: { unlistedAssets: unlisted.length, stuckRuns: 0, packsToPublish: packs.filter((p) => !p.zipUrl).length }, providers: { openai: "healthy", deepseek: "healthy" }, budget: { used: budget.monthlyUsed, cap: budget.monthlyCap, remaining: budget.monthlyRemaining }, shouldForge: false, isProcessing: true }
+      }
     }
 
     // 4. Check budget

@@ -9,6 +9,8 @@ import { runOrchestrator, findIncompleteRun } from "@/app/actions/orchestrator"
 import { autonomousTick } from "@/app/actions/autonomous-agent"
 import { scoutTrends } from "@/app/actions/scout"
 import { runReflection } from "@/app/actions/reflection"
+import { buildPackDeliverable } from "@/app/actions/pack-builder"
+import { getPackById, getPacks } from "@/lib/firebase/packs"
 
 export interface MastaToolEvent {
   name: string
@@ -145,6 +147,53 @@ function tools(): OpenAI.Chat.Completions.ChatCompletionTool[] {
         parameters: { type: "object", properties: {}, additionalProperties: false },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "list_packs",
+        description:
+          "List asset packs with their status and whether the buyer-facing ZIP deliverable has been built. Use this when the operator asks 'what's ready to ship' or 'show me the packs'.",
+        parameters: {
+          type: "object",
+          properties: {
+            limit: { type: "number", description: "Max packs to return (default 10)." },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "build_pack_deliverable",
+        description:
+          "Assemble the buyer-facing ZIP, preview grid, and cover image for a specific pack. Use when the operator asks to 'package' a pack or 'get it ready to upload'.",
+        parameters: {
+          type: "object",
+          properties: {
+            packId: { type: "string", description: "Pack id from list_packs." },
+          },
+          required: ["packId"],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_pack",
+        description:
+          "Get the full record for a pack including the ZIP, cover, and preview URLs once built.",
+        parameters: {
+          type: "object",
+          properties: {
+            packId: { type: "string" },
+          },
+          required: ["packId"],
+          additionalProperties: false,
+        },
+      },
+    },
   ]
 }
 
@@ -205,6 +254,45 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     }
     case "reflect": {
       return await runReflection()
+    }
+    case "list_packs": {
+      const lim = typeof args.limit === "number" ? args.limit : 10
+      const packs = await getPacks()
+      return packs.slice(0, lim).map((p) => ({
+        id: p.id,
+        title: p.title,
+        assetCount: p.assets?.length ?? 0,
+        price: p.price,
+        status: p.status,
+        deliverableReady: !!p.zipUrl,
+        uploaded: !!p.storeUrl,
+        slug: p.slug,
+      }))
+    }
+    case "build_pack_deliverable": {
+      const packId = typeof args.packId === "string" ? args.packId : ""
+      if (!packId) return { success: false, error: "packId required" }
+      return await buildPackDeliverable(packId)
+    }
+    case "get_pack": {
+      const packId = typeof args.packId === "string" ? args.packId : ""
+      if (!packId) return { success: false, error: "packId required" }
+      const pack = await getPackById(packId)
+      if (!pack) return { success: false, error: "Pack not found" }
+      return {
+        id: pack.id,
+        title: pack.title,
+        description: pack.description,
+        price: pack.price,
+        status: pack.status,
+        assetCount: pack.assets?.length ?? 0,
+        slug: pack.slug,
+        zipUrl: pack.zipUrl,
+        coverUrl: pack.coverUrl,
+        previewGridUrl: pack.previewGridUrl,
+        listing: pack.listing,
+        uploaded: !!pack.storeUrl,
+      }
     }
     default:
       return { error: `Unknown tool: ${name}` }

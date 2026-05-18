@@ -32,6 +32,17 @@ export interface AssetPack {
   status: AssetStatus
   previewUrl: string
   storeUrl?: string
+  slug?: string
+  zipUrl?: string
+  coverUrl?: string
+  previewGridUrl?: string
+  readmeText?: string
+  listing?: {
+    title: string
+    description: string
+    tags: string[]
+    suggestedPrice: number
+  }
   createdAt: string
 }
 
