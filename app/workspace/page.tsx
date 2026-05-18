@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { autonomousTick, getAutonomousStatus, type AutonomousStatus } from "@/app/actions/autonomous-agent"
+import { autonomousTick, type AutonomousStatus } from "@/app/actions/autonomous-agent"
 import { runOrchestrator } from "@/app/actions/orchestrator"
 import { toast } from "sonner"
-import { Terminal, Wrench, Zap, Play, Pause, Brain, Loader2 } from "lucide-react"
+import { Terminal, Wrench, Zap, Play, Pause, Loader2 } from "lucide-react"
 
 const STEPS = ["Budget", "Ledger", "Scout", "Decision", "Forge", "Curator", "Finalize", "Reflection"]
 
@@ -29,7 +29,7 @@ export default function MapPage() {
   // ── Poll autonomous agent ──
   useEffect(() => {
     const tick = () => {
-      getAutonomousStatus().then(setStatus).catch(() => {})
+      autonomousTick().then(setStatus).catch(() => {})
     }
     tick()
     const interval = setInterval(tick, 5000)
@@ -45,19 +45,14 @@ export default function MapPage() {
       try {
         const tick = await autonomousTick()
         setStatus(tick)
-        log(`[${new Date().toLocaleTimeString()}] ${tick.action}: ${tick.detail}`)
+        log(`[${new Date().toLocaleTimeString()}] ${tick.action.toUpperCase()}: ${tick.detail}`)
 
-        if (tick.action === "resume") {
-          log(`[${new Date().toLocaleTimeString()}] RESUME: ${tick.detail} — manual resume required on Dashboard`)
-        } else if (tick.action === "ready") {
-          toast.info("Auto-forging new product...")
+        if (tick.shouldForge) {
           const result = await runOrchestrator({ maxAssets: 1 })
-          log(`[${new Date().toLocaleTimeString()}] Orchestrator ${result.status}${result.error ? `: ${result.error}` : ""}`)
-        } else if (tick.action === "packaged" || tick.action === "published") {
-          toast.success(tick.detail)
-          log(`[${new Date().toLocaleTimeString()}] ${tick.action.toUpperCase()}: ${tick.detail}`)
-        } else if (tick.action === "paused" || tick.action === "backlog") {
-          log(`[${new Date().toLocaleTimeString()}] ${tick.action.toUpperCase()}: ${tick.detail}`)
+          log(`[${new Date().toLocaleTimeString()}] ⚡ Forge: ${result.status}${result.error ? ` (${result.error})` : " ✓"}`)
+          if (result.status === "completed") toast.success("Product forged!")
+          else if (result.status.includes("paused") || result.status.includes("awaiting")) toast.info(result.error ?? "Run paused")
+          else toast.error(result.error ?? "Forge failed")
         }
       } catch (err) {
         log(`[${new Date().toLocaleTimeString()}] ERROR: ${err}`)
@@ -191,7 +186,7 @@ export default function MapPage() {
                   Budget: ${status.budget.used.toFixed(2)} / ${status.budget.cap}
                 </p>
                 <p className="opacity-40" style={{ color: "#39ff14" }}>
-                  Backlog: {status.backlog.unlistedAssets} unlisted | {status.backlog.stuckRuns} stuck | {status.backlog.packsNeedingPublish} publish
+                  Backlog: {status.backlog.unlistedAssets} unlisted | {status.backlog.stuckRuns} stuck | {status.backlog.packsToPublish} publish
                 </p>
                 <p className="opacity-30" style={{ color: "#39ff14" }}>──────────────────────────</p>
               </>
