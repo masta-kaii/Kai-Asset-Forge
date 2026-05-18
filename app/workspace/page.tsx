@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator"
 import { getDashboardData } from "@/app/actions/dashboard"
 import type { BudgetStatus } from "@/lib/budget/types"
 import {
-  Cpu, Shield, Warehouse, Store, Wrench, Terminal, Zap,
+  Cpu, Shield, Warehouse, Store, Wrench, Terminal, Zap, AlertTriangle,
 } from "lucide-react"
 
 interface RoomDef {
@@ -46,13 +46,19 @@ export default function MapPage() {
   const [activeTerminal, setActiveTerminal] = useState<string | null>(null)
   const [terminalData, setTerminalData] = useState<TerminalData | null>(null)
 
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
   useEffect(() => {
     getDashboardData().then((data) => {
       setBudget(data.budget)
       setTotalAssets(data.totalAssets)
       setApprovedCount(data.recentAssets.filter((a) => a.status === "approved").length)
       setGenCount(data.recentGenerations.length)
-    })
+    }).catch((e) => {
+      console.error("Map load error:", e)
+      setError("Systems offline — check Vercel logs")
+    }).finally(() => setLoading(false))
   }, [])
 
   const rooms: RoomDef[] = [
@@ -173,6 +179,13 @@ export default function MapPage() {
       </div>
 
       <Separator />
+
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-amber-500 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 font-mono">
+          <AlertTriangle className="size-4" />
+          {error} — showing static layout
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2 overflow-hidden" style={{ background: "#0a0a0a", borderColor: "rgba(57,255,20,0.15)" }}>
