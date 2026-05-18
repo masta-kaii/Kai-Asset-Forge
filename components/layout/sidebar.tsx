@@ -8,13 +8,18 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
   LayoutDashboard, Sparkles, Library, Package, FileText,
-  Activity, Settings, Anvil, Monitor, LogOut,
+  Activity, Settings, Anvil, Monitor, LogOut, Crown,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
 import { getSidebarStats } from "@/app/actions/sidebar"
 import { useEffect, useState } from "react"
 
 const NAV_ITEMS = [
+  {
+    title: "Masta",
+    href: "/masta",
+    icon: Crown,
+  },
   {
     title: "Dashboard",
     href: "/dashboard",
