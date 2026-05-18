@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
+import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { autonomousTick } from "@/app/actions/autonomous-agent"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { pause, resume } from "@/lib/budget/kill-switch"
@@ -11,38 +11,31 @@ import { runOrchestrator } from "@/app/actions/orchestrator"
 import { Play, Pause, Zap, Loader2 } from "lucide-react"
 
 // ---------------------------------------------------------------------------
-// Agent map — 3x3 grid, Orchestrator in center
-// gridX, gridY are tile positions (0-2)
+// Agent config — positions on a 3x3 grid, each with a character sprite
 // ---------------------------------------------------------------------------
 
 interface AgentDef {
   id: string
   label: string
-  emoji: string
   role: string
-  homeX: number
-  homeY: number
-  color: string
+  sprite: string   // folder name under /sprites/agents/
+  homeX: number     // grid col 0-2
+  homeY: number     // grid row 0-2
 }
 
 const AGENTS: AgentDef[] = [
-  { id: "monitor",      label: "Monitor",  emoji: "📡", role: "Watch", homeX: 0, homeY: 0, color: "#334" },
-  { id: "scout",        label: "Scout",    emoji: "🔍", role: "Trends", homeX: 1, homeY: 0, color: "#244" },
-  { id: "forge",        label: "Forge",    emoji: "⚡", role: "Generate", homeX: 2, homeY: 0, color: "#430" },
-  { id: "deploy",       label: "Deploy",   emoji: "🚀", role: "Ship", homeX: 0, homeY: 2, color: "#224" },
-  { id: "lister",       label: "Lister",   emoji: "🏪", role: "Sell", homeX: 1, homeY: 2, color: "#412" },
-  { id: "packager",     label: "Packager", emoji: "📦", role: "Bundle", homeX: 2, homeY: 2, color: "#420" },
-  { id: "orchestrator", label: "Orch",     emoji: "🧠", role: "MANAGER", homeX: 1, homeY: 1, color: "#232" },
-  { id: "curator",      label: "Curator",  emoji: "✅", role: "Review", homeX: 2, homeY: 1, color: "#142" },
+  { id: "monitor",      label: "Monitor",  role: "Watch",      sprite: "lizard_m",      homeX: 0, homeY: 0 },
+  { id: "scout",        label: "Scout",    role: "Trends",     sprite: "elf_f",         homeX: 1, homeY: 0 },
+  { id: "forge",        label: "Forge",    role: "Generate",   sprite: "dwarf_m",       homeX: 2, homeY: 0 },
+  { id: "deploy",       label: "Deploy",   role: "Ship",       sprite: "imp",           homeX: 0, homeY: 2 },
+  { id: "lister",       label: "Lister",   role: "Sell",       sprite: "elf_m",         homeX: 1, homeY: 2 },
+  { id: "packager",     label: "Packager", role: "Bundle",     sprite: "goblin",        homeX: 2, homeY: 2 },
+  { id: "orchestrator", label: "Orch",     role: "MANAGER",    sprite: "wizzard_m",     homeX: 1, homeY: 1 },
+  { id: "curator",      label: "Curator",  role: "Review",     sprite: "knight_f",      homeX: 2, homeY: 1 },
 ]
 
-// Center is orchestrator; rearrange curator to (2,1)
-AGENTS.find((a) => a.id === "curator")!.homeX = 2
-AGENTS.find((a) => a.id === "curator")!.homeY = 1
-
-// Deploy stays left-bottom
-// Lister stays middle-bottom
-// Packager stays right-bottom
+// Move curator to (2,1) — bottom-right area
+AGENTS.find((a) => a.id === "curator")!.homeX = 2; AGENTS.find((a) => a.id === "curator")!.homeY = 1
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,6 +49,8 @@ interface AgentState {
   gridX: number
   gridY: number
   pulse: boolean
+  frame: number
+  animType: "idle" | "run"
 }
 
 interface SimStatus {
@@ -66,7 +61,6 @@ interface SimStatus {
   backlog: { unlistedAssets: number; stuckRuns: number; packsToPublish: number }
   isPaused: boolean
   totalAssets: number
-  readyPacks: number
 }
 
 interface LogEntry {
@@ -84,42 +78,58 @@ interface ForgeStep {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Step → agent map
 // ---------------------------------------------------------------------------
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms))
-}
-
-function tileColor(x: number, y: number, isPath: boolean): string {
-  // Checkerboard floor
-  const dark = (x + y) % 2 === 0
-  if (isPath) return dark ? "#1a2a1a" : "#1e2e1e"
-  return dark ? "#1a1a1f" : "#1e1e24"
-}
-
-function providerDot(s: string) {
-  if (s === "healthy") return "🟢"
-  if (s === "degraded") return "🟡"
-  return "🔴"
-}
-
-// Map step name to agent id
 const stepAgentMap: Record<string, string> = {
   scout: "scout", curate: "curator", generate: "forge",
   package: "packager", listing: "lister", publish: "deploy",
   orchestrate: "orchestrator", complete: "orchestrator",
 }
 
-function stepToAgent(stepName: string): string | null {
-  for (const [key, agent] of Object.entries(stepAgentMap)) {
-    if (stepName.toLowerCase().includes(key)) return agent
+function stepToAgent(step: string): string | null {
+  for (const [k, a] of Object.entries(stepAgentMap)) {
+    if (step.toLowerCase().includes(k)) return a
   }
   return null
 }
 
+function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)) }
+function providerDot(s: string) { return s === "healthy" ? "🟢" : s === "degraded" ? "🟡" : "🔴" }
+
 // ---------------------------------------------------------------------------
-// Component
+// Animated Sprite Component
+// ---------------------------------------------------------------------------
+
+function AnimatedSprite({
+  agentId, animType, frame, size, className,
+}: {
+  agentId: string
+  animType: "idle" | "run"
+  frame: number
+  size: number
+  className?: string
+}) {
+  const def = AGENTS.find((a) => a.id === agentId)
+  if (!def) return null
+  const src = `/sprites/agents/${def.sprite}/${animType}_f${frame}.png`
+  return (
+    <div className={`relative ${className ?? ""}`} style={{ width: size, height: size * 1.75 }}>
+      <Image
+        src={src}
+        alt={def.label}
+        width={size}
+        height={size * 1.75}
+        className="pixelated"
+        unoptimized
+        priority
+      />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
 // ---------------------------------------------------------------------------
 
 export default function WorkstationPage() {
@@ -127,13 +137,13 @@ export default function WorkstationPage() {
     action: "idle", detail: "System booting...", providers: { openai: "unknown", deepseek: "unknown" },
     budget: { used: 0, cap: 10, remaining: 10 },
     backlog: { unlistedAssets: 0, stuckRuns: 0, packsToPublish: 0 },
-    isPaused: false, totalAssets: 0, readyPacks: 0,
+    isPaused: false, totalAssets: 0,
   })
 
   const [agents, setAgents] = useState<Record<string, AgentState>>(() => {
     const init: Record<string, AgentState> = {}
     for (const a of AGENTS) {
-      init[a.id] = { status: "idle", message: "", gridX: a.homeX, gridY: a.homeY, pulse: false }
+      init[a.id] = { status: "idle", message: "", gridX: a.homeX, gridY: a.homeY, pulse: false, frame: 0, animType: "idle" }
     }
     return init
   })
@@ -149,12 +159,30 @@ export default function WorkstationPage() {
   const prevAction = useRef("")
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isVisible = useRef(true)
+  const frameTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({})
+
+  // ---- Frame animation timers for each agent ----
+  useEffect(() => {
+    for (const a of AGENTS) {
+      frameTimers.current[a.id] = setInterval(() => {
+        setAgents((prev) => {
+          const cur = prev[a.id]
+          if (!cur) return prev
+          const maxFrames = cur.animType === "run" ? 4 : 4
+          return { ...prev, [a.id]: { ...cur, frame: (cur.frame + 1) % maxFrames } }
+        })
+      }, 180)
+    }
+    return () => {
+      for (const t of Object.values(frameTimers.current)) clearInterval(t)
+    }
+  }, [])
 
   // ---- Logging ----
   function addLog(agent: string, msg: string, type: LogEntry["type"] = "info") {
     const id = ++logCounter.current
     const time = new Date().toLocaleTimeString("en-US", { hour12: false }).slice(0, 8)
-    setLogs((p) => [...p.slice(-50), { id, time, agent, msg, type }])
+    setLogs((p) => [...p.slice(-40), { id, time, agent, msg, type }])
   }
 
   // ---- Uptime ----
@@ -167,27 +195,11 @@ export default function WorkstationPage() {
   useEffect(() => {
     function handle() {
       isVisible.current = document.visibilityState === "visible"
-      if (isVisible.current) poll() // re-poll immediately on focus
+      if (isVisible.current) poll()
     }
     document.addEventListener("visibilitychange", handle)
     return () => document.removeEventListener("visibilitychange", handle)
   }, [])
-
-  // ---- Agent movement ----
-  function moveAgent(id: string, tx: number, ty: number) {
-    setAgents((prev) => {
-      if (!prev[id]) return prev
-      const current = prev[id]
-      if (current.gridX === tx && current.gridY === ty) return prev
-      return { ...prev, [id]: { ...current, gridX: tx, gridY: ty, status: "walking" } }
-    })
-  }
-
-  function sendHome(id: string) {
-    const def = AGENTS.find((a) => a.id === id)
-    if (!def) return
-    moveAgent(id, def.homeX, def.homeY)
-  }
 
   // ---- Poll ----
   const poll = useCallback(async () => {
@@ -196,74 +208,52 @@ export default function WorkstationPage() {
       setStatus({
         action: tick.action, detail: tick.detail,
         providers: tick.providers, budget: tick.budget, backlog: tick.backlog,
-        isPaused: dash.isPaused, totalAssets: dash.totalAssets, readyPacks: dash.readyPacks,
+        isPaused: dash.isPaused, totalAssets: dash.totalAssets,
       })
 
       const action = tick.action
       const detail = tick.detail
-
-      // Build honest agent states — only "working" when system actually active
       const updates: Record<string, Partial<AgentState>> = {}
 
       for (const a of AGENTS) {
         let st: AgentStatus = "idle"
         let msg = ""
-        const isActive = action !== "idle"
+        let anim: "idle" | "run" = "idle"
 
         switch (a.id) {
           case "orchestrator":
-            if (isActive) { st = "working"; msg = detail; }
+            if (action !== "idle") { st = "working"; msg = detail; anim = "idle"; }
             else { st = "idle"; msg = "Awaiting orders"; }
             break
           case "scout":
-            if (action === "scanning") { st = "working"; msg = "Scanning market"; }
-            else if (action === "forging") { st = "done"; msg = "Trends found"; }
+            if (action === "scanning") { st = "working"; msg = "Scanning market"; anim = "run"; }
+            else if (action === "forging") { st = "done"; msg = "Trends ready"; }
             break
           case "forge":
-            if (action === "forging") { st = "working"; msg = "Drawing pixels"; }
+            if (action === "forging") { st = "working"; msg = "Forging assets"; anim = "run"; }
             break
           case "curator":
-            if (action === "forging") { st = "working"; msg = "Scoring quality"; }
+            if (action === "forging") { st = "working"; msg = "Scoring"; anim = "run"; }
             break
           case "packager":
-            if (action === "packaging") { st = "working"; msg = "Bundling assets"; }
+            if (action === "packaging") { st = "working"; msg = "Bundling"; anim = "run"; }
             break
           case "lister":
-            if (action === "packaging" || action === "publishing") { st = "working"; msg = "Writing listing"; }
+            if (action === "packaging" || action === "publishing") { st = "working"; msg = "Listing"; anim = "run"; }
             break
           case "deploy":
-            if (action === "publishing") { st = "working"; msg = "Uploading store"; }
+            if (action === "publishing") { st = "working"; msg = "Uploading"; anim = "run"; }
             break
           case "monitor":
-            st = "working"
-            msg = `Watching ${tick.backlog.unlistedAssets + tick.backlog.packsToPublish} items`
+            st = "working"; msg = `${tick.backlog.unlistedAssets + tick.backlog.packsToPublish} items`; anim = "idle"
             break
         }
 
-        // Move agent to center when working, home when idle
-        const tx = st === "working" ? a.homeX : a.homeX
-        const ty = st === "working" ? a.homeY : a.homeY
-
-        // For working agents (not orchestrator), walk toward center
-        if (st === "working" && a.id !== "orchestrator" && a.id !== "monitor") {
-          // Move one step toward center (1,1)
-          const towardX = a.homeX < 1 ? a.homeX + 1 : a.homeX > 1 ? a.homeX - 1 : a.homeX
-          const towardY = a.homeY < 1 ? a.homeY + 1 : a.homeY > 1 ? a.homeY - 1 : a.homeY
-          updates[a.id] = {
-            status: st, message: msg,
-            gridX: towardX, gridY: towardY, pulse: true,
-          }
-        } else {
-          updates[a.id] = {
-            status: st, message: msg,
-            gridX: tx, gridY: ty, pulse: st === "working",
-          }
+        updates[a.id] = {
+          status: st, message: msg, animType: anim,
+          gridX: a.homeX, gridY: a.homeY,
+          pulse: st === "working",
         }
-      }
-
-      // Also animate orchestrator pulsing more when dispatching
-      if (updates.orchestrator?.status === "working") {
-        updates.orchestrator.pulse = true
       }
 
       setAgents((prev) => {
@@ -274,69 +264,50 @@ export default function WorkstationPage() {
         return next
       })
 
-      // Log state changes
       if (action !== prevAction.current && action !== "idle") {
         addLog("system", detail, action === "blocked" ? "warn" : "info")
       }
       prevAction.current = action
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
 
     if (pollTimer.current) clearTimeout(pollTimer.current)
     pollTimer.current = setTimeout(poll, 5000)
   }, [])
 
-  // Start polling
-  useEffect(() => {
-    poll()
-    return () => { if (pollTimer.current) clearTimeout(pollTimer.current) }
-  }, [poll])
+  useEffect(() => { poll(); return () => { if (pollTimer.current) clearTimeout(pollTimer.current) } }, [poll])
 
   // ---- Launch forge ----
   async function handleForge() {
-    setForgeRunning(true)
-    setForgeSteps([])
-    setForgeProgress("Starting...")
-
-    // Animate agents gathering around orchestrator
-    for (const a of AGENTS) {
-      if (a.id !== "orchestrator") moveAgent(a.id, a.homeX, a.homeY)
-    }
-    addLog("orchestrator", "📋 Dispatching pipeline...", "info")
-    await sleep(400)
+    setForgeRunning(true); setForgeSteps([]); setForgeProgress("Assembling team...")
+    addLog("orchestrator", "Dispatching pipeline...", "info")
+    await sleep(300)
 
     try {
       const result = await runOrchestrator({ theme: "fantasy creatures", maxAssets: 2 })
       const steps = result.steps ?? []
 
       if (steps.length > 0) {
-        setForgeSteps(steps.map((s) => ({
-          step: s.step, status: s.status, summary: s.summary ?? "",
-        })))
+        setForgeSteps(steps.map((s) => ({ step: s.step, status: s.status, summary: s.summary ?? "" })))
 
-        // Animate each step — move the relevant agent and show speech
         for (const step of steps) {
           const agentId = stepToAgent(step.step)
-          const statusIcon = step.status === "completed" ? "✓" : step.status === "failed" ? "✗" : "..."
-          setForgeProgress(`${statusIcon} ${step.step}`)
+          const icon = step.status === "completed" ? "✓" : step.status === "failed" ? "✗" : "..."
+          setForgeProgress(`${icon} ${step.step}`)
 
-          if (agentId && agents[agentId]) {
+          if (agentId) {
             setAgents((prev) => ({
               ...prev,
               [agentId]: {
                 ...prev[agentId],
                 status: step.status === "completed" ? "done" : step.status === "failed" ? "error" : "working",
-                message: `${statusIcon} ${step.summary ?? step.step}`,
+                message: `${icon} ${step.summary ?? step.step}`,
+                animType: step.status === "running" ? "run" : "idle",
                 pulse: step.status === "running",
-                gridX: agentId === "orchestrator" ? 1 : AGENTS.find((a) => a.id === agentId)?.homeX ?? 0,
-                gridY: agentId === "orchestrator" ? 1 : AGENTS.find((a) => a.id === agentId)?.homeY ?? 0,
               },
             }))
             addLog(agentId, step.summary ?? step.step, step.status === "failed" ? "err" : "ok")
           }
-
-          if (agentId) { await sleep(700) } // stagger for animation
+          await sleep(700)
         }
       }
 
@@ -344,298 +315,260 @@ export default function WorkstationPage() {
         setForgeProgress(`Failed: ${result.error}`)
         addLog("orchestrator", result.error, "err")
       } else if (result.status === "completed") {
-        setForgeProgress("✓ Pipeline complete!")
-        addLog("orchestrator", "Pipeline complete!", "ok")
+        setForgeProgress("Pipeline complete!")
+        addLog("orchestrator", "All done!", "ok")
       } else if (result.status === "paused_provider") {
-        setForgeProgress("⏸ Provider at limit")
-        addLog("orchestrator", `Paused: ${result.error ?? "provider limit"}`, "warn")
+        setForgeProgress("Provider limit — top up")
+        addLog("orchestrator", `Paused: ${result.error ?? "limit"}`, "warn")
       } else {
         setForgeProgress(`Status: ${result.status}`)
       }
 
-      // Send agents home
-      await sleep(800)
-      for (const a of AGENTS) sendHome(a.id)
+      // Reset agents to idle after forge
+      await sleep(1000)
+      for (const a of AGENTS) {
+        setAgents((prev) => ({
+          ...prev,
+          [a.id]: { ...prev[a.id], status: "idle", message: "", animType: "idle", pulse: false },
+        }))
+      }
 
     } catch (e: unknown) {
-      setForgeProgress("Error during forge")
+      setForgeProgress("Error")
       addLog("orchestrator", (e as Error).message ?? "Unknown", "err")
     } finally {
       setForgeRunning(false)
     }
   }
 
-  // ---- Killswitch ----
   async function handlePause() {
-    if (status.isPaused) {
-      await resume()
-      addLog("system", "Killswitch released", "ok")
-    } else {
-      await pause()
-      addLog("system", "Killswitch engaged — forge paused", "warn")
-    }
+    if (status.isPaused) { await resume(); addLog("system", "Killswitch released", "ok") }
+    else { await pause(); addLog("system", "Forge paused", "warn") }
     const dash = await getDashboardData()
     setStatus((s) => ({ ...s, isPaused: dash.isPaused }))
   }
 
-  // ---- Auto-scroll logs ----
   useEffect(() => { logsEnd.current?.scrollIntoView({ behavior: "smooth" }) }, [logs])
 
-  // ---- Derived ----
+  // Derived
   const budgetPct = status.budget.cap > 0 ? Math.round((status.budget.used / status.budget.cap) * 100) : 0
   const uptimeStr = `${String(Math.floor(uptime / 3600)).padStart(2, "0")}:${String(Math.floor((uptime % 3600) / 60)).padStart(2, "0")}:${String(uptime % 60).padStart(2, "0")}`
   const workingAgents = Object.values(agents).filter((a) => a.status === "working" || a.status === "walking").length
 
-  // Grid cell pixel size
-  const CELL = 100 // px
+  const CELL_W = 128 // room width px (includes walls)
+  const CELL_H = 128 // room height px
+  const WALL = 8     // wall thickness
+  const INNER = CELL_W - WALL * 2
+  const INNER_H = CELL_H - WALL * 2
+  const TILE = 16    // floor tile size (will be scaled to fit inner room)
 
   return (
     <div className="flex flex-col gap-2 p-1 select-none">
       {/* ═══════ HUD ═══════ */}
-      <div className="flex flex-wrap items-center gap-2 rounded border-2 border-emerald-900/60 bg-[#0a0a0a] px-3 py-1.5 font-mono text-[10px] text-emerald-400 shadow-[inset_0_0_20px_rgba(0,255,100,0.04)]">
-        <span className="text-emerald-700">SYS</span>
+      <div className="flex flex-wrap items-center gap-2 rounded border-2 border-amber-900/40 bg-[#0c0a08] px-3 py-1.5 font-mono text-[10px] text-amber-300 shadow-[inset_0_0_12px_rgba(255,180,0,0.04)]">
+        <span className="text-amber-700">⚔ SYS</span>
         <Badge className={`rounded-none border px-1.5 py-0 text-[10px] font-mono ${
-          status.action === "idle" ? "border-blue-800 bg-blue-950 text-blue-400" :
+          status.action === "idle" ? "border-stone-700 bg-stone-900 text-stone-400" :
           status.action === "blocked" ? "border-red-800 bg-red-950 text-red-400" :
-          "border-emerald-800 bg-emerald-950 text-emerald-400"
+          "border-amber-700 bg-amber-950 text-amber-300"
         }`}>{status.action.toUpperCase()}</Badge>
-        <span className="text-emerald-700 max-w-48 truncate hidden sm:inline">{status.detail}</span>
-
-        <span className="text-emerald-800 mx-1">│</span>
+        <span className="text-amber-600 max-w-52 truncate hidden sm:inline">{status.detail}</span>
+        <span className="text-amber-800 mx-1">│</span>
         <span>{providerDot(status.providers.openai)}</span>
         <span>{providerDot(status.providers.deepseek)}</span>
-
-        <span className="text-emerald-800 mx-1">│</span>
+        <span className="text-amber-800 mx-1">│</span>
         <span>${status.budget.used.toFixed(2)}/${status.budget.cap}</span>
-
-        <span className="text-emerald-800 mx-1">│</span>
-        <span className="text-emerald-600">AG</span>
-        <span>{workingAgents}/8</span>
-
-        <span className="text-emerald-800 mx-1">│</span>
+        <span className="text-amber-800 mx-1">│</span>
+        <span className="text-amber-700">AG</span><span>{workingAgents}/8</span>
+        <span className="text-amber-800 mx-1">│</span>
         <span>{uptimeStr}</span>
-
         <span className="ml-auto flex items-center gap-2">
-          {status.isPaused && <span className="animate-pulse text-red-400 text-[9px]">KS</span>}
-          <button onClick={handlePause} className="hover:text-white" title="Killswitch">
+          {status.isPaused && <span className="animate-pulse text-red-400 text-[9px]">KILLSWITCH</span>}
+          <button onClick={handlePause} className="hover:text-white" title="Toggle killswitch">
             {status.isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
           </button>
-          <button
-            onClick={handleForge}
-            disabled={forgeRunning}
-            className="border border-emerald-700 px-2 py-0.5 hover:bg-emerald-900/30 disabled:opacity-40 flex items-center gap-1"
+          <button onClick={handleForge} disabled={forgeRunning}
+            className="border border-amber-700 px-2 py-0.5 hover:bg-amber-900/30 disabled:opacity-40 flex items-center gap-1 text-amber-200"
           >
             {forgeRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-            {forgeRunning ? "RUNNING" : "FORGE"}
+            {forgeRunning ? "FORGING" : "FORGE"}
           </button>
         </span>
       </div>
 
-      {/* ═══════ FACTORY FLOOR — 3×3 tile map ═══════ */}
-      <div
-        className="relative rounded border-2 border-zinc-800 overflow-hidden"
-        style={{ backgroundColor: "#111118", height: `${CELL * 3 + 8}px`, minHeight: 340 }}
-      >
-        {/* Scanlines */}
-        <div className="pointer-events-none absolute inset-0 z-30"
-          style={{ backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px)" }}
-        />
+      {/* ═══════ DUNGEON FLOOR ═══════ */}
+      <div className="relative rounded border-2 border-stone-800 overflow-hidden" style={{ backgroundColor: "#161210" }}>
+        {/* Ambient overlay */}
+        <div className="pointer-events-none absolute inset-0 z-20" style={{
+          background: "radial-gradient(ellipse at 50% 50%, rgba(255,180,40,0.04) 0%, transparent 70%)",
+        }} />
 
-        {/* Floor label */}
-        <div className="absolute top-1.5 left-2 z-20 font-mono text-[9px] text-zinc-600">KAI ASSET FORGE · FACTORY FLOOR</div>
+        {/* 3x3 room grid */}
+        <div className="grid" style={{
+          gridTemplateColumns: `repeat(3, ${CELL_W}px)`,
+          gridTemplateRows: `repeat(3, ${CELL_H}px)`,
+          padding: 2, gap: 0,
+        }}>
+          {AGENTS.map((agent) => {
+            const st = agents[agent.id]
+            if (!st) return null
+            const isOrch = agent.id === "orchestrator"
+            const isWorking = st.status === "working" || st.status === "walking"
 
-        {/* Tiles background */}
-        <div className="absolute inset-0 z-0 grid grid-cols-3 grid-rows-3" style={{ padding: 4, gap: 2 }}>
-          {Array.from({ length: 9 }).map((_, i) => {
-            const x = i % 3
-            const y = Math.floor(i / 3)
-            const isCenter = x === 1 && y === 1
-            const isPath = (x === 1 || y === 1) && !isCenter // cross-shaped paths to center
+            // Grid placement
+            const col = agent.homeX + 1
+            const row = agent.homeY + 1
+
             return (
               <div
-                key={i}
-                className="relative rounded-sm border"
-                style={{
-                  backgroundColor: isCenter ? "#0f1f0f" : tileColor(x, y, isPath),
-                  borderColor: isCenter ? "rgba(74,222,128,0.15)" : "rgba(63,63,70,0.2)",
-                }}
+                key={agent.id}
+                className="relative"
+                style={{ gridColumn: col, gridRow: row }}
               >
-                {/* Tile decoration */}
-                {isCenter && (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                    <div className="text-4xl">⬡</div>
+                {/* Room card */}
+                <div className={`
+                  relative w-full h-full border-2 flex flex-col items-center justify-center
+                  ${isOrch ? "border-amber-700/60 bg-amber-950/20 shadow-[inset_0_0_20px_rgba(255,180,0,0.05)]" : ""}
+                  ${!isOrch ? "border-stone-700/40 bg-stone-900/30" : ""}
+                  ${isWorking ? "border-amber-600/50" : ""}
+                `}>
+                  {/* Floor tile pattern (repeating) */}
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: `url(/sprites/tiles/floor.png)`,
+                    backgroundSize: `${TILE * 2}px ${TILE * 2}px`,
+                    backgroundPosition: `${(agent.homeX * TILE) % 64}px ${(agent.homeY * TILE) % 64}px`,
+                    imageRendering: "pixelated",
+                  }} />
+
+                  {/* Speech bubble */}
+                  {st.message && (st.status === "working" || st.status === "done" || st.status === "error") && (
+                    <div className="absolute -top-7 z-30 animate-bounce-in">
+                      <div className={`relative px-2 py-0.5 max-w-[120px] border text-center bg-[#0a0808] ${
+                        st.status === "error" ? "border-red-700/50" : "border-amber-700/50"
+                      }`}>
+                        <p className={`font-mono text-[8px] leading-tight ${
+                          st.status === "error" ? "text-red-300" : "text-amber-200"
+                        }`}>{st.message}</p>
+                        <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rotate-45 bg-[#0a0808] border-r border-b ${
+                          st.status === "error" ? "border-red-700/50" : "border-amber-700/50"
+                        }`} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Agent sprite */}
+                  <div className={`relative z-10 transition-all duration-700 ${
+                    st.status === "working" ? "animate-bob" : ""
+                  } ${st.status === "error" ? "animate-shake" : ""}`}>
+                    <AnimatedSprite
+                      agentId={agent.id}
+                      animType={st.animType}
+                      frame={st.frame}
+                      size={isOrch ? 48 : 40}
+                      className={st.pulse ? "drop-shadow-[0_0_8px_rgba(255,200,50,0.4)]" : ""}
+                    />
+
+                    {/* Glow under working agents */}
+                    {st.pulse && (
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3/4 h-2 rounded-full bg-amber-400/20 blur-sm" />
+                    )}
                   </div>
-                )}
-                {!isCenter && (
-                  <div className="absolute top-0.5 left-0.5 font-mono text-[7px] text-zinc-800">
-                    {x},{y}
+
+                  {/* Nameplate */}
+                  <div className={`absolute bottom-1 px-2 py-0.5 border text-center z-10 ${
+                    isOrch ? "border-amber-700/40 bg-black/70" : "border-stone-700/30 bg-black/60"
+                  }`}>
+                    <p className={`font-mono text-[9px] leading-none ${
+                      isOrch ? "text-amber-300 font-bold" : "text-stone-300"
+                    }`}>{agent.label}</p>
+                    <p className="font-mono text-[7px] leading-none text-stone-600">{agent.role}</p>
                   </div>
-                )}
+
+                  {/* Status dot */}
+                  <div className="absolute top-1 right-1">
+                    <div className={`h-2 w-2 rounded-full ${
+                      st.status === "working" ? "bg-amber-400 shadow-[0_0_5px_#fbbf24]" :
+                      st.status === "done" ? "bg-blue-400" :
+                      st.status === "error" ? "bg-red-400 shadow-[0_0_5px_#f87171]" :
+                      "bg-stone-600"
+                    } ${st.pulse ? "animate-pulse" : ""}`} />
+                  </div>
+                </div>
               </div>
             )
           })}
         </div>
 
-        {/* Dotted path lines (cross shape to center) */}
-        <svg className="absolute inset-0 z-5 w-full h-full pointer-events-none opacity-20" viewBox="0 0 300 300" preserveAspectRatio="none">
-          {/* Horizontal center line */}
-          <line x1="0" y1="150" x2="300" y2="150" stroke="#4ade80" strokeWidth="1" strokeDasharray="4,8" />
-          {/* Vertical center line */}
-          <line x1="150" y1="0" x2="150" y2="300" stroke="#4ade80" strokeWidth="1" strokeDasharray="4,8" />
-          {/* Center highlight */}
-          <rect x="105" y="105" width="90" height="90" fill="none" stroke="#4ade80" strokeWidth="0.5" strokeDasharray="3,6" opacity="0.3" />
+        {/* Path lines connecting rooms to center */}
+        <svg className="absolute inset-0 z-0 w-full h-full pointer-events-none" viewBox={`0 0 ${CELL_W * 3} ${CELL_H * 3}`}>
+          {/* Horizontal center corridor */}
+          <line x1={0} y1={CELL_H * 1.5} x2={CELL_W * 3} y2={CELL_H * 1.5}
+            stroke="rgba(180,140,80,0.15)" strokeWidth="2" strokeDasharray="6,8" />
+          {/* Vertical center corridor */}
+          <line x1={CELL_W * 1.5} y1={0} x2={CELL_W * 1.5} y2={CELL_H * 3}
+            stroke="rgba(180,140,80,0.15)" strokeWidth="2" strokeDasharray="6,8" />
+          {/* ORCH room highlight */}
+          <rect x={CELL_W + 2} y={CELL_H + 2} width={CELL_W - 4} height={CELL_H - 4}
+            fill="none" stroke="rgba(255,180,40,0.1)" strokeWidth="1" strokeDasharray="4,8" />
         </svg>
 
-        {/* Agents on the floor */}
-        {AGENTS.map((agent) => {
-          const st = agents[agent.id]
-          if (!st) return null
-          const px = st.gridX * CELL + CELL / 2
-          const py = st.gridY * CELL + CELL / 2
-          const isOrch = agent.id === "orchestrator"
-
-          return (
-            <div
-              key={agent.id}
-              className="absolute z-10 flex flex-col items-center pointer-events-auto"
-              style={{
-                left: px,
-                top: py,
-                transform: "translate(-50%, -50%)",
-                transition: "left 0.8s ease-in-out, top 0.8s ease-in-out",
-              }}
-            >
-              {/* Speech bubble */}
-              {st.message && (st.status === "working" || st.status === "done" || st.status === "error") && (
-                <div
-                  className="mb-1 px-2 py-0.5 max-w-[120px] border text-center animate-bounce-in"
-                  style={{
-                    backgroundColor: "#0a0a0a",
-                    borderColor: st.status === "error" ? "rgba(248,113,113,0.5)" : "rgba(74,222,128,0.5)",
-                  }}
-                >
-                  <p className={`font-mono text-[8px] leading-tight ${
-                    st.status === "error" ? "text-red-300" : "text-emerald-300"
-                  }`}>
-                    {st.message}
-                  </p>
-                  <div
-                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rotate-45"
-                    style={{
-                      backgroundColor: "#0a0a0a",
-                      borderRight: `1px solid ${st.status === "error" ? "rgba(248,113,113,0.5)" : "rgba(74,222,128,0.5)"}`,
-                      borderBottom: `1px solid ${st.status === "error" ? "rgba(248,113,113,0.5)" : "rgba(74,222,128,0.5)"}`,
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Agent sprite */}
-              <div
-                className={`
-                  flex items-center justify-center rounded-sm border-2
-                  ${isOrch ? "w-14 h-14 text-3xl" : "w-11 h-11 text-2xl"}
-                  ${st.pulse ? "shadow-[0_0_12px_rgba(74,222,128,0.3)]" : ""}
-                  ${st.status === "walking" ? "animate-bob" : ""}
-                  ${st.status === "working" ? "animate-bob" : ""}
-                  ${st.status === "error" ? "animate-shake" : ""}
-                `}
-                style={{
-                  backgroundColor: agent.color,
-                  borderColor: isOrch ? "rgba(74,222,128,0.5)" :
-                    st.status === "working" ? "rgba(74,222,128,0.3)" :
-                    st.status === "error" ? "rgba(248,113,113,0.3)" :
-                    "rgba(63,63,70,0.4)",
-                  imageRendering: "pixelated",
-                }}
-              >
-                <span className={st.pulse ? "animate-pulse" : ""}>{agent.emoji}</span>
-              </div>
-
-              {/* Name tag */}
-              <div className="mt-0.5 px-1.5 py-0.5 rounded-sm border border-zinc-800 bg-black/80">
-                <p className={`font-mono text-[8px] leading-none ${
-                  isOrch ? "text-emerald-400 font-bold" : "text-zinc-400"
-                }`}>
-                  {agent.label}
-                </p>
-                <p className="font-mono text-[7px] text-zinc-600 leading-none">{agent.role}</p>
-              </div>
-            </div>
-          )
-        })}
+        {/* Top label */}
+        <div className="absolute top-1 left-2 z-20 font-mono text-[8px] text-stone-700">KAI ASSET FORGE · DUNGEON FLOOR</div>
       </div>
 
       {/* ═══════ FORGE PROGRESS ═══════ */}
       {(forgeRunning || forgeSteps.length > 0) && (
-        <div className="flex flex-wrap items-center gap-1.5 rounded border border-zinc-800 bg-black/80 px-3 py-2 font-mono text-[10px]">
-          <span className="text-emerald-600 mr-1">PROGRESS</span>
-          {forgeRunning && !forgeSteps.length && (
-            <span className="text-emerald-400 animate-pulse">{forgeProgress}</span>
-          )}
+        <div className="flex flex-wrap items-center gap-1.5 rounded border border-stone-800 bg-[#0a0808] px-3 py-2 font-mono text-[10px]">
+          <span className="text-amber-600 mr-1">PROGRESS</span>
+          {forgeRunning && !forgeSteps.length && <span className="text-amber-300 animate-pulse">{forgeProgress}</span>}
           {forgeSteps.map((s, i) => (
-            <span
-              key={i}
-              className={`px-1.5 py-0.5 rounded-sm border ${
-                s.status === "completed" ? "border-emerald-700 text-emerald-400 bg-emerald-950/30" :
-                s.status === "failed" ? "border-red-700 text-red-400 bg-red-950/30" :
-                s.status === "running" ? "border-amber-700 text-amber-400 bg-amber-950/30 animate-pulse" :
-                "border-zinc-700 text-zinc-500"
-              }`}
-            >
-              {s.status === "completed" ? "✓" : s.status === "failed" ? "✗" : "·"} {s.step}
-            </span>
+            <span key={i} className={`px-1.5 py-0.5 rounded-sm border ${
+              s.status === "completed" ? "border-amber-700 text-amber-400 bg-amber-950/20" :
+              s.status === "failed" ? "border-red-700 text-red-400 bg-red-950/20" :
+              s.status === "running" ? "border-amber-600 text-amber-300 bg-amber-950/30 animate-pulse" :
+              "border-stone-700 text-stone-500"
+            }`}>{s.status === "completed" ? "✓" : s.status === "failed" ? "✗" : "·"} {s.step}</span>
           ))}
           {!forgeRunning && forgeSteps.length > 0 && forgeProgress && (
-            <span className={`${
-              forgeProgress.includes("complete") ? "text-emerald-400" :
-              forgeProgress.includes("Failed") || forgeProgress.includes("Error") ? "text-red-400" :
-              "text-amber-400"
-            }`}>{forgeProgress}</span>
+            <span className={forgeProgress.includes("complete") ? "text-amber-300" : forgeProgress.includes("Failed") ? "text-red-400" : "text-stone-400"}>
+              {forgeProgress}
+            </span>
           )}
         </div>
       )}
 
       {/* ═══════ COMMS LOG ═══════ */}
-      <Card className="border-zinc-800 bg-black/80">
+      <Card className="border-stone-800 bg-[#0a0808]">
         <CardContent className="p-2">
           <div className="h-28 overflow-y-auto font-mono text-[10px] leading-relaxed">
-            <p className="text-emerald-700 mb-0.5">┌─ COMMS LOG</p>
-            {logs.length === 0 && (
-              <p className="text-zinc-700 px-2">No events. Hit FORGE to begin.</p>
-            )}
+            <p className="text-amber-700 mb-0.5">┌─ COMMS LOG</p>
+            {logs.length === 0 && <p className="text-stone-600 px-2">No events. Press FORGE to begin.</p>}
             {logs.map((l) => (
               <div key={l.id} className="flex gap-1 px-2">
-                <span className="text-zinc-700 shrink-0">[{l.time}]</span>
-                <span className="text-zinc-600 shrink-0">&lt;{l.agent}&gt;</span>
+                <span className="text-stone-700 shrink-0">[{l.time}]</span>
+                <span className="text-stone-600 shrink-0">&lt;{l.agent}&gt;</span>
                 <span className={
-                  l.type === "err" ? "text-red-400" :
-                  l.type === "warn" ? "text-amber-400" :
-                  l.type === "ok" ? "text-emerald-400" :
-                  "text-zinc-300"
+                  l.type === "err" ? "text-red-400" : l.type === "warn" ? "text-amber-400" : l.type === "ok" ? "text-amber-300" : "text-stone-300"
                 }>{l.msg}</span>
               </div>
             ))}
             <div ref={logsEnd} />
-            <p className="text-emerald-700 mt-0.5">└──────────</p>
+            <p className="text-amber-700 mt-0.5">└──────────</p>
           </div>
         </CardContent>
       </Card>
 
-      <p className="text-center font-mono text-[9px] text-zinc-800">
-        Manager (🧠 Orch) dispatches tasks · Agents walk the floor · Polls every 5s · Tab-safe
-      </p>
+      <p className="text-center font-mono text-[9px] text-stone-800">Orch (Wizard) dispatches from center · Agents poll every 5s · Tab-safe</p>
 
-      {/* ═══════ ANIMATIONS ═══════ */}
       <style jsx>{`
         @keyframes bob {
-          0%, 100% { transform: translate(-50%, -50%); }
-          50% { transform: translate(-50%, calc(-50% - 5px)); }
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
         }
         @keyframes shake {
-          0%, 100% { transform: translate(-50%, -50%); }
-          25% { transform: translate(calc(-50% - 3px), -50%); }
-          75% { transform: translate(calc(-50% + 3px), -50%); }
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-3px); }
+          75% { transform: translateX(3px); }
         }
         @keyframes bounce-in {
           0% { transform: translateY(4px); opacity: 0; }
@@ -644,6 +577,7 @@ export default function WorkstationPage() {
         .animate-bob { animation: bob 0.8s ease-in-out infinite; }
         .animate-shake { animation: shake 0.3s ease-in-out infinite; }
         .animate-bounce-in { animation: bounce-in 0.25s ease-out; }
+        :global(.pixelated) { image-rendering: pixelated; image-rendering: crisp-edges; }
       `}</style>
     </div>
   )
