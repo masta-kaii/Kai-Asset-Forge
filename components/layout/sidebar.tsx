@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
   LayoutDashboard, Sparkles, Library, Package, FileText,
-  Activity, Settings, Anvil, Monitor, LogOut, Eye, Cpu,
+  Activity, Settings, Anvil, Monitor, LogOut, Eye, Cpu, MessagesSquare,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
 import { getSidebarStats } from "@/app/actions/sidebar"
@@ -54,6 +54,11 @@ const NAV_ITEMS = [
     title: "Sim Workstation",
     href: "/workstation",
     icon: Cpu,
+  },
+  {
+    title: "Hermes Chat",
+    href: "/hermes-chat",
+    icon: MessagesSquare,
   },
   {
     title: "Base Map",

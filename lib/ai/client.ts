@@ -1,4 +1,5 @@
 import OpenAI from "openai"
+import Anthropic from "@anthropic-ai/sdk"
 import type { ImageGenParams, ImageGenResponse, ImageGenResult, TextGenParams, TextGenResponse, AIProvider } from "./types"
 
 function getClient(provider?: AIProvider): OpenAI {
@@ -63,6 +64,65 @@ export async function generateImage(params: ImageGenParams): Promise<ImageGenRes
       success: false,
       images: [],
       error: `OpenAI image generation failed: ${message}. Check OPENAI_API_KEY in Vercel env vars and billing at platform.openai.com.`,
+    }
+  }
+}
+
+export async function generateTextWithClaude(params: {
+  system?: string
+  prompt?: string
+  messages?: { role: "user" | "assistant"; content: string }[]
+  model?: string
+  maxTokens?: number
+  temperature?: number
+}): Promise<TextGenResponse> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return {
+      success: false,
+      text: "",
+      provider: "claude",
+      model: params.model ?? "claude-sonnet-4-20250514",
+      error: "ANTHROPIC_API_KEY is missing. Add it in Vercel → Settings → Environment Variables.",
+    }
+  }
+
+  const anthropic = new Anthropic({ apiKey })
+  const model = params.model ?? "claude-sonnet-4-20250514"
+
+  try {
+    const msg = await anthropic.messages.create({
+      model,
+      max_tokens: params.maxTokens ?? 1024,
+      system: params.system,
+      messages: params.messages ?? [{ role: "user", content: params.prompt ?? "" }],
+      temperature: params.temperature,
+    })
+
+    const text = msg.content
+      .filter((c) => c.type === "text")
+      .map((c) => (c as { type: "text"; text: string }).text)
+      .join("\n")
+
+    return {
+      success: true,
+      text,
+      provider: "claude",
+      model,
+      usage: {
+        promptTokens: msg.usage?.input_tokens ?? 0,
+        completionTokens: msg.usage?.output_tokens ?? 0,
+      },
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    console.error("Claude text generation error:", message)
+    return {
+      success: false,
+      text: "",
+      provider: "claude",
+      model,
+      error: `Claude generation failed: ${message}. Check ANTHROPIC_API_KEY in Vercel.`,
     }
   }
 }
