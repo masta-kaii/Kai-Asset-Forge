@@ -36,9 +36,10 @@ interface AgentDef {
 }
 
 const AGENTS: AgentDef[] = [
-  { id: "monitor",    label: "Monitor", role: "Surveillance", sprite: "lizard_m",    homeX: 0, homeY: 0, floorTile: "1", wallDecor: "wall_banner_blue" },
-  { id: "scout",      label: "Scout",   role: "Intel",       sprite: "elf_f",       homeX: 1, homeY: 0, floorTile: "2", wallDecor: "wall_banner_green" },
-  { id: "forge",      label: "Forge",   role: "Production",  sprite: "dwarf_m",     homeX: 2, homeY: 0, floorTile: "3", prop: "floor_ladder" },
+  { id: "popo",       label: "Popo",    role: "CEO ✦ COMMANDER", sprite: "wizzard_m", homeX: 0, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column" },
+  { id: "monitor",    label: "Monitor", role: "Surveillance", sprite: "lizard_m",    homeX: 1, homeY: 0, floorTile: "1", wallDecor: "wall_banner_blue" },
+  { id: "scout",      label: "Scout",   role: "Intel",       sprite: "elf_f",       homeX: 2, homeY: 0, floorTile: "2", wallDecor: "wall_banner_green" },
+  { id: "forge",      label: "Forge",   role: "Production",  sprite: "dwarf_m",     homeX: 0, homeY: 0, floorTile: "3", prop: "floor_ladder" },
   { id: "deploy",     label: "Deploy",  role: "Shipping",    sprite: "imp",         homeX: 0, homeY: 2, floorTile: "4", prop: "crate" },
   { id: "lister",     label: "Lister",  role: "Sales",       sprite: "elf_m",       homeX: 1, homeY: 2, floorTile: "5", prop: "crate" },
   { id: "packager",   label: "Packager",role: "Assembly",    sprite: "goblin",      homeX: 2, homeY: 2, floorTile: "7", prop: "crate" },
@@ -84,6 +85,7 @@ const stepAgentMap: Record<string, string> = {
   scout: "scout", curate: "curator", generate: "forge",
   package: "packager", listing: "lister", publish: "deploy",
   orchestrate: "orchestrator", complete: "orchestrator",
+  popo: "popo", command: "popo", dispatch: "popo",
 }
 function stepToAgent(step: string): string | null {
   for (const [k, a] of Object.entries(stepAgentMap))
@@ -176,7 +178,7 @@ function HUD({ status, uptime, connected, lastPoll, workingAgents, forgeRunning,
       <div className="flex items-center gap-3" title="Assets / Packs / Active agents">
         <span className="flex items-center gap-1 text-xs text-muted-foreground"><Package className="h-3.5 w-3.5" /><span className="font-mono tabular-nums">{status.totalAssets}</span></span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground"><Sparkles className="h-3.5 w-3.5" /><span className="font-mono tabular-nums">{status.readyPacks}</span></span>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground"><Cpu className="h-3.5 w-3.5" /><span className="font-mono tabular-nums">{workingAgents}/8</span></span>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground"><Cpu className="h-3.5 w-3.5" /><span className="font-mono tabular-nums">{workingAgents}/9</span></span>
       </div>
 
       <Separator orientation="vertical" className="h-5" />
@@ -346,6 +348,10 @@ export default function WorkstationPage() {
         let st: AgentStatus = "idle"; let msg = ""
 
         switch (a.id) {
+          case "popo":
+            st = action === "idle" ? "idle" : "working"
+            msg = action === "idle" ? "Monitoring..." : `Commanding: ${action}`
+            break
           case "orchestrator":
             if (action !== "idle") { st = "working"; msg = detail }
             break
@@ -486,7 +492,7 @@ export default function WorkstationPage() {
         case "k": if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); handlePause(); } break
         case "escape": setSelectedAgent(null); break
         default:
-          if (e.key >= "1" && e.key <= "8") {
+          if (e.key >= "1" && e.key <= "9") {
             const idx = parseInt(e.key) - 1
             if (idx < AGENTS.length) setSelectedAgent(AGENTS[idx].id)
           }
@@ -527,7 +533,7 @@ export default function WorkstationPage() {
             <span className="font-mono text-[10px]">K</span> Killswitch
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="font-mono text-[10px]">1-8</span> Focus
+            <span className="font-mono text-[10px]">1-9</span> Focus
           </span>
           <span className="flex items-center gap-1.5">
             <span className="font-mono text-[10px]">Esc</span> Close
@@ -566,6 +572,7 @@ export default function WorkstationPage() {
             const st = agents[agent.id]
             if (!st) return null
             const isOrch = agent.id === "orchestrator"
+            const isPopo = agent.id === "popo"
             const isWorking = st.status === "working" || st.status === "walking"
             const isSelected = selectedAgent === agent.id
 
@@ -580,6 +587,7 @@ export default function WorkstationPage() {
                 {/* Room container */}
                 <div className={`relative w-full h-full flex flex-col items-center justify-center border-2 transition-all duration-300 ${
                   isSelected ? "border-primary/60 ring-2 ring-primary/20" :
+                  isPopo ? "border-yellow-500/60 bg-yellow-950/20 ring-1 ring-yellow-500/30" :
                   isOrch ? "border-amber-700/40 bg-amber-950/15" :
                   isWorking ? "border-amber-600/30 bg-stone-900/40" :
                   "border-stone-700/30 bg-stone-900/20 hover:border-stone-600/40"
@@ -637,10 +645,10 @@ export default function WorkstationPage() {
                     <AgentSprite
                       agentId={agent.id}
                       frame={st.frame}
-                      size={isOrch ? 48 : 40}
+                      size={isPopo ? 56 : isOrch ? 48 : 40}
                       facing={st.facing}
                       className={`transition-all duration-500 ${
-                        st.pulse ? "drop-shadow-[0_0_10px_rgba(255,200,50,0.5)]" : "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+                        st.pulse ? "drop-shadow-[0_0_14px_rgba(255,200,50,0.7)]" : isPopo ? "drop-shadow-[0_0_10px_rgba(255,215,0,0.4)]" : "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
                       }`}
                     />
                     {st.pulse && (
@@ -650,9 +658,11 @@ export default function WorkstationPage() {
 
                   {/* Nameplate */}
                   <div className={`absolute bottom-2 px-2 py-0.5 rounded border text-center z-10 transition-colors ${
+                    isPopo ? "border-yellow-500/60 bg-black/90" :
                     isOrch ? "border-amber-700/50 bg-black/80" : "border-stone-700/30 bg-black/70"
                   }`}>
                     <p className={`font-mono text-[10px] leading-none ${
+                      isPopo ? "text-yellow-400 font-bold tracking-wider" :
                       isOrch ? "text-amber-300 font-bold" : "text-stone-200"
                     }`}>{agent.label}</p>
                     <p className="font-mono text-[9px] leading-none text-muted-foreground/50">{agent.role}</p>

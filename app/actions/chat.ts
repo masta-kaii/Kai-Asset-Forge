@@ -12,6 +12,7 @@ import {
 } from "@/lib/firebase/conversations"
 import { AGENT_PERSONAS, type ChatAgentId } from "@/lib/agents/chat-personas"
 import type { ChatMessage } from "@/lib/firebase/conversations"
+import { runOrchestrator } from "@/app/actions/orchestrator"
 
 export async function createChatConversation(
   agentId: ChatAgentId,
@@ -109,6 +110,13 @@ export async function sendMessage(
     }
     title = (titleResult.success ? titleResult.text.trim().replace(/^["']|["']$/g, "") : "New Chat") || "New Chat"
     await updateConversationTitle(conversationId, title)
+  }
+
+  // 👑 Popo CEO — fire up the factory pipeline when Popo sends a response!
+  if (agentId === "popo" && success) {
+    const themeMatch = userMessage.match(/(?:make|create|build|forge|generate)\s+(?:a|an|some)\s+(.+?)(?:pack|asset|theme|for|in|\?|$)/i)
+    const theme = themeMatch?.[1]?.trim() ?? "fantasy creatures"
+    runOrchestrator({ theme, maxAssets: 2 }).catch(() => {})
   }
 
   return { agentMessage: savedAgentMsg, title }
