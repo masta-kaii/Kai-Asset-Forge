@@ -13,8 +13,11 @@ import {
   Play, Pause, Zap, Loader2, Wifi, WifiOff, Clock,
   Cpu, Brain, Activity, TrendingUp, CheckCircle2, XCircle,
   AlertTriangle, Package, Sparkles, ScrollText,
-  X, Monitor, MessageSquare, ChevronRight,
+  X, Monitor, MessageSquare, ChevronRight, Library, FileText, ListChecks,
 } from "lucide-react"
+import { CuratorPanel } from "@/components/workstation/curator-panel"
+import { ScoutPanel } from "@/components/workstation/scout-panel"
+import { ListerPanel } from "@/components/workstation/lister-panel"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -727,61 +730,150 @@ export default function WorkstationPage() {
         </div>
       </div>
 
-      {/* ═══════ POPUP: AGENT DETAIL ═══════ */}
+      {/* ═══════ POPUP: AGENT DETAIL / DEPARTMENT VIEW ═══════ */}
       {selectedAgent && selectedAgentDef && selectedAgentState && (
         <GameWindow
           title={`${selectedAgentDef.label} · ${selectedAgentDef.role}`}
-          icon={<Activity className="h-4 w-4" />}
+          icon={(() => {
+            switch (selectedAgent) {
+              case "popo": return <Activity className="h-4 w-4" />
+              case "curator": return <Library className="h-4 w-4" />
+              case "scout": return <ListChecks className="h-4 w-4" />
+              case "lister": return <FileText className="h-4 w-4" />
+              default: return <Activity className="h-4 w-4" />
+            }
+          })()}
           onClose={() => setSelectedAgent(null)}
         >
-          <div className="space-y-4">
-            {/* Agent sprite preview */}
-            <div className="flex justify-center py-2">
-              <div className="bg-stone-800/80 rounded-lg border border-stone-700/50 p-4">
-                <AgentSprite
-                  agentId={selectedAgent}
-                  frame={selectedAgentState.frame}
-                  size={80}
-                  facing={selectedAgentState.facing}
-                  className={selectedAgentState.pulse ? "drop-shadow-[0_0_14px_rgba(255,200,50,0.5)]" : ""}
-                />
+          {/* Department-specific content */}
+          {selectedAgent === "curator" ? (
+            <div>
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-stone-700/30">
+                <Library className="h-4 w-4 text-yellow-500" />
+                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Asset Library · Quality Control</span>
               </div>
+              <CuratorPanel />
             </div>
+          ) : selectedAgent === "scout" ? (
+            <div>
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-stone-700/30">
+                <ListChecks className="h-4 w-4 text-green-500" />
+                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Wishlist · Bounty Board</span>
+              </div>
+              <ScoutPanel />
+            </div>
+          ) : selectedAgent === "lister" ? (
+            <div>
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-stone-700/30">
+                <FileText className="h-4 w-4 text-blue-400" />
+                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Listing Drafts · Marketing</span>
+              </div>
+              <ListerPanel />
+            </div>
+          ) : selectedAgent === "popo" ? (
+            /* Popo CEO Overview */
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
+                <Activity className="h-4 w-4 text-yellow-500" />
+                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Command Center · Factory Overview</span>
+              </div>
 
-            {/* Status grid */}
-            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-              <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
-                <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Status</p>
-                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] ${
-                  selectedAgentState.status === "working" ? "border-emerald-500/30 text-emerald-400" :
-                  selectedAgentState.status === "error" ? "border-red-500/30 text-red-400" :
-                  selectedAgentState.status === "done" ? "border-blue-500/30 text-blue-400" :
-                  "border-stone-600/30 text-stone-400"
-                }`}>
-                  <div className={`h-1.5 w-1.5 rounded-full ${
-                    selectedAgentState.status === "working" ? "bg-emerald-500" :
-                    selectedAgentState.status === "error" ? "bg-red-500" :
-                    selectedAgentState.status === "done" ? "bg-blue-400" : "bg-stone-600"
-                  } ${selectedAgentState.pulse ? "animate-pulse" : ""}`} />
-                  {selectedAgentState.status.toUpperCase()}
+              {/* Quick stats */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
+                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">System</p>
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-red-500"}`} />
+                    <span className="font-mono text-xs text-stone-300">{connected ? "ONLINE" : "OFFLINE"}</span>
+                  </div>
+                </div>
+                <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
+                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Status</p>
+                  <span className="font-mono text-xs text-yellow-400 uppercase">{status.action}</span>
+                </div>
+                <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
+                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Budget</p>
+                  <span className="font-mono text-xs text-stone-300">${status.budget.used.toFixed(2)} <span className="text-stone-600">/ ${status.budget.cap}</span></span>
+                </div>
+                <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
+                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Workers</p>
+                  <span className="font-mono text-xs text-stone-300">{workingAgents}/9 active</span>
                 </div>
               </div>
 
-              <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
-                <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Position</p>
-                <p className="text-stone-300 font-mono text-[11px]">
-                  ({selectedAgentState.gridX}, {selectedAgentState.gridY})
-                </p>
+              {/* Agent overview */}
+              <div>
+                <p className="text-stone-500 text-[10px] font-mono uppercase mb-2">Agent Fleet</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {AGENTS.filter((a) => a.id !== "popo").map((a) => {
+                    const st = agents[a.id]
+                    const colors: Record<string, string> = {
+                      working: "bg-emerald-500", idle: "bg-stone-700", done: "bg-blue-500", error: "bg-red-500",
+                    }
+                    return (
+                      <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded bg-stone-800/40 border border-stone-700/20">
+                        <div className={`h-1.5 w-1.5 rounded-full ${colors[st?.status ?? "idle"] ?? "bg-stone-700"} ${st?.pulse ? "animate-pulse" : ""}`} />
+                        <span className="font-mono text-[10px] text-stone-400 truncate">{a.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Agent sprite preview */}
+              <div className="flex justify-center py-1">
+                <AgentSprite agentId="popo" frame={selectedAgentState.frame} size={64} facing="right"
+                  className="drop-shadow-[0_0_14px_rgba(255,215,0,0.4)]" />
               </div>
             </div>
-
-            {selectedAgentState.message && (
-              <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
-                <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Last Report</p>
-                <p className="text-stone-300 text-xs leading-relaxed">{selectedAgentState.message}</p>
+          ) : (
+            /* Default agent status view for others (Orchestrator, Forge, Monitor, Packager, Deploy) */
+            <div className="space-y-4">
+              {/* Agent sprite preview */}
+              <div className="flex justify-center py-2">
+                <div className="bg-stone-800/80 rounded-lg border border-stone-700/50 p-4">
+                  <AgentSprite
+                    agentId={selectedAgent}
+                    frame={selectedAgentState.frame}
+                    size={80}
+                    facing={selectedAgentState.facing}
+                    className={selectedAgentState.pulse ? "drop-shadow-[0_0_14px_rgba(255,200,50,0.5)]" : ""}
+                  />
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Status grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
+                  <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Status</p>
+                  <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] ${
+                    selectedAgentState.status === "working" ? "border-emerald-500/30 text-emerald-400" :
+                    selectedAgentState.status === "error" ? "border-red-500/30 text-red-400" :
+                    selectedAgentState.status === "done" ? "border-blue-500/30 text-blue-400" :
+                    "border-stone-600/30 text-stone-400"
+                  }`}>
+                    <div className={`h-1.5 w-1.5 rounded-full ${
+                      selectedAgentState.status === "working" ? "bg-emerald-500" :
+                      selectedAgentState.status === "error" ? "bg-red-500" :
+                      selectedAgentState.status === "done" ? "bg-blue-400" : "bg-stone-600"
+                    } ${selectedAgentState.pulse ? "animate-pulse" : ""}`} />
+                    {selectedAgentState.status.toUpperCase()}
+                  </div>
+                </div>
+                <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
+                  <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Position</p>
+                  <p className="text-stone-300 font-mono text-[11px]">({selectedAgentState.gridX}, {selectedAgentState.gridY})</p>
+                </div>
+              </div>
+
+              {selectedAgentState.message && (
+                <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
+                  <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Last Report</p>
+                  <p className="text-stone-300 text-xs leading-relaxed">{selectedAgentState.message}</p>
+                </div>
+              )}
+            </div>
+          )}
         </GameWindow>
       )}
 
