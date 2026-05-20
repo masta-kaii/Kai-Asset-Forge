@@ -703,11 +703,11 @@ export default function WorkstationPage() {
         <button
           onClick={handleForge}
           disabled={forgeRunning}
-          className="absolute bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-xl font-mono text-sm font-bold transition-all duration-300 shadow-[0_0_20px_rgba(255,200,50,0.2)] hover:shadow-[0_0_30px_rgba(255,200,50,0.4)] ${
+          className={`absolute bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-xl font-mono text-sm font-bold transition-all duration-300 shadow-[0_0_20px_rgba(255,200,50,0.2)] hover:shadow-[0_0_30px_rgba(255,200,50,0.4)] ${
             forgeRunning
               ? "bg-stone-800 text-stone-500 cursor-not-allowed border border-stone-700"
               : "bg-gradient-to-b from-amber-600 to-amber-800 text-yellow-200 border border-yellow-500/40 hover:from-amber-500 hover:to-amber-700 active:scale-95"
-          }"
+          }`}
           title="FORGE (F)"
         >
           {forgeRunning ? (
