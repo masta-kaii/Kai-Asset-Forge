@@ -19,6 +19,20 @@ export interface ListingResult {
   error?: string
 }
 
+function extractJson(text: string): any {
+  try { return JSON.parse(text) } catch {}
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (match) {
+    try { return JSON.parse(match[1].trim()) } catch {}
+  }
+  const braceStart = text.indexOf("{")
+  const braceEnd = text.lastIndexOf("}")
+  if (braceStart >= 0 && braceEnd > braceStart) {
+    try { return JSON.parse(text.slice(braceStart, braceEnd + 1)) } catch {}
+  }
+  throw new Error("Could not extract JSON from response")
+}
+
 export async function generateListing(input: ListingInput): Promise<ListingResult> {
   const { platform, keywords, pricingTier, provider } = input
 
@@ -54,7 +68,7 @@ The JSON must have exactly these keys:
   logTextCost(textProvider, textProvider === "deepseek" ? "deepseek-v4-flash" : "gpt-4o", prompt, result.text).catch(() => {})
 
   try {
-    const parsed = JSON.parse(result.text)
+    const parsed = extractJson(result.text)
     return {
       success: true,
       title: parsed.title ?? "",
