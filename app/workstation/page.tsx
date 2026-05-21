@@ -44,6 +44,7 @@ const AGENTS: AgentDef[] = [
   { id: "popo",     label: "Popo",    role: "CEO ✦ CMD",sprite: "wizzard_m", homeX: 0, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column", color: "#fbbf24" },
   { id: "packager", label: "Packager",role: "Assembly", sprite: "goblin",    homeX: 1, homeY: 1, floorTile: "7", prop: "crate", color: "#fb923c" },
   { id: "lister",   label: "Lister",  role: "Sales",    sprite: "elf_m",     homeX: 2, homeY: 1, floorTile: "5", prop: "crate", color: "#3b82f6" },
+  { id: "testbench",label: "Test",    role: "Bench ✦", sprite: "wizzard_f",  homeX: 1, homeY: 2, floorTile: "4", prop: "column", color: "#a855f7" },
 ]
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -94,6 +95,11 @@ const SOUL_LINES: Record<string, string[]> = {
   popo: [
     "All agents report!", "The factory thrives!", "Excellent work, team!",
     "Keep the forge burning!", "Popo is watching!",
+  ],
+  testbench: [
+    "Come see the latest forges!", "Asset showcase ready!",
+    "Share-worthy preview!", "Zoom in on the details!",
+    "Spin it, zoom it, share it!",
   ],
 }
 
@@ -867,7 +873,7 @@ export default function WorkstationPage() {
         <div className="absolute inset-0 p-2 sm:p-4">
           <div className="grid gap-1 sm:gap-2 w-full h-full" style={{
             gridTemplateColumns: "repeat(3, 1fr)",
-            gridTemplateRows: "repeat(2, 1fr)",
+            gridTemplateRows: "repeat(3, 1fr)",
           }}>
             {AGENTS.map((agent) => {
               const st = agents[agent.id]
@@ -1041,6 +1047,7 @@ export default function WorkstationPage() {
               case "curator": return <Library className="h-4 w-4" />
               case "scout": return <ListChecks className="h-4 w-4" />
               case "lister": return <FileText className="h-4 w-4" />
+              case "testbench": return <Eye className="h-4 w-4" />
               default: return <Activity className="h-4 w-4" />
             }
           })()}
@@ -1149,8 +1156,44 @@ export default function WorkstationPage() {
                   className="drop-shadow-[0_0_14px_rgba(255,215,0,0.4)]" />
               </div>
             </div>
+          ) : selectedAgent === "testbench" ? (
+            /* 🏟️ Test Bench — Asset Showcase Arena */
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
+                <Eye className="h-4 w-4 text-violet-400" />
+                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">
+                  Test Bench · Asset Showcase
+                </span>
+              </div>
+              <p className="text-stone-500 text-[11px] font-mono leading-relaxed">
+                The Test Bench is coming soon! Here you'll be able to preview, animate, and share your pixel art assets.
+              </p>
+              <div className="flex justify-center py-4">
+                <div className="p-3 rounded-lg border border-violet-700/30 bg-violet-950/20 flex flex-col items-center gap-2">
+                  <AgentSprite agentId="testbench" frame={0} size={64} facing="right" />
+                  <span className="font-mono text-[10px] text-violet-300">⚡ Showcase Arena</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                  <p className="text-stone-500 text-[10px] font-mono mb-1">Preview</p>
+                  <p className="text-stone-400 text-[11px] font-mono">Animated spin + bob + zoom</p>
+                </div>
+                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                  <p className="text-stone-500 text-[10px] font-mono mb-1">Background</p>
+                  <p className="text-stone-400 text-[11px] font-mono">Transparent · Grid · Dungeon Floor</p>
+                </div>
+                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                  <p className="text-stone-500 text-[10px] font-mono mb-1">Record</p>
+                  <p className="text-stone-400 text-[11px] font-mono">Export animated GIF for sharing</p>
+                </div>
+                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                  <p className="text-stone-500 text-[10px] font-mono mb-1">Share</p>
+                  <p className="text-stone-400 text-[11px] font-mono">Twitter · Discord · itch.io</p>
+                </div>
+              </div>
+            </div>
           ) : (
-            /* Default agent status view for others (Forge, Packager) */
             <div className="space-y-4">
               {/* Agent sprite preview */}
               <div className="flex justify-center py-2">
