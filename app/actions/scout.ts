@@ -18,6 +18,23 @@ export interface ScoutProposal {
   trendingScore: number
 }
 
+function extractJson(text: string): any {
+  // Try direct parse first
+  try { return JSON.parse(text) } catch {}
+  // Try extracting from markdown code block
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (match) {
+    try { return JSON.parse(match[1].trim()) } catch {}
+  }
+  // Try finding first { ... } that parses
+  const braceStart = text.indexOf("{")
+  const braceEnd = text.lastIndexOf("}")
+  if (braceStart >= 0 && braceEnd > braceStart) {
+    try { return JSON.parse(text.slice(braceStart, braceEnd + 1)) } catch {}
+  }
+  throw new Error("Could not extract JSON from response")
+}
+
 export async function scoutTrends(input: {
   theme?: string
   provider?: AIProvider
@@ -48,6 +65,7 @@ ${pastThemesStr}
 Return JSON with: theme, assetType, style, count (2-8), styleAnchor, targetPrice (2-8 USD), rationale (1 sentence), trendingScore (1-10).
 Return ONLY valid JSON, no markdown:`,
     provider,
+    model: "deepseek-v4-flash",
     temperature: 0.8,
     maxTokens: 400,
   })
@@ -57,7 +75,7 @@ Return ONLY valid JSON, no markdown:`,
   if (!result.success) return { success: false, error: result.error }
 
   try {
-    const parsed = JSON.parse(result.text)
+    const parsed = extractJson(result.text)
     return { success: true, proposal: parsed as ScoutProposal }
   } catch {
     return { success: false, error: "Failed to parse Scout output" }

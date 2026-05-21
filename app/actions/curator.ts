@@ -15,6 +15,20 @@ export interface CuratorScore {
   tags: string[]
 }
 
+function extractJson(text: string): any {
+  try { return JSON.parse(text) } catch {}
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (match) {
+    try { return JSON.parse(match[1].trim()) } catch {}
+  }
+  const braceStart = text.indexOf("{")
+  const braceEnd = text.lastIndexOf("}")
+  if (braceStart >= 0 && braceEnd > braceStart) {
+    try { return JSON.parse(text.slice(braceStart, braceEnd + 1)) } catch {}
+  }
+  throw new Error("Could not extract JSON from response")
+}
+
 export async function curatorScore(input: {
   assetName: string
   assetType: string
@@ -46,6 +60,7 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown:`,
     provider,
+    model: "deepseek-v4-flash",
     temperature: 0.4,
     maxTokens: 300,
   })
@@ -55,7 +70,7 @@ Return ONLY valid JSON, no markdown:`,
   if (!result.success) return { success: false, error: result.error }
 
   try {
-    const parsed = JSON.parse(result.text)
+    const parsed = extractJson(result.text)
     return { success: true, score: parsed as CuratorScore }
   } catch {
     return { success: false, error: "Failed to parse Curator output" }
