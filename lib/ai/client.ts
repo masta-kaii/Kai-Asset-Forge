@@ -129,7 +129,7 @@ export async function generateTextWithClaude(params: {
 
 export async function generateText(params: TextGenParams): Promise<TextGenResponse> {
   const client = getClient(params.provider)
-  const model = params.model ?? (params.provider === "deepseek" ? "deepseek-chat" : "gpt-4o")
+  const model = params.model ?? (params.provider === "deepseek" ? "deepseek-v4-flash" : "gpt-4o")
 
   try {
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []

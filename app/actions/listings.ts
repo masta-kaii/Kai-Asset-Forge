@@ -42,7 +42,7 @@ The JSON must have exactly these keys:
   const result = await generateText({
     prompt,
     provider: textProvider,
-    model: provider === "deepseek" ? "deepseek-chat" : "gpt-4o",
+    model: textProvider === "deepseek" ? "deepseek-v4-flash" : "gpt-4o",
     temperature: 0.8,
     maxTokens: 1024,
   })
@@ -51,7 +51,7 @@ The JSON must have exactly these keys:
     return { success: false, title: "", description: "", tags: [], error: result.error ?? "Generation failed" }
   }
 
-  logTextCost(textProvider, provider === "deepseek" ? "deepseek-chat" : "gpt-4o", prompt, result.text).catch(() => {})
+  logTextCost(textProvider, textProvider === "deepseek" ? "deepseek-v4-flash" : "gpt-4o", prompt, result.text).catch(() => {})
 
   try {
     const parsed = JSON.parse(result.text)

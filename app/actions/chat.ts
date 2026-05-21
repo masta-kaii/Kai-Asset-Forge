@@ -74,7 +74,7 @@ export async function sendMessage(
     const result = await generateText({
       prompt: fullPrompt,
       provider: "deepseek",
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       maxTokens: 1024,
       temperature: 0.8,
     })
@@ -103,7 +103,7 @@ export async function sendMessage(
       titleResult = await generateText({
         prompt: titlePrompt,
         provider: "deepseek",
-        model: "deepseek-chat",
+        model: "deepseek-v4-flash",
         maxTokens: 20,
         temperature: 0.3,
       })
