@@ -1,19 +1,16 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { autonomousTick, type AutonomousStatus } from "@/app/actions/autonomous-agent"
-import { getDashboardData } from "@/app/actions/dashboard"
-import { pause, resume } from "@/lib/budget/kill-switch"
-import { runOrchestrator } from "@/app/actions/orchestrator"
 import {
   Play, Pause, Zap, Loader2, Wifi, WifiOff, Clock,
   Cpu, Brain, Activity, TrendingUp, CheckCircle2, XCircle,
   AlertTriangle, Package, Sparkles, ScrollText,
   X, Monitor, MessageSquare, ChevronRight, Library, FileText, ListChecks,
+  MapPin, Eye, Footprints,
 } from "lucide-react"
 import { CuratorPanel } from "@/components/workstation/curator-panel"
 import { ScoutPanel } from "@/components/workstation/scout-panel"
@@ -23,9 +20,13 @@ import { ListerPanel } from "@/components/workstation/lister-panel"
 // Configuration
 // ═══════════════════════════════════════════════════════════════════════════
 
-const POLL_INTERVAL = 5000
 const FRAME_INTERVAL = 200
-const SCALE = 3 // sprite pixel scale
+const SCALE = 3
+const PIPELINE_TICK_MS = 2000 // scheduler tick every 2s
+const PIPELINE_STEP_DURATION = 8000 // 8 seconds per pipeline step
+const WALK_SPEED = 0.02 // progress per tick
+const RANDOM_WALK_INTERVAL_MS = 12000 // agents randomly walk to visit buddies
+const POPO_CHECK_INTERVAL_MS = 15000 // popo checks on agents
 
 interface AgentDef {
   id: string; label: string; role: string; sprite: string
@@ -33,39 +34,114 @@ interface AgentDef {
   floorTile: string
   wallDecor?: string
   prop?: string
-  propX?: number; propY?: number
+  color: string // theme color
 }
 
 const AGENTS: AgentDef[] = [
-  { id: "popo",       label: "Popo",    role: "CEO ✦ CMD", sprite: "wizzard_m", homeX: 0, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column" },
-  { id: "monitor",    label: "Monitor", role: "Surveil",    sprite: "lizard_m",  homeX: 1, homeY: 0, floorTile: "1", wallDecor: "wall_banner_blue" },
-  { id: "scout",      label: "Scout",   role: "Intel",      sprite: "elf_f",     homeX: 2, homeY: 0, floorTile: "2", wallDecor: "wall_banner_green" },
-  { id: "forge",      label: "Forge",   role: "Prod",       sprite: "dwarf_m",   homeX: 0, homeY: 0, floorTile: "3", prop: "floor_ladder" },
-  { id: "deploy",     label: "Deploy",  role: "Ship",       sprite: "imp",       homeX: 0, homeY: 2, floorTile: "4", prop: "crate" },
-  { id: "lister",     label: "Lister",  role: "Sales",      sprite: "elf_m",     homeX: 1, homeY: 2, floorTile: "5", prop: "crate" },
-  { id: "packager",   label: "Packager",role: "Assembly",   sprite: "goblin",    homeX: 2, homeY: 2, floorTile: "7", prop: "crate" },
-  { id: "orchestrator",label:"Orch",    role: "MGR",        sprite: "wizzard_m", homeX: 1, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column" },
-  { id: "curator",    label: "Curator", role: "QA",         sprite: "knight_f",  homeX: 2, homeY: 1, floorTile: "1", prop: "column" },
+  { id: "scout",    label: "Scout",   role: "Intel",    sprite: "elf_f",     homeX: 0, homeY: 0, floorTile: "2", color: "#22c55e" },
+  { id: "forge",    label: "Forge",   role: "Prod",     sprite: "dwarf_m",   homeX: 1, homeY: 0, floorTile: "3", prop: "floor_ladder", color: "#f97316" },
+  { id: "curator",  label: "Curator", role: "QA",       sprite: "knight_f",  homeX: 2, homeY: 0, floorTile: "1", prop: "column", color: "#eab308" },
+  { id: "popo",     label: "Popo",    role: "CEO ✦ CMD",sprite: "wizzard_m", homeX: 0, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column", color: "#fbbf24" },
+  { id: "packager", label: "Packager",role: "Assembly", sprite: "goblin",    homeX: 1, homeY: 1, floorTile: "7", prop: "crate", color: "#fb923c" },
+  { id: "lister",   label: "Lister",  role: "Sales",    sprite: "elf_m",     homeX: 2, homeY: 1, floorTile: "5", prop: "crate", color: "#3b82f6" },
 ]
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Pipeline Config
+// ═══════════════════════════════════════════════════════════════════════════
+
+const PIPELINE_STEPS = [
+  { id: 0, name: "SCAN",  agentId: "scout",    label: "Scanning markets..." },
+  { id: 1, name: "FORGE", agentId: "forge",    label: "Forging assets..." },
+  { id: 2, name: "QC",    agentId: "curator",  label: "Inspecting quality..." },
+  { id: 3, name: "BUNDLE",agentId: "packager", label: "Bundling packs..." },
+  { id: 4, name: "LIST",  agentId: "lister",   label: "Listing for sale..." },
+] as const
+
+function nextPipelineStep(current: number): number {
+  return (current + 1) % PIPELINE_STEPS.length
+}
+
+function prevPipelineStep(current: number): number {
+  return (current - 1 + PIPELINE_STEPS.length) % PIPELINE_STEPS.length
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Soul Dialogues
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SOUL_LINES: Record<string, string[]> = {
+  scout: [
+    "Intel incoming!", "The markets are whispering...", "I found something BIG!",
+    "Trend spotted!", "My eyes don't miss a thing!",
+  ],
+  forge: [
+    "By the hammer!", "The forge is HOT!", "Another masterpiece!",
+    "Feel the HEAT!", "I'll forge you something magnificent!",
+  ],
+  curator: [
+    "Inspecting...", "Quality check in progress.", "Flawless. Passed with honors.",
+    "This needs rework.", "I am the shield that guards the standard!",
+  ],
+  packager: [
+    "BUNDLE TIME!", "So many assets to organize!", "PERFECT bundle!",
+    "This goes with THAT!", "Beautiful organization!",
+  ],
+  lister: [
+    "A fine choice!", "Let me make this irresistible!", "LISTED!",
+    "This pack writes its own ticket!", "LIMITED EDITION!",
+  ],
+  popo: [
+    "All agents report!", "The factory thrives!", "Excellent work, team!",
+    "Keep the forge burning!", "Popo is watching!",
+  ],
+}
+
+const MEETING_LINES: Record<string, string> = {
+  "scout-forge": "Found a hot trend, Forge! Get your hammer ready!",
+  "forge-curator": "Fresh off the anvil! Tell me it's perfect.",
+  "curator-packager": "Approved assets ready for bundling.",
+  "packager-lister": "Premium packs ready for the market!",
+  "popo-scout": "How's the factory running?",
+  "popo-forge": "How's the factory running?",
+  "popo-curator": "How's the factory running?",
+  "popo-packager": "How's the factory running?",
+  "popo-lister": "How's the factory running?",
+}
+
+function randomSoulLine(agentId: string): string {
+  const lines = SOUL_LINES[agentId] ?? ["..."]
+  return lines[Math.floor(Math.random() * lines.length)]
+}
+
+function meetingLine(a: string, b: string): string {
+  const key = `${a}-${b}`
+  const reverseKey = `${b}-${a}`
+  return MEETING_LINES[key] ?? MEETING_LINES[reverseKey] ?? "Hey there!"
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
 
-type AgentStatus = "idle" | "walking" | "working" | "done" | "error"
+type AgentStatus = "idle" | "walking" | "meeting" | "working" | "done"
 
-interface AgentState {
-  status: AgentStatus; message: string; gridX: number; gridY: number
-  pulse: boolean; frame: number; facing: "right" | "left"
+interface WalkTarget {
+  targetX: number; targetY: number
+  walkProgress: number // 0 → 1
+  fromX: number; fromY: number
 }
 
-interface SimStatus {
-  action: string; detail: string
-  providers: { openai: string; deepseek: string }
-  budget: { used: number; cap: number; remaining: number }
-  backlog: { unlistedAssets: number; stuckRuns: number; packsToPublish: number }
-  isPaused: boolean
-  totalAssets: number; readyPacks: number
+interface AgentState {
+  status: AgentStatus
+  message: string
+  gridX: number; gridY: number
+  pulse: boolean
+  frame: number
+  facing: "right" | "left"
+  animMode: "idle" | "run"
+  walk: WalkTarget | null
+  dialogueTimer: number // countdown ticks until next random line
 }
 
 interface LogEntry {
@@ -73,38 +149,48 @@ interface LogEntry {
   type: "info" | "ok" | "warn" | "err"
 }
 
-interface ForgeStep { step: string; status: string; summary: string; time: string }
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)) }
 function now(): string { return new Date().toLocaleTimeString("en-US", { hour12: false }) }
 
-const stepAgentMap: Record<string, string> = {
-  scout: "scout", curate: "curator", generate: "forge",
-  package: "packager", listing: "lister", publish: "deploy",
-  orchestrate: "orchestrator", complete: "orchestrator",
-  popo: "popo", command: "popo", dispatch: "popo",
+// ═══════════════════════════════════════════════════════════════════════════
+// Status helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+const statusVariants: Record<string, { cls: string; icon: typeof CheckCircle2 }> = {
+  idle:     { cls: "border-stone-600/30 bg-stone-800/30 text-stone-400", icon: Monitor },
+  scanning: { cls: "border-blue-500/30 bg-blue-950/30 text-blue-400", icon: Activity },
+  forging:  { cls: "border-amber-500/30 bg-amber-950/30 text-amber-400", icon: Zap },
+  packaging:{ cls: "border-violet-500/30 bg-violet-950/30 text-violet-400", icon: Package },
+  publishing:{cls: "border-emerald-500/30 bg-emerald-950/30 text-emerald-400", icon: TrendingUp },
+  blocked:  { cls: "border-red-500/30 bg-red-950/30 text-red-400", icon: AlertTriangle },
+  paused:   { cls: "border-yellow-500/30 bg-yellow-950/30 text-yellow-400", icon: Pause },
 }
-function stepToAgent(step: string): string | null {
-  for (const [k, a] of Object.entries(stepAgentMap))
-    if (step.toLowerCase().includes(k)) return a
-  return null
+
+function logTypeColor(type: string) {
+  switch (type) {
+    case "ok": return "#34d399"
+    case "warn": return "#fbbf24"
+    case "err": return "#f87171"
+    default: return "#a1a1aa"
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Sprite component
+// Sprite component (with animMode support)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function AgentSprite({ agentId, frame, size, facing, className }: {
-  agentId: string; frame: number; size: number; facing: "right" | "left"; className?: string
+function AgentSprite({ agentId, frame, size, facing, animMode, className }: {
+  agentId: string; frame: number; size: number; facing: "right" | "left"
+  animMode?: "idle" | "run"; className?: string
 }) {
   const def = AGENTS.find((a) => a.id === agentId)
   if (!def) return null
   const w = size; const h = size * 1.75
-  const src = `/sprites/agents/${agentId}/idle_f${frame % 4}.png`
+  const mode = animMode ?? "idle"
+  const src = `/sprites/agents/${agentId}/${mode}_f${frame % 4}.png`
   return (
     <div className={className} style={{ width: w, height: h, transform: facing === "left" ? "scaleX(-1)" : undefined }}>
       <Image src={src} alt={def.label} width={w} height={h} className="pixelated" unoptimized priority />
@@ -113,7 +199,7 @@ function AgentSprite({ agentId, frame, size, facing, className }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Popup Window Component (Sim-style game window)
+// Popup Window Component
 // ═══════════════════════════════════════════════════════════════════════════
 
 function GameWindow({ title, icon, onClose, children, className }: {
@@ -146,29 +232,6 @@ function GameWindow({ title, icon, onClose, children, className }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Status helpers
-// ═══════════════════════════════════════════════════════════════════════════
-
-const statusVariants: Record<string, { cls: string; icon: typeof CheckCircle2 }> = {
-  idle:     { cls: "border-stone-600/30 bg-stone-800/30 text-stone-400", icon: Monitor },
-  scanning: { cls: "border-blue-500/30 bg-blue-950/30 text-blue-400", icon: Activity },
-  forging:  { cls: "border-amber-500/30 bg-amber-950/30 text-amber-400", icon: Zap },
-  packaging:{ cls: "border-violet-500/30 bg-violet-950/30 text-violet-400", icon: Package },
-  publishing:{cls: "border-emerald-500/30 bg-emerald-950/30 text-emerald-400", icon: TrendingUp },
-  blocked:  { cls: "border-red-500/30 bg-red-950/30 text-red-400", icon: AlertTriangle },
-  paused:   { cls: "border-yellow-500/30 bg-yellow-950/30 text-yellow-400", icon: Pause },
-}
-
-function logTypeColor(type: string) {
-  switch (type) {
-    case "ok": return "#34d399"
-    case "warn": return "#fbbf24"
-    case "err": return "#f87171"
-    default: return "#a1a1aa"
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Wall top border
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -187,67 +250,89 @@ function WallBorderTop() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Main Page — SIM STYLE
+// Pipeline Progress Bar
+// ═══════════════════════════════════════════════════════════════════════════
+
+function PipelineBar({ currentStep, stepProgress }: { currentStep: number; stepProgress: number }) {
+  return (
+    <div className="flex items-center gap-1 px-3 py-1 bg-stone-900/80 border-t border-yellow-900/20">
+      {PIPELINE_STEPS.map((step, idx) => {
+        const isCurrent = idx === currentStep
+        const isDone = false // we highlight current only
+        return (
+          <div key={step.id} className="flex items-center gap-1 flex-1">
+            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono transition-all ${
+              isCurrent
+                ? "bg-yellow-900/40 text-yellow-300 border border-yellow-600/40 shadow-[0_0_6px_rgba(255,200,50,0.2)]"
+                : "text-stone-600"
+            }`}>
+              <div className={`h-1.5 w-1.5 rounded-full ${
+                isCurrent ? "bg-yellow-400 animate-pulse" : "bg-stone-700"
+              }`} />
+              <span>{step.name}</span>
+            </div>
+            {idx < PIPELINE_STEPS.length - 1 && (
+              <div className="flex-1 h-px bg-stone-800 mx-0.5 relative">
+                {isCurrent && (
+                  <div className="absolute inset-0 bg-yellow-600/40 transition-all" style={{ width: `${stepProgress * 100}%` }} />
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Main Page — AUTONOMOUS DUNGEON
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function WorkstationPage() {
   const [loading, setLoading] = useState(true)
-  const [connected, setConnected] = useState(false)
-  const [lastPoll, setLastPoll] = useState("")
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [showForgeModal, setShowForgeModal] = useState(false)
 
-  const [status, setStatus] = useState<SimStatus>({
-    action: "idle", detail: "Initializing...",
-    providers: { openai: "unknown", deepseek: "unknown" },
-    budget: { used: 0, cap: 10, remaining: 10 },
-    backlog: { unlistedAssets: 0, stuckRuns: 0, packsToPublish: 0 },
-    isPaused: false, totalAssets: 0, readyPacks: 0,
-  })
+  // Pipeline state
+  const [currentPipelineStep, setCurrentPipelineStep] = useState(0)
+  const [stepProgress, setStepProgress] = useState(0) // 0→1 over step duration
+  const [pipelineCycle, setPipelineCycle] = useState(0)
 
+  // Agent state
   const [agents, setAgents] = useState<Record<string, AgentState>>(() => {
     const s: Record<string, AgentState> = {}
-    for (const a of AGENTS)
-      s[a.id] = { status: "idle", message: "", gridX: a.homeX, gridY: a.homeY, pulse: false, frame: Math.floor(Math.random() * 4), facing: "right" }
+    for (const a of AGENTS) {
+      s[a.id] = {
+        status: "idle",
+        message: "",
+        gridX: a.homeX,
+        gridY: a.homeY,
+        pulse: false,
+        frame: Math.floor(Math.random() * 4),
+        facing: "right",
+        animMode: "idle",
+        walk: null,
+        dialogueTimer: Math.floor(Math.random() * 15) + 5, // 5-20 ticks
+      }
+    }
     return s
   })
 
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [forgeRunning, setForgeRunning] = useState(false)
-  const [forgeSteps, setForgeSteps] = useState<ForgeStep[]>([])
-  const [forgeProgress, setForgeProgress] = useState("")
-  const [lastForgeTime, setLastForgeTime] = useState("")
-  const [lastForgeStatus, setLastForgeStatus] = useState("")
   const [uptime, setUptime] = useState(0)
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
-  const [showForgeModal, setShowForgeModal] = useState(false)
-  const [showLogModal, setShowLogModal] = useState(false)
 
   const logsEnd = useRef<HTMLDivElement>(null)
   const logCounter = useRef(0)
-  const prevAction = useRef("")
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const rafRef = useRef<number>(0)
   const lastFrameTime = useRef(0)
-
-  // ── Frame animation (single rAF) ──
-  useEffect(() => {
-    function tick(ts: number) {
-      if (ts - lastFrameTime.current > FRAME_INTERVAL) {
-        lastFrameTime.current = ts
-        setAgents((prev) => {
-          let changed = false
-          const next = { ...prev }
-          for (const id of Object.keys(next)) {
-            next[id] = { ...next[id], frame: (next[id].frame + 1) % 4 }
-            changed = true
-          }
-          return changed ? next : prev
-        })
-      }
-      rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [])
+  const schedulerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pipelineStepRef = useRef(currentPipelineStep)
+  pipelineStepRef.current = currentPipelineStep
+  const pipelineCycleRef = useRef(pipelineCycle)
+  pipelineCycleRef.current = pipelineCycle
 
   // ── Logging ──
   const addLog = useCallback((agent: string, msg: string, type: LogEntry["type"] = "info") => {
@@ -262,170 +347,428 @@ export default function WorkstationPage() {
     return () => clearInterval(i)
   }, [])
 
-  // ── Poll ──
-  const poll = useCallback(async () => {
-    try {
-      const [tick, dash] = await Promise.all([autonomousTick(), getDashboardData()])
-      setConnected(true)
-      setLastPoll(now())
-      if (loading) setLoading(false)
-
-      setStatus({
-        action: tick.action, detail: tick.detail,
-        providers: tick.providers, budget: tick.budget, backlog: tick.backlog,
-        isPaused: dash.isPaused, totalAssets: dash.totalAssets, readyPacks: dash.readyPacks,
-      })
-
-      const action = tick.action
-      const detail = tick.detail
-      const updates: Record<string, Partial<AgentState>> = {}
-
-      for (const a of AGENTS) {
-        let st: AgentStatus = "idle"; let msg = ""
-
-        switch (a.id) {
-          case "popo":
-            st = action === "idle" ? "idle" : "working"
-            msg = action === "idle" ? "Monitoring..." : `Commanding: ${action}`
-            break
-          case "orchestrator":
-            if (action !== "idle") { st = "working"; msg = detail }
-            break
-          case "scout":
-            if (action === "scanning") { st = "working"; msg = "Scanning markets" }
-            else if (action === "forging") { st = "done"; msg = "Intel ready" }
-            break
-          case "forge":
-            if (action === "forging") { st = "working"; msg = "Forging" }
-            break
-          case "curator":
-            if (action === "forging") { st = "working"; msg = "Scoring" }
-            break
-          case "packager":
-            if (action === "packaging") { st = "working"; msg = "Bundling" }
-            break
-          case "lister":
-            if (action === "packaging" || action === "publishing") { st = "working"; msg = "Listing" }
-            break
-          case "deploy":
-            if (action === "publishing") { st = "working"; msg = "Uploading" }
-            break
-          case "monitor":
-            st = "working"
-            msg = `${tick.backlog.unlistedAssets + tick.backlog.packsToPublish} pending`
-            break
-        }
-
-        updates[a.id] = {
-          status: st, message: msg,
-          gridX: a.homeX, gridY: a.homeY,
-          pulse: st === "working",
-        }
-      }
-
-      setAgents((prev) => {
-        const next = { ...prev }
-        for (const [id, u] of Object.entries(updates)) next[id] = { ...next[id], ...u }
-        return next
-      })
-
-      if (action !== prevAction.current && action !== "idle")
-        addLog("system", detail, action === "blocked" ? "warn" : "info")
-      prevAction.current = action
-    } catch {
-      setConnected(false)
-    }
-
-    if (pollTimer.current) clearTimeout(pollTimer.current)
-    pollTimer.current = setTimeout(poll, POLL_INTERVAL)
-  }, [loading, addLog])
-
-  useEffect(() => { poll(); return () => { if (pollTimer.current) clearTimeout(pollTimer.current) } }, [poll])
-
-  // ── Forge ──
-  async function handleForge() {
-    setForgeRunning(true); setForgeSteps([]); setForgeProgress("Assembling team...")
-    addLog("orchestrator", "Dispatching pipeline...", "info")
-    setShowForgeModal(true)
-    await sleep(300)
-
-    try {
-      const result = await runOrchestrator({ theme: "fantasy creatures", maxAssets: 2 })
-      const steps = result.steps ?? []
-      const completedSteps: ForgeStep[] = []
-
-      if (steps.length > 0) {
-        for (const step of steps) {
-          const fs: ForgeStep = { step: step.step, status: step.status, summary: step.summary ?? "", time: now() }
-          completedSteps.push(fs)
-          setForgeSteps([...completedSteps])
-
-          const agentId = stepToAgent(step.step)
-          const icon = step.status === "completed" ? "✓" : step.status === "failed" ? "✗" : "..."
-          setForgeProgress(`${icon} ${step.step}`)
-
-          if (agentId) {
-            setAgents((prev) => ({
-              ...prev,
-              [agentId]: {
-                ...prev[agentId],
-                status: step.status === "completed" ? "done" : step.status === "failed" ? "error" : "working",
-                message: `${icon} ${step.summary ?? step.step}`,
-                pulse: step.status === "running",
-                facing: Math.random() > 0.5 ? "left" : "right",
-              },
-            }))
-            addLog(agentId, step.summary ?? step.step, step.status === "failed" ? "err" : "ok")
-          }
-          await sleep(700)
-        }
-        setForgeSteps(completedSteps)
-      }
-
-      const t = now()
-      setLastForgeTime(t)
-      if (result.error) {
-        setForgeProgress(`Failed: ${result.error}`); setLastForgeStatus("failed")
-        addLog("orchestrator", result.error, "err")
-      } else if (result.status === "completed") {
-        setForgeProgress("Pipeline complete!"); setLastForgeStatus("completed")
-        addLog("orchestrator", "All done!", "ok")
-      } else if (result.status === "paused_provider") {
-        setForgeProgress("Provider limit — top up"); setLastForgeStatus("paused")
-        addLog("orchestrator", `Paused: ${result.error ?? "limit"}`, "warn")
-      } else {
-        setForgeProgress(`Status: ${result.status}`); setLastForgeStatus(result.status)
-      }
-    } catch (e: unknown) {
-      setForgeProgress("Error"); setLastForgeStatus("error"); setLastForgeTime(now())
-      addLog("orchestrator", (e as Error).message ?? "Unknown", "err")
-    } finally {
-      setForgeRunning(false)
-      setTimeout(() => {
+  // ── Frame animation (single rAF) ──
+  useEffect(() => {
+    function tick(ts: number) {
+      if (ts - lastFrameTime.current > FRAME_INTERVAL) {
+        lastFrameTime.current = ts
         setAgents((prev) => {
-          const next = { ...prev }
-          for (const a of AGENTS) next[a.id] = { ...next[a.id], status: "idle", message: "", pulse: false }
+          let changed = false
+          const next: Record<string, AgentState> = {}
+          for (const [id, st] of Object.entries(prev)) {
+            const n = { ...st, frame: (st.frame + 1) % 4 }
+            // Decay dialogue timer
+            if (n.dialogueTimer > 0) {
+              n.dialogueTimer = n.dialogueTimer - 1
+              changed = true
+            } else {
+              // Trigger random soul line when idle
+              if (n.status === "idle" && !n.message) {
+                n.message = randomSoulLine(id)
+                n.dialogueTimer = Math.floor(Math.random() * 15) + 8
+                changed = true
+              }
+            }
+            // Auto-clear idle messages after a bit
+            if (n.status === "idle" && n.message && n.dialogueTimer < 3) {
+              n.message = ""
+            }
+            next[id] = n
+          }
+          return changed ? next : prev
+        })
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [])
+
+  // ── Walk movement tick (runs every FRAME_INTERVAL via the update logic in scheduler) ──
+  function updateWalk(prev: Record<string, AgentState>): Record<string, AgentState> {
+    const next: Record<string, AgentState> = {}
+    let changed = false
+    for (const id of Object.keys(prev)) {
+      const st = prev[id]
+      let n = { ...st, frame: st.frame }
+      if (st.walk && st.status === "walking") {
+        n.walk = { ...st.walk }
+        n.walk.walkProgress = Math.min(1, n.walk.walkProgress + WALK_SPEED)
+        // Interpolate position
+        n.gridX = st.walk.fromX + (st.walk.targetX - st.walk.fromX) * n.walk.walkProgress
+        n.gridY = st.walk.fromY + (st.walk.targetY - st.walk.fromY) * n.walk.walkProgress
+        // Facing direction
+        if (st.walk.targetX > st.walk.fromX) n.facing = "right"
+        else if (st.walk.targetX < st.walk.fromX) n.facing = "left"
+        n.animMode = "run"
+        changed = true
+        if (n.walk.walkProgress >= 1) {
+          // Arrived at destination
+          n.gridX = st.walk.targetX
+          n.gridY = st.walk.targetY
+          n.walk = null
+          n.animMode = "idle"
+          // Check if someone else is at this position → meeting
+          // Will be handled by scheduler
+        }
+      }
+      next[id] = n
+    }
+    return changed ? next : prev
+  }
+
+  // ── Scheduler (autonomous pipeline + random walks) ──
+  useEffect(() => {
+    // Initial loading delay
+    const loadTimer = setTimeout(() => setLoading(false), 800)
+
+    // Pipeline scheduler
+    let stepTimer = 0
+
+    schedulerRef.current = setInterval(() => {
+      const currentStepIdx = pipelineStepRef.current
+      const currentCycle = pipelineCycleRef.current
+      stepTimer += PIPELINE_TICK_MS
+
+      // Update step progress
+      setStepProgress(Math.min(1, stepTimer / PIPELINE_STEP_DURATION))
+
+      // Update walk movements
+      setAgents((prev) => updateWalk(prev))
+
+      if (stepTimer >= PIPELINE_STEP_DURATION) {
+        // Pipeline step complete
+        stepTimer = 0
+
+        setAgents((prev) => {
+          const next: Record<string, AgentState> = {}
+          for (const [id, st] of Object.entries(prev)) {
+            next[id] = { ...st }
+          }
+
+          const currentStep = PIPELINE_STEPS[currentStepIdx]
+          const nextStep = PIPELINE_STEPS[nextPipelineStep(currentStepIdx)]
+          const stepAgent = currentStep.agentId
+
+          // Current step agent → done briefly, then back to idle
+          if (next[stepAgent]) {
+            if (next[stepAgent].status === "working" || next[stepAgent].status === "idle") {
+              next[stepAgent] = {
+                ...next[stepAgent],
+                status: "done",
+                pulse: false,
+                message: `${currentStep.name} complete!`,
+                animMode: "idle",
+              }
+              // Add log
+              addLog(stepAgent, `${currentStep.name} complete!`, "ok")
+            }
+          }
+
+          // Next step agent starts walking toward previous agent's position
+          if (next[nextStep.agentId] && next[stepAgent]) {
+            const prevAgentPos = {
+              x: Math.round(next[stepAgent].gridX),
+              y: Math.round(next[stepAgent].gridY),
+            }
+            const def = AGENTS.find(a => a.id === nextStep.agentId)
+            if (def) {
+              next[nextStep.agentId] = {
+                ...next[nextStep.agentId],
+                status: "walking",
+                message: `Heading to ${currentStep.agentId}...`,
+                animMode: "run",
+                walk: {
+                  fromX: def.homeX,
+                  fromY: def.homeY,
+                  targetX: prevAgentPos.x,
+                  targetY: prevAgentPos.y,
+                  walkProgress: 0,
+                },
+                facing: prevAgentPos.x > def.homeX ? "right" : "left",
+              }
+            }
+          }
+
           return next
         })
-      }, 1500)
-    }
-  }
 
-  // ── Killswitch ──
-  async function handlePause() {
-    if (status.isPaused) { await resume(); addLog("system", "Killswitch released", "ok") }
-    else { await pause(); addLog("system", "Forge paused", "warn") }
-    const dash = await getDashboardData()
-    setStatus((s) => ({ ...s, isPaused: dash.isPaused }))
-  }
+        // Advance pipeline step
+        setCurrentPipelineStep((prev) => nextPipelineStep(prev))
+        setPipelineCycle((c) => c + 1)
+      } else if (stepTimer === PIPELINE_TICK_MS) {
+        // Just started a new step
+        setAgents((prev) => {
+          const next: Record<string, AgentState> = {}
+          for (const [id, st] of Object.entries(prev)) {
+            next[id] = { ...st }
+          }
+
+          const currentStep = PIPELINE_STEPS[currentStepIdx]
+          const stepAgent = currentStep.agentId
+
+          // If this agent just arrived from walking and is at home, switch to working
+          const def = AGENTS.find(a => a.id === stepAgent)
+          if (def && next[stepAgent]) {
+            if (next[stepAgent].status !== "walking") {
+              next[stepAgent] = {
+                ...next[stepAgent],
+                status: "working" as AgentStatus,
+                pulse: true,
+                message: currentStep.label,
+                animMode: "idle",
+                gridX: def.homeX,
+                gridY: def.homeY,
+                walk: null,
+              }
+              addLog(stepAgent, currentStep.label, "info")
+            }
+          }
+
+          return next
+        })
+      } else if (stepTimer > PIPELINE_TICK_MS && stepTimer < PIPELINE_STEP_DURATION) {
+        // Mid-step: check for walking agents that arrived
+        setAgents((prev) => {
+          const next: Record<string, AgentState> = {}
+          let changed = false
+          for (const [id, st] of Object.entries(prev)) {
+            let n = { ...st }
+            // If walking agent arrived (walk was consumed, at target)
+            if (n.status === "walking" && !n.walk) {
+              // They've arrived - switch to working at their home
+              const def = AGENTS.find(a => a.id === id)
+              if (def) {
+                n = {
+                  ...n,
+                  status: "working" as AgentStatus,
+                  pulse: true,
+                  message: PIPELINE_STEPS.find(s => s.agentId === id)?.label ?? "Working...",
+                  animMode: "idle",
+                  gridX: def.homeX,
+                  gridY: def.homeY,
+                }
+                changed = true
+              }
+            }
+            next[id] = n
+          }
+          return changed ? next : prev
+        })
+      }
+
+      // ── Random buddy visits ──
+      if (Math.random() < 0.15) { // ~15% chance per tick
+        const allIds = AGENTS.map(a => a.id)
+        const idx = Math.floor(Math.random() * allIds.length)
+        const walkerId = allIds[idx]
+
+        setAgents((prev) => {
+          if (!prev[walkerId] || prev[walkerId].status !== "idle") return prev
+          const def = AGENTS.find(a => a.id === walkerId)
+          if (!def) return prev
+
+          // Pick a random buddy (different agent)
+          const buddies = AGENTS.filter(a => a.id !== walkerId)
+          const buddy = buddies[Math.floor(Math.random() * buddies.length)]
+
+          const next: Record<string, AgentState> = { ...prev }
+          next[walkerId] = {
+            ...next[walkerId],
+            status: "walking" as AgentStatus,
+            message: `Visiting ${buddy.label}...`,
+            animMode: "run",
+            walk: {
+              fromX: def.homeX,
+              fromY: def.homeY,
+              targetX: buddy.homeX,
+              targetY: buddy.homeY,
+              walkProgress: 0,
+            },
+            facing: buddy.homeX > def.homeX ? "right" : "left",
+          }
+          return next
+        })
+      }
+
+      // ── Popo checks on random agent ──
+      if (Math.random() < 0.12) {
+        setAgents((prev) => {
+          if (!prev["popo"] || prev["popo"].status !== "idle") return prev
+          const popoDef = AGENTS.find(a => a.id === "popo")
+          if (!popoDef) return prev
+
+          const targets = AGENTS.filter(a => a.id !== "popo" && prev[a.id]?.status === "working")
+          if (targets.length === 0) return prev
+          const target = targets[Math.floor(Math.random() * targets.length)]
+
+          const next: Record<string, AgentState> = { ...prev }
+          next["popo"] = {
+            ...next["popo"],
+            status: "walking" as AgentStatus,
+            message: `Checking on ${target.label}...`,
+            animMode: "run",
+            walk: {
+              fromX: popoDef.homeX,
+              fromY: popoDef.homeY,
+              targetX: target.homeX,
+              targetY: target.homeY,
+              walkProgress: 0,
+            },
+            facing: target.homeX > popoDef.homeX ? "right" : "left",
+          }
+          return next
+        })
+      }
+
+      // ── Meeting detection ──
+      setAgents((prev) => {
+        const next: Record<string, AgentState> = { ...prev }
+        // Check all pairs
+        for (let i = 0; i < AGENTS.length; i++) {
+          for (let j = i + 1; j < AGENTS.length; j++) {
+            const a = AGENTS[i]; const b = AGENTS[j]
+            const sa = next[a.id]; const sb = next[b.id]
+            if (!sa || !sb) continue
+            const ax = Math.round(sa.gridX); const ay = Math.round(sa.gridY)
+            const bx = Math.round(sb.gridX); const by = Math.round(sb.gridY)
+            const dist = Math.abs(ax - bx) + Math.abs(ay - by)
+            if (dist <= 1 && (sa.status === "walking" || sa.status === "working") && (sb.status === "walking" || sb.status === "working" || sb.status === "idle")) {
+              // Both agents are close — start meeting
+              next[a.id] = {
+                ...sa,
+                status: "meeting",
+                message: meetingLine(a.id, b.id),
+                animMode: "idle",
+                walk: null,
+                pulse: false,
+              }
+              next[b.id] = {
+                ...sb,
+                status: "meeting",
+                message: meetingLine(a.id, b.id),
+                animMode: "idle",
+                walk: null,
+                pulse: false,
+              }
+            }
+          }
+        }
+        return next
+      })
+    }, PIPELINE_TICK_MS)
+
+    return () => {
+      clearTimeout(loadTimer)
+      if (schedulerRef.current) clearInterval(schedulerRef.current)
+    }
+  }, [addLog]) // Only depends on addLog, uses refs for pipeline state
+
+  // ── Handle completed walking agents (arrived at destination) ──
+  // Also reset walking agents after meeting
+  useEffect(() => {
+    const cleanup = setInterval(() => {
+      setAgents((prev) => {
+        let changed = false
+        const next: Record<string, AgentState> = {}
+        for (const [id, st] of Object.entries(prev)) {
+          let n = { ...st }
+          // If walking but no walk target and not at home, return home
+          if (n.status === "walking" && !n.walk) {
+            const def = AGENTS.find(a => a.id === id)
+            if (def) {
+              // If arrived at non-home location, they're visiting - start meeting
+              n = {
+                ...n,
+                status: "idle" as AgentStatus,
+                gridX: def.homeX,
+                gridY: def.homeY,
+                animMode: "idle",
+                message: "Back at post.",
+                dialogueTimer: 5,
+              }
+              changed = true
+            }
+          }
+          // Reset meeting agents after some time (handled by timer in next cleanup)
+          next[id] = n
+        }
+        return changed ? next : prev
+      })
+    }, 4000)
+    return () => clearInterval(cleanup)
+  }, [])
+
+  // ── Meeting reset timer ──
+  useEffect(() => {
+    const mtgReset = setInterval(() => {
+      setAgents((prev) => {
+        let changed = false
+        const next: Record<string, AgentState> = {}
+        for (const [id, st] of Object.entries(prev)) {
+          let n = { ...st }
+          if (n.status === "meeting") {
+            const def = AGENTS.find(a => a.id === id)
+            if (def) {
+              n = {
+                ...n,
+                status: "idle" as AgentStatus,
+                message: "",
+                animMode: "idle",
+                gridX: def.homeX,
+                gridY: def.homeY,
+                pulse: false,
+                dialogueTimer: 5,
+              }
+              changed = true
+            }
+          }
+          next[id] = n
+        }
+        return changed ? next : prev
+      })
+    }, 6000) // meetings last ~6 seconds
+    return () => clearInterval(mtgReset)
+  }, [])
+
+  // ── Done → idle cleanup ──
+  useEffect(() => {
+    const doneReset = setInterval(() => {
+      setAgents((prev) => {
+        let changed = false
+        const next: Record<string, AgentState> = {}
+        for (const [id, st] of Object.entries(prev)) {
+          let n = { ...st }
+          if (n.status === "done") {
+            const def = AGENTS.find(a => a.id === id)
+            if (def) {
+              n = {
+                ...n,
+                status: "idle" as AgentStatus,
+                message: "",
+                pulse: false,
+                animMode: "idle",
+                gridX: def.homeX,
+                gridY: def.homeY,
+                walk: null,
+                dialogueTimer: 3,
+              }
+              changed = true
+            }
+          }
+          next[id] = n
+        }
+        return changed ? next : prev
+      })
+    }, 3000)
+    return () => clearInterval(doneReset)
+  }, [])
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       switch (e.key.toLowerCase()) {
-        case "f": if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); handleForge(); } break
-        case "k": if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); handlePause(); } break
         case "escape": setSelectedAgent(null); setShowForgeModal(false); setShowLogModal(false); break
         default:
           if (e.key >= "1" && e.key <= "9") {
@@ -436,7 +779,7 @@ export default function WorkstationPage() {
     }
     document.addEventListener("keydown", handleKey)
     return () => document.removeEventListener("keydown", handleKey)
-  }, [status.isPaused, forgeRunning])
+  }, [])
 
   // ── Derived ──
   const workingAgents = Object.values(agents).filter((a) => a.status === "working" || a.status === "walking").length
@@ -460,53 +803,21 @@ export default function WorkstationPage() {
     <div className="h-screen w-screen overflow-hidden bg-stone-950 flex flex-col">
       {/* ═══════ SIM-STYLE HUD BAR ═══════ */}
       <div className="shrink-0 flex items-center gap-4 px-4 py-1.5 bg-stone-900/95 border-b border-yellow-900/30 font-mono text-[11px] z-30 relative">
-        {/* Connection */}
-        <div className="flex items-center gap-1.5" title={`Last poll: ${lastPoll}`}>
-          <div className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500 shadow-[0_0_6px_#34d399] animate-pulse" : "bg-red-500 shadow-[0_0_6px_#ef4444]"}`} />
-          <span className={`${connected ? "text-emerald-400" : "text-red-400"}`}>{connected ? "LIVE" : "STALE"}</span>
-        </div>
-
-        <div className="w-px h-4 bg-yellow-900/40" />
-
         {/* Status */}
         <div className="flex items-center gap-1.5">
-          <span className="text-stone-500 uppercase tracking-wider text-[9px]">Status</span>
-          <Badge variant="outline" className={`gap-1 font-mono text-[10px] h-5 ${statusVariants[status.action]?.cls ?? statusVariants.idle.cls}`}>
-            {(() => {
-              const Icon = statusVariants[status.action]?.icon ?? Monitor
-              return <Icon className="h-2.5 w-2.5" />
-            })()}
-            {status.action.toUpperCase()}
-          </Badge>
+          <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#34d399] animate-pulse" />
+          <span className="text-emerald-400">LIVE</span>
         </div>
 
         <div className="w-px h-4 bg-yellow-900/40" />
 
-        {/* Providers */}
-        <div className="flex items-center gap-2">
-          <span className="text-stone-500 uppercase tracking-wider text-[9px]">API</span>
-          <div className="flex items-center gap-1">
-            <div className={`h-1.5 w-1.5 rounded-full ${status.providers.openai === "healthy" ? "bg-emerald-500" : "bg-red-500"}`} />
-            <span className="text-stone-400 text-[10px]">OAI</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className={`h-1.5 w-1.5 rounded-full ${status.providers.deepseek === "healthy" ? "bg-emerald-500" : "bg-red-500"}`} />
-            <span className="text-stone-400 text-[10px]">DS</span>
-          </div>
-        </div>
-
-        <div className="w-px h-4 bg-yellow-900/40" />
-
-        {/* Budget */}
+        {/* Pipeline info */}
         <div className="flex items-center gap-1.5">
-          <span className="text-stone-500 uppercase tracking-wider text-[9px]">$</span>
-          <span className="font-mono text-stone-300 text-[10px]">${status.budget.used.toFixed(2)}<span className="text-stone-600">/${status.budget.cap}</span></span>
-          <div className="w-12 h-1.5 rounded-full bg-stone-800 overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-500 ${
-              (status.budget.used / status.budget.cap) > 0.9 ? "bg-red-500" :
-              (status.budget.used / status.budget.cap) > 0.6 ? "bg-amber-500" : "bg-emerald-500"
-            }`} style={{ width: `${Math.min(100, (status.budget.used / status.budget.cap) * 100)}%` }} />
-          </div>
+          <span className="text-stone-500 uppercase tracking-wider text-[9px]">Cycle</span>
+          <Badge variant="outline" className="gap-1 font-mono text-[10px] h-5 border-yellow-600/30 bg-yellow-950/20 text-yellow-400">
+            <Activity className="h-2.5 w-2.5" />
+            {PIPELINE_STEPS[currentPipelineStep]?.name ?? "IDLE"}
+          </Badge>
         </div>
 
         <div className="w-px h-4 bg-yellow-900/40" />
@@ -514,16 +825,12 @@ export default function WorkstationPage() {
         {/* Stats */}
         <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1 text-stone-400 text-[10px]">
-            <Package className="h-3 w-3 text-stone-500" />
-            <span className="font-mono tabular-nums">{status.totalAssets}</span>
-          </span>
-          <span className="flex items-center gap-1 text-stone-400 text-[10px]">
-            <Sparkles className="h-3 w-3 text-stone-500" />
-            <span className="font-mono tabular-nums">{status.readyPacks}</span>
+            <Footprints className="h-3 w-3 text-stone-500" />
+            <span className="font-mono tabular-nums">{workingAgents}/6</span>
           </span>
           <span className="flex items-center gap-1 text-stone-400 text-[10px]">
             <Cpu className="h-3 w-3 text-stone-500" />
-            <span className="font-mono tabular-nums">{workingAgents}/9</span>
+            <span className="font-mono tabular-nums">Cycle #{pipelineCycle}</span>
           </span>
         </div>
 
@@ -542,17 +849,6 @@ export default function WorkstationPage() {
           <ScrollText className="h-3 w-3" />
           LOG
         </button>
-
-        {/* Killswitch */}
-        <button onClick={handlePause}
-          className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors text-[10px] ${
-            status.isPaused
-              ? "border-red-700/50 bg-red-950/30 text-red-400 hover:bg-red-950/50"
-              : "border-stone-700/50 text-stone-400 hover:border-yellow-700/30 hover:text-yellow-400"
-          }`}>
-          {status.isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
-          {status.isPaused ? "RESUME" : "PAUSE"}
-        </button>
       </div>
 
       {/* ═══════ DUNGEON FLOOR — FULL SCREEN ═══════ */}
@@ -567,19 +863,20 @@ export default function WorkstationPage() {
           Kai Asset Forge · Factory Floor
         </div>
 
-        {/* Grid — fills the entire space */}
+        {/* Grid — 3x2 layout */}
         <div className="absolute inset-0 p-2 sm:p-4">
           <div className="grid gap-1 sm:gap-2 w-full h-full" style={{
             gridTemplateColumns: "repeat(3, 1fr)",
-            gridTemplateRows: "repeat(3, 1fr)",
+            gridTemplateRows: "repeat(2, 1fr)",
           }}>
             {AGENTS.map((agent) => {
               const st = agents[agent.id]
               if (!st) return null
               const isPopo = agent.id === "popo"
-              const isOrch = agent.id === "orchestrator"
               const isWorking = st.status === "working" || st.status === "walking"
+              const isMeeting = st.status === "meeting"
               const isSelected = selectedAgent === agent.id
+              const isPipelineStep = PIPELINE_STEPS[currentPipelineStep]?.agentId === agent.id
 
               return (
                 <div
@@ -593,7 +890,8 @@ export default function WorkstationPage() {
                   <div className={`relative w-full h-full flex flex-col items-center justify-center border-2 transition-all duration-300 ${
                     isSelected ? "border-primary/60 ring-2 ring-primary/20" :
                     isPopo ? "border-yellow-500/60 bg-yellow-950/20 ring-1 ring-yellow-500/30" :
-                    isOrch ? "border-amber-700/40 bg-amber-950/15" :
+                    isMeeting ? "border-violet-500/60 bg-violet-950/20 ring-1 ring-violet-500/30" :
+                    isPipelineStep ? "border-amber-500/50 bg-stone-900/40 ring-1 ring-amber-500/20" :
                     isWorking ? "border-amber-600/30 bg-stone-900/40" :
                     "border-stone-700/30 bg-stone-900/20 hover:border-stone-600/40"
                   }`}>
@@ -628,16 +926,28 @@ export default function WorkstationPage() {
                     )}
 
                     {/* Speech bubble */}
-                    {st.message && (isWorking || st.status === "done" || st.status === "error") && (
-                      <div className="absolute -top-6 z-30 animate-bounce-in max-w-[85%]">
+                    {st.message && (
+                      <div className="absolute -top-7 z-30 animate-bounce-in max-w-[85%]">
                         <div className={`relative px-2 py-0.5 rounded border text-center bg-stone-900/95 backdrop-blur ${
-                          st.status === "error" ? "border-red-500/30" : "border-yellow-700/30"
+                          st.status === "meeting" ? "border-violet-500/40" :
+                          st.status === "walking" ? "border-blue-500/30" :
+                          st.status === "done" ? "border-emerald-500/40" :
+                          st.status === "working" ? "border-amber-500/40" :
+                          "border-yellow-700/20"
                         }`}>
                           <p className={`font-mono text-[10px] leading-tight ${
-                            st.status === "error" ? "text-red-400" : "text-stone-200"
+                            st.status === "meeting" ? "text-violet-300" :
+                            st.status === "walking" ? "text-blue-300" :
+                            st.status === "done" ? "text-emerald-300" :
+                            st.status === "working" ? "text-amber-300" :
+                            "text-stone-400"
                           }`}>{st.message}</p>
                           <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-stone-900/95 backdrop-blur border-r border-b ${
-                            st.status === "error" ? "border-red-500/30" : "border-yellow-700/30"
+                            st.status === "meeting" ? "border-violet-500/40" :
+                            st.status === "walking" ? "border-blue-500/30" :
+                            st.status === "done" ? "border-emerald-500/40" :
+                            st.status === "working" ? "border-amber-500/40" :
+                            "border-yellow-700/20"
                           }`} />
                         </div>
                       </div>
@@ -645,15 +955,20 @@ export default function WorkstationPage() {
 
                     {/* Agent sprite */}
                     <div className={`relative z-10 transition-transform duration-700 ${
-                      isWorking ? "animate-bob" : ""
-                    } ${st.status === "error" ? "animate-shake" : ""}`}>
+                      st.status !== "walking" ? "animate-bob" : ""
+                    } ${st.status === "meeting" ? "animate-meeting-bounce" : ""} ${st.status === "done" ? "animate-shake" : ""}`}>
                       <AgentSprite
                         agentId={agent.id}
                         frame={st.frame}
-                        size={isPopo ? 56 : isOrch ? 48 : 40}
+                        size={isPopo ? 56 : 40}
                         facing={st.facing}
+                        animMode={st.animMode}
                         className={`transition-all duration-500 ${
-                          st.pulse ? "drop-shadow-[0_0_14px_rgba(255,200,50,0.7)]" : isPopo ? "drop-shadow-[0_0_10px_rgba(255,215,0,0.4)]" : "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+                          st.pulse ? "drop-shadow-[0_0_14px_rgba(255,200,50,0.7)]" :
+                          st.status === "meeting" ? "drop-shadow-[0_0_14px_rgba(139,92,246,0.5)]" :
+                          st.status === "walking" ? "drop-shadow-[0_0_10px_rgba(59,130,246,0.4)]" :
+                          isPopo ? "drop-shadow-[0_0_10px_rgba(255,215,0,0.4)]" :
+                          "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
                         }`}
                       />
                       {st.pulse && (
@@ -664,11 +979,11 @@ export default function WorkstationPage() {
                     {/* Nameplate */}
                     <div className={`absolute bottom-2 px-2 py-0.5 rounded border text-center z-10 transition-colors ${
                       isPopo ? "border-yellow-500/60 bg-black/90" :
-                      isOrch ? "border-amber-700/50 bg-black/80" : "border-stone-700/30 bg-black/70"
+                      "border-stone-700/30 bg-black/70"
                     }`}>
                       <p className={`font-mono text-[10px] leading-none ${
                         isPopo ? "text-yellow-400 font-bold tracking-wider" :
-                        isOrch ? "text-amber-300 font-bold" : "text-stone-200"
+                        "text-stone-200"
                       }`}>{agent.label}</p>
                       <p className="font-mono text-[9px] leading-none text-stone-600">{agent.role}</p>
                     </div>
@@ -677,8 +992,9 @@ export default function WorkstationPage() {
                     <div className="absolute top-1.5 right-1.5">
                       <div className={`h-2.5 w-2.5 rounded-full transition-colors ${
                         st.status === "working" ? "bg-emerald-500 shadow-[0_0_6px_#34d399]" :
-                        st.status === "done" ? "bg-blue-400" :
-                        st.status === "error" ? "bg-red-500 shadow-[0_0_6px_#ef4444]" :
+                        st.status === "walking" ? "bg-blue-400 shadow-[0_0_6px_#60a5fa]" :
+                        st.status === "meeting" ? "bg-violet-400 shadow-[0_0_6px_#a78bfa]" :
+                        st.status === "done" ? "bg-emerald-400" :
                         "bg-stone-700"
                       } ${st.pulse ? "animate-pulse" : ""}`} />
                     </div>
@@ -690,45 +1006,30 @@ export default function WorkstationPage() {
         </div>
 
         {/* Corridor SVG overlay */}
-        <svg className="absolute inset-0 z-5 w-full h-full pointer-events-none" viewBox="0 0 300 300" preserveAspectRatio="none">
+        <svg className="absolute inset-0 z-5 w-full h-full pointer-events-none" viewBox="0 0 300 200" preserveAspectRatio="none">
           <defs>
             <filter id="glow">
               <feGaussianBlur stdDeviation="1.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
-          <line x1="0" y1="150" x2="300" y2="150" stroke="rgba(217,168,65,0.3)" strokeWidth="2" strokeDasharray="6,8" filter="url(#glow)" />
-          <line x1="150" y1="0" x2="150" y2="300" stroke="rgba(217,168,65,0.3)" strokeWidth="2" strokeDasharray="6,8" filter="url(#glow)" />
-          <rect x="105" y="105" width="90" height="90" fill="none" stroke="rgba(255,200,50,0.15)" strokeWidth="1.5" strokeDasharray="4,8" filter="url(#glow)" />
+          {/* Horizontal corridors */}
+          <line x1="0" y1="66" x2="300" y2="66" stroke="rgba(217,168,65,0.3)" strokeWidth="2" strokeDasharray="6,8" filter="url(#glow)" />
+          <line x1="0" y1="133" x2="300" y2="133" stroke="rgba(217,168,65,0.3)" strokeWidth="2" strokeDasharray="6,8" filter="url(#glow)" />
+          {/* Vertical corridors */}
+          <line x1="100" y1="0" x2="100" y2="200" stroke="rgba(217,168,65,0.3)" strokeWidth="2" strokeDasharray="6,8" filter="url(#glow)" />
+          <line x1="200" y1="0" x2="200" y2="200" stroke="rgba(217,168,65,0.3)" strokeWidth="2" strokeDasharray="6,8" filter="url(#glow)" />
         </svg>
 
-        {/* ═══════ FLOATING FORGE BUTTON ═══════ */}
-        <button
-          onClick={handleForge}
-          disabled={forgeRunning}
-          className={`absolute bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-xl font-mono text-sm font-bold transition-all duration-300 shadow-[0_0_20px_rgba(255,200,50,0.2)] hover:shadow-[0_0_30px_rgba(255,200,50,0.4)] ${
-            forgeRunning
-              ? "bg-stone-800 text-stone-500 cursor-not-allowed border border-stone-700"
-              : "bg-gradient-to-b from-amber-600 to-amber-800 text-yellow-200 border border-yellow-500/40 hover:from-amber-500 hover:to-amber-700 active:scale-95"
-          }`}
-          title="FORGE (F)"
-        >
-          {forgeRunning ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Zap className="h-5 w-5" />
-          )}
-          {forgeRunning ? "FORGING..." : "FORGE!"}
-        </button>
-
         {/* ═══════ KEYBOARD HINT ═══════ */}
-        <div className="absolute bottom-6 left-6 z-20 flex gap-3 text-[9px] font-mono text-stone-600">
-          <span><span className="text-stone-500">F</span> Forge</span>
-          <span><span className="text-stone-500">K</span> Kill</span>
-          <span><span className="text-stone-500">1-9</span> Focus</span>
+        <div className="absolute bottom-8 left-6 z-20 flex gap-3 text-[9px] font-mono text-stone-600">
+          <span><span className="text-stone-500">1-6</span> Focus</span>
           <span><span className="text-stone-500">Esc</span> Close</span>
         </div>
       </div>
+
+      {/* ═══════ PIPELINE PROGRESS BAR ═══════ */}
+      <PipelineBar currentStep={currentPipelineStep} stepProgress={stepProgress} />
 
       {/* ═══════ POPUP: AGENT DETAIL / DEPARTMENT VIEW ═══════ */}
       {selectedAgent && selectedAgentDef && selectedAgentState && (
@@ -771,7 +1072,7 @@ export default function WorkstationPage() {
               <ListerPanel />
             </div>
           ) : selectedAgent === "popo" ? (
-            /* Popo CEO Overview */
+            /* Popo CEO Overview — Command Center */
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
                 <Activity className="h-4 w-4 text-yellow-500" />
@@ -781,23 +1082,44 @@ export default function WorkstationPage() {
               {/* Quick stats */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
-                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">System</p>
-                  <div className="flex items-center gap-2">
-                    <div className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-red-500"}`} />
-                    <span className="font-mono text-xs text-stone-300">{connected ? "ONLINE" : "OFFLINE"}</span>
-                  </div>
+                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Pipeline</p>
+                  <span className="font-mono text-xs text-yellow-400 uppercase">{PIPELINE_STEPS[currentPipelineStep]?.name ?? "IDLE"}</span>
                 </div>
                 <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
-                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Status</p>
-                  <span className="font-mono text-xs text-yellow-400 uppercase">{status.action}</span>
+                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Cycle</p>
+                  <span className="font-mono text-xs text-stone-300">#{pipelineCycle}</span>
                 </div>
                 <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
-                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Budget</p>
-                  <span className="font-mono text-xs text-stone-300">${status.budget.used.toFixed(2)} <span className="text-stone-600">/ ${status.budget.cap}</span></span>
+                  <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Uptime</p>
+                  <span className="font-mono text-xs text-stone-300">{uptimeStr}</span>
                 </div>
                 <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
                   <p className="text-stone-500 text-[10px] font-mono uppercase mb-1">Workers</p>
-                  <span className="font-mono text-xs text-stone-300">{workingAgents}/9 active</span>
+                  <span className="font-mono text-xs text-stone-300">{workingAgents}/6 active</span>
+                </div>
+              </div>
+
+              {/* Pipeline status */}
+              <div>
+                <p className="text-stone-500 text-[10px] font-mono uppercase mb-2">Pipeline Steps</p>
+                <div className="space-y-1">
+                  {PIPELINE_STEPS.map((step, idx) => {
+                    const isCurrent = idx === currentPipelineStep
+                    const st = agents[step.agentId]
+                    return (
+                      <div key={step.id} className={`flex items-center gap-2 px-2 py-1 rounded text-[10px] font-mono ${
+                        isCurrent ? "bg-yellow-950/30 border border-yellow-700/30" : "bg-stone-800/30 border border-stone-800/20"
+                      }`}>
+                        <div className={`h-1.5 w-1.5 rounded-full ${
+                          isCurrent ? "bg-yellow-400 animate-pulse" :
+                          st?.status === "done" ? "bg-emerald-500" :
+                          "bg-stone-700"
+                        }`} />
+                        <span className={isCurrent ? "text-yellow-300" : "text-stone-500"}>{step.name}</span>
+                        <span className="text-stone-600 ml-auto">{step.label}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -807,12 +1129,13 @@ export default function WorkstationPage() {
                 <div className="grid grid-cols-3 gap-1.5">
                   {AGENTS.filter((a) => a.id !== "popo").map((a) => {
                     const st = agents[a.id]
-                    const colors: Record<string, string> = {
-                      working: "bg-emerald-500", idle: "bg-stone-700", done: "bg-blue-500", error: "bg-red-500",
+                    const statusColors: Record<string, string> = {
+                      working: "bg-emerald-500", idle: "bg-stone-700", done: "bg-emerald-400",
+                      walking: "bg-blue-400", meeting: "bg-violet-400", error: "bg-red-500",
                     }
                     return (
                       <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded bg-stone-800/40 border border-stone-700/20">
-                        <div className={`h-1.5 w-1.5 rounded-full ${colors[st?.status ?? "idle"] ?? "bg-stone-700"} ${st?.pulse ? "animate-pulse" : ""}`} />
+                        <div className={`h-1.5 w-1.5 rounded-full ${statusColors[st?.status ?? "idle"] ?? "bg-stone-700"} ${st?.pulse ? "animate-pulse" : ""}`} />
                         <span className="font-mono text-[10px] text-stone-400 truncate">{a.label}</span>
                       </div>
                     )
@@ -827,7 +1150,7 @@ export default function WorkstationPage() {
               </div>
             </div>
           ) : (
-            /* Default agent status view for others (Orchestrator, Forge, Monitor, Packager, Deploy) */
+            /* Default agent status view for others (Forge, Packager) */
             <div className="space-y-4">
               {/* Agent sprite preview */}
               <div className="flex justify-center py-2">
@@ -837,6 +1160,7 @@ export default function WorkstationPage() {
                     frame={selectedAgentState.frame}
                     size={80}
                     facing={selectedAgentState.facing}
+                    animMode={selectedAgentState.animMode}
                     className={selectedAgentState.pulse ? "drop-shadow-[0_0_14px_rgba(255,200,50,0.5)]" : ""}
                   />
                 </div>
@@ -848,21 +1172,23 @@ export default function WorkstationPage() {
                   <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Status</p>
                   <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] ${
                     selectedAgentState.status === "working" ? "border-emerald-500/30 text-emerald-400" :
-                    selectedAgentState.status === "error" ? "border-red-500/30 text-red-400" :
-                    selectedAgentState.status === "done" ? "border-blue-500/30 text-blue-400" :
+                    selectedAgentState.status === "walking" ? "border-blue-500/30 text-blue-400" :
+                    selectedAgentState.status === "meeting" ? "border-violet-500/30 text-violet-400" :
+                    selectedAgentState.status === "done" ? "border-emerald-500/30 text-emerald-400" :
                     "border-stone-600/30 text-stone-400"
                   }`}>
                     <div className={`h-1.5 w-1.5 rounded-full ${
                       selectedAgentState.status === "working" ? "bg-emerald-500" :
-                      selectedAgentState.status === "error" ? "bg-red-500" :
-                      selectedAgentState.status === "done" ? "bg-blue-400" : "bg-stone-600"
+                      selectedAgentState.status === "walking" ? "bg-blue-400" :
+                      selectedAgentState.status === "meeting" ? "bg-violet-400" :
+                      selectedAgentState.status === "done" ? "bg-emerald-400" : "bg-stone-600"
                     } ${selectedAgentState.pulse ? "animate-pulse" : ""}`} />
                     {selectedAgentState.status.toUpperCase()}
                   </div>
                 </div>
                 <div className="bg-stone-800/60 rounded-lg p-3 border border-stone-700/30">
                   <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Position</p>
-                  <p className="text-stone-300 font-mono text-[11px]">({selectedAgentState.gridX}, {selectedAgentState.gridY})</p>
+                  <p className="text-stone-300 font-mono text-[11px]">({Math.round(selectedAgentState.gridX)}, {Math.round(selectedAgentState.gridY)})</p>
                 </div>
               </div>
 
@@ -877,53 +1203,6 @@ export default function WorkstationPage() {
         </GameWindow>
       )}
 
-      {/* ═══════ POPUP: FORGE PROGRESS ═══════ */}
-      {(showForgeModal || forgeRunning) && (
-        <GameWindow
-          title={forgeRunning ? "🔥 FORGE IN PROGRESS" : "⚡ FORGE RESULTS"}
-          icon={<Zap className="h-4 w-4" />}
-          onClose={() => { if (!forgeRunning) setShowForgeModal(false) }}
-        >
-          <div className="space-y-3">
-            {forgeRunning && !forgeSteps.length && (
-              <div className="flex items-center gap-2 text-amber-400 font-mono text-sm animate-pulse">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {forgeProgress}
-              </div>
-            )}
-
-            {forgeSteps.length > 0 && (
-              <div className="space-y-1.5">
-                {forgeSteps.map((s, i) => (
-                  <div key={i} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs font-mono transition-all ${
-                    s.status === "completed" ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-400" :
-                    s.status === "failed" ? "border-red-500/30 bg-red-950/20 text-red-400" :
-                    "border-stone-700/30 bg-stone-800/30 text-stone-400"
-                  }`}>
-                    {s.status === "completed" ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> :
-                     s.status === "failed" ? <XCircle className="h-3.5 w-3.5 shrink-0" /> :
-                     <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />}
-                    <span className="flex-1">{s.step}</span>
-                    {s.time && <span className="text-[10px] text-stone-600">{s.time.slice(0, 5)}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Final status */}
-            {!forgeRunning && forgeProgress && (
-              <div className={`mt-2 px-3 py-2 rounded-lg border font-mono text-xs ${
-                forgeProgress.includes("complete") ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-400" :
-                forgeProgress.includes("Failed") ? "border-red-500/30 bg-red-950/20 text-red-400" :
-                "border-amber-500/30 bg-amber-950/20 text-amber-400"
-              }`}>
-                {forgeProgress}
-              </div>
-            )}
-          </div>
-        </GameWindow>
-      )}
-
       {/* ═══════ POPUP: ACTIVITY LOG ═══════ */}
       {showLogModal && (
         <GameWindow
@@ -934,7 +1213,7 @@ export default function WorkstationPage() {
           <div className="font-mono text-[11px] leading-relaxed max-h-96 overflow-y-auto space-y-0.5">
             {logs.length === 0 && (
               <p className="text-stone-500 text-center py-8 text-xs">
-                No events yet. Press FORGE to start the factory.
+                No events yet. The autonomous pipeline is running...
               </p>
             )}
             {logs.map((l) => (
@@ -964,9 +1243,11 @@ export default function WorkstationPage() {
         @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
         @keyframes bounce-in { 0% { transform: translateY(6px) scale(0.98); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+        @keyframes meeting-bounce { 0%, 100% { transform: translateY(0) scale(1); } 25% { transform: translateY(-2px) scale(1.02); } 75% { transform: translateY(-2px) scale(1.02); } }
         .animate-bob { animation: bob 1s ease-in-out infinite; }
         .animate-shake { animation: shake 0.3s ease-in-out infinite; }
         .animate-bounce-in { animation: bounce-in 0.2s ease-out; }
+        .animate-meeting-bounce { animation: meeting-bounce 0.8s ease-in-out infinite; }
         :global(.pixelated) { image-rendering: pixelated; image-rendering: crisp-edges; }
       `}</style>
     </div>
