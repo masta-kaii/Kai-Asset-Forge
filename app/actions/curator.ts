@@ -62,7 +62,7 @@ Return ONLY valid JSON, no markdown:`,
     provider,
     model: "deepseek-v4-flash",
     temperature: 0.4,
-    maxTokens: 300,
+    maxTokens: 600,
   })
 
   logTextCost(provider, "curator", result.text, "").catch(() => {})
@@ -73,6 +73,7 @@ Return ONLY valid JSON, no markdown:`,
     const parsed = extractJson(result.text)
     return { success: true, score: parsed as CuratorScore }
   } catch {
+    console.error("Curator raw output:", result.text)
     return { success: false, error: "Failed to parse Curator output" }
   }
 }

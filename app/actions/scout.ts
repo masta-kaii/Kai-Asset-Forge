@@ -67,7 +67,7 @@ Return ONLY valid JSON, no markdown:`,
     provider,
     model: "deepseek-v4-flash",
     temperature: 0.8,
-    maxTokens: 400,
+    maxTokens: 600,
   })
 
   logTextCost(provider, "scout", result.success ? result.text : "", "").catch(() => {})
