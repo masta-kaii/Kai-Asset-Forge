@@ -2,7 +2,7 @@ export type AIProvider = 'openai' | 'deepseek' | 'claude'
 
 export type ImageModel = 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5' | 'gpt-image-2' | 'dall-e-3' | 'dall-e-2' | 'flux'
 
-export type TextModel = 'gpt-4o' | 'gpt-4-turbo' | 'deepseek-chat' | 'deepseek-reasoner' | 'claude-3-opus' | 'claude-3-sonnet'
+export type TextModel = 'gpt-4o' | 'gpt-4-turbo' | 'deepseek-v4-flash' | 'deepseek-reasoner' | 'claude-3-opus' | 'claude-3-sonnet'
 
 export type ImageSize = 'auto' | '256x256' | '512x512' | '1024x1024' | '1536x1024' | '1024x1536' | '1792x1024' | '1024x1792'
 
