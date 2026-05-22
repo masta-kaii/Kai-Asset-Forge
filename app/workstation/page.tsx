@@ -11,6 +11,7 @@ import {
   AlertTriangle, Package, Sparkles, ScrollText,
   X, Monitor, MessageSquare, ChevronRight, Library, FileText, ListChecks,
   MapPin, Eye, Footprints, RefreshCw, Grid, Wallpaper,
+  Building2, Moon, Star,
 } from "lucide-react"
 import { CuratorPanel } from "@/components/workstation/curator-panel"
 import { ScoutPanel } from "@/components/workstation/scout-panel"
