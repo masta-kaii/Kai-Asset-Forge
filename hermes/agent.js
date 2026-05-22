@@ -7,18 +7,19 @@ const API_TOKEN = process.env.KAI_API_TOKEN || ""
 const POLL_SECONDS = parseInt(process.env.POLL_SECONDS || "10", 10)
 const HEARTBEAT_MINUTES = parseInt(process.env.HEARTBEAT_MINUTES || "30", 10)
 
+const projectRoot = path.resolve(__dirname, "..")
 const conf = {
   orchestrator: {
-    inbox: "/srv/agent-bus/orchestrator/inbox",
-    outbox: "/srv/agent-bus/orchestrator/outbox",
-    archive: "/srv/agent-bus/orchestrator/archive",
+    inbox: path.join(projectRoot, ".memory/agent-bus/orchestrator/inbox"),
+    outbox: path.join(projectRoot, ".memory/agent-bus/orchestrator/outbox"),
+    archive: path.join(projectRoot, ".memory/agent-bus/orchestrator/archive"),
     endpoint: "/api/agents/orchestrator",
     method: "POST",
   },
   lister: {
-    inbox: "/srv/agent-bus/sales/inbox",
-    outbox: "/srv/agent-bus/sales/outbox",
-    archive: "/srv/agent-bus/sales/archive",
+    inbox: path.join(projectRoot, ".memory/agent-bus/sales/inbox"),
+    outbox: path.join(projectRoot, ".memory/agent-bus/sales/outbox"),
+    archive: path.join(projectRoot, ".memory/agent-bus/sales/archive"),
     endpoint: "/api/agents/listing",
     method: "POST",
   },
