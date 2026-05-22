@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════════════════════
-   DUNGEON COMMAND CENTER — Phase 3
+   DUNGEON COMMAND CENTER — Quality Pass
+   Atmosphere · Animation · Polish
    ═══════════════════════════════════════════════════════ */
 
 @keyframes bounce-in {
@@ -27,6 +28,26 @@
   50% { box-shadow: 0 0 40px rgba(255,102,0,0.8), 0 0 60px rgba(255,102,0,0.3); }
 }
 .forge-pulse { animation: forge-glow 1.5s ease-in-out infinite; }
+
+/* ═══ DUNGEON ATMOSPHERE ═══ */
+
+@keyframes ember-float {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.1; }
+  25% { transform: translateY(-15px) translateX(5px); opacity: 0.25; }
+  50% { transform: translateY(-8px) translateX(-5px); opacity: 0.15; }
+  75% { transform: translateY(-20px) translateX(3px); opacity: 0.2; }
+}
+
+@keyframes room-breathe {
+  0%, 100% { box-shadow: 0 0 8px rgba(212,160,60,0.1); }
+  50% { box-shadow: 0 0 12px rgba(212,160,60,0.18); }
+}
+
+@keyframes count-up {
+  0% { transform: translateY(4px); opacity: 0.5; filter: blur(1px); }
+  100% { transform: translateY(0); opacity: 1; filter: blur(0); }
+}
+.animate-count { animation: count-up 0.4s ease-out; }
 
 .pixelated {
   image-rendering: pixelated;

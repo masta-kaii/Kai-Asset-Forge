@@ -164,6 +164,17 @@ function NeonPathways({ activeStep, walks, meetings }: { activeStep: number; wal
               filter={hasMeeting ? "url(#neon-glow-strong)" : isActive ? "url(#neon-glow-strong)" : "url(#neon-glow)"}
               className={hasMeeting ? "animate-pulse" : ""}
             />
+            {/* Flowing particles on active pathways */}
+            {isActive && (
+              <circle r="0.8" fill="#00ff88" filter="url(#neon-glow-strong)" opacity="0.8">
+                <animateMotion dur="1.5s" repeatCount="indefinite" path={p.d} />
+              </circle>
+            )}
+            {isActive && (
+              <circle r="0.6" fill="#88ffcc" filter="url(#neon-glow-strong)" opacity="0.5">
+                <animateMotion dur="2s" repeatCount="indefinite" path={p.d} begin="0.5s" />
+              </circle>
+            )}
           </g>
         )
       })}
@@ -220,11 +231,11 @@ function SpeechBubble({ text, color, onDone }: { text: string; color: string; on
 // ═══════════════════════════════════════════════════════════
 
 function RoomNode({
-  agent, status, isSelected, onClick, isWalkingAway, speech,
+  agent, status, isSelected, onClick, isWalkingAway, speech, frame,
 }: {
   agent: { id: string; label: string; role: string; icon: string; color: string; gridX: number; gridY: number }
   status: KanbanAgent | undefined; isSelected: boolean; onClick: () => void
-  isWalkingAway: boolean; speech: string | undefined
+  isWalkingAway: boolean; speech: string | undefined; frame: number
 }) {
   const isWorking = (status?.activeCount ?? 0) > 0
   const isReady = (status?.readyCount ?? 0) > 0 && !isWorking
@@ -250,7 +261,7 @@ function RoomNode({
 
       <div className="relative z-10 mb-1">
         <div className="relative">
-          <Image src={`/sprites/agents/${agent.id}/idle_f0.png`} alt={agent.label} width={32} height={56} className={`pixelated ${isWalkingAway ? "opacity-30" : ""}`} unoptimized />
+          <Image src={`/sprites/agents/${agent.id}/idle_f${frame % 4}.png`} alt={agent.label} width={32} height={56} className={`pixelated ${isWalkingAway ? "opacity-30" : ""}`} unoptimized />
           <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full border border-black/50" style={{ backgroundColor: isBlocked ? "#ff3344" : isWorking ? "#00ff88" : isReady ? "#ffaa00" : "#555", boxShadow: isWorking ? "0 0 6px #00ff88" : isBlocked ? "0 0 6px #ff3344" : "none" }} />
         </div>
       </div>
@@ -436,8 +447,26 @@ export default function WorkstationPage() {
   const prevPipelineRef = useRef<number>(-1)
   const prevAllDoneRef = useRef(false)
 
+  // Sprite animation
+  const [spriteFrame, setSpriteFrame] = useState(0)
+  const rafRef = useRef<number>(0)
+  const lastFrameRef = useRef(0)
+
   // Audio init
   const initAudio = useCallback(() => { getAudioCtx() }, [])
+
+  // ═══ SPRITE ANIMATION: Cycle idle frames ═══
+  useEffect(() => {
+    function tick(ts: number) {
+      if (ts - lastFrameRef.current > 180) {
+        lastFrameRef.current = ts
+        setSpriteFrame(f => (f + 1) % 4)
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [])
 
   // ═══ SOUL SYSTEM: Random chatter ═══
   useEffect(() => {
@@ -633,7 +662,31 @@ export default function WorkstationPage() {
         </div>
 
         {/* CENTRAL — Factory Floor */}
-        <div className="flex-1 relative p-4">
+        <div className="flex-1 relative p-4 overflow-hidden">
+          {/* ═══ DUNGEON ATMOSPHERE ═══ */}
+          <div className="absolute inset-0 pointer-events-none z-0" style={{
+            background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 85%, rgba(0,0,0,0.9) 100%)",
+          }} />
+          {/* Floating ember particles */}
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={`ember-${i}`} className="absolute rounded-full pointer-events-none z-0"
+              style={{
+                width: `${2 + Math.random() * 3}px`, height: `${2 + Math.random() * 3}px`,
+                left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`,
+                background: i % 3 === 0 ? "#ffaa00" : i % 3 === 1 ? "#ff6600" : "#ffd700",
+                boxShadow: `0 0 ${3 + Math.random() * 4}px currentColor`,
+                opacity: 0.15 + Math.random() * 0.25,
+                animation: `ember-float ${3 + Math.random() * 5}s ease-in-out infinite`,
+                animationDelay: `${Math.random() * 5}s`,
+              }}
+            />
+          ))}
+          {/* Floor grid lines */}
+          <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none"
+            style={{
+              backgroundImage: "linear-gradient(rgba(212,160,60,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(212,160,60,0.5) 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+            }} />
           <NeonPathways activeStep={kanban?.pipeline.currentStep ?? -1} walks={walks} meetings={meetings} />
           <div className="relative z-10 w-full h-full grid gap-3" style={{ gridTemplateColumns: "repeat(3, 1fr)", gridTemplateRows: "repeat(2, 1fr)" }}>
             {AGENTS.map(agent => (
@@ -641,6 +694,7 @@ export default function WorkstationPage() {
                 isSelected={selectedAgent === agent.id} onClick={() => setSelectedAgent(agent.id)}
                 isWalkingAway={walks.some(w => w.agentId === agent.id)}
                 speech={speeches[agent.id]}
+                frame={spriteFrame}
               />
             ))}
           </div>
