@@ -30,6 +30,26 @@ export interface AssetPack {
   previewUrl: string
   storeUrl?: string
   createdAt: string
+  theme?: string
+  qualityScore?: number
+  assetCount?: number
+  packPreviewUrls?: string[]
+  tags?: string[]
+  category?: 'creatures' | 'weapons' | 'items' | 'environment' | 'ui' | 'mixed'
+}
+
+export interface PackLibraryEntry {
+  id: string
+  title: string
+  theme: string
+  qualityScore: number
+  assetCount: number
+  previewUrls: string[]
+  status: 'draft' | 'ready' | 'published'
+  price: number
+  category: string
+  description: string
+  tags: string[]
 }
 
 export interface GenerationRecord {

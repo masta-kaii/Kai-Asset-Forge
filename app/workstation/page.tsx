@@ -1,196 +1,34 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  Play, Pause, Zap, Loader2, Wifi, WifiOff, Clock,
-  Cpu, Brain, Activity, TrendingUp, CheckCircle2, XCircle,
-  AlertTriangle, Package, Sparkles, ScrollText,
-  X, Monitor, MessageSquare, ChevronRight, Library, FileText, ListChecks,
-  MapPin, Eye, Footprints, RefreshCw, Grid, Wallpaper,
+  Zap, Loader2, Clock,
+  Cpu, Activity, Sparkles, ScrollText,
+  X, Library, FileText, ListChecks,
+  Eye, Footprints, RefreshCw,
   Building2, Moon, Star, Volume2, VolumeX,
+  Hammer, Trophy, Coins, Skull, Flame,
+  BookOpen, Gem, ArrowUpDown,
 } from "lucide-react"
 import { CuratorPanel } from "@/components/workstation/curator-panel"
 import { ScoutPanel } from "@/components/workstation/scout-panel"
 import { ListerPanel } from "@/components/workstation/lister-panel"
-import type { Asset } from "@/lib/types"
+import type { Asset, PackLibraryEntry } from "@/lib/types"
 import "./kairosoft-theme.css"
 import {
   playPipelineStart, playStepComplete, playCycleComplete,
-  playAgentClick, playLogNotification, initAudio,
+  playAgentClick, playLogNotification,
   startAmbientDrone, stopAmbientDrone,
 } from "@/lib/factory-audio"
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Configuration
-// ═══════════════════════════════════════════════════════════════════════════
-
-const FRAME_INTERVAL = 200
-const SCALE = 3
-const PIPELINE_TICK_MS = 2000 // scheduler tick every 2s
-const PIPELINE_STEP_DURATION = 8000 // 8 seconds per pipeline step
-const WALK_SPEED = 0.02 // progress per tick
-const RANDOM_WALK_INTERVAL_MS = 12000 // agents randomly walk to visit buddies
-const POPO_CHECK_INTERVAL_MS = 15000 // popo checks on agents
-
-interface AgentDef {
-  id: string; label: string; role: string
-  homeX: number; homeY: number
-  floorTile: string
-  wallDecor?: string
-  prop?: string
-  color: string // theme color
-}
-
-const AGENTS: AgentDef[] = [
-  { id: "scout",    label: "Scout",   role: "Intel",    homeX: 0, homeY: 0, floorTile: "2", color: "#22c55e" },
-  { id: "forge",    label: "Forge",   role: "Prod",     homeX: 1, homeY: 0, floorTile: "3", prop: "floor_ladder", color: "#f97316" },
-  { id: "curator",  label: "Curator", role: "QA",       homeX: 2, homeY: 0, floorTile: "1", prop: "column", color: "#eab308" },
-  { id: "popo",     label: "Popo",    role: "CEO ✦ CMD",homeX: 0, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column", color: "#fbbf24" },
-  { id: "packager", label: "Packager",role: "Assembly", homeX: 1, homeY: 1, floorTile: "7", prop: "crate", color: "#fb923c" },
-  { id: "lister",   label: "Lister",  role: "Sales",    homeX: 2, homeY: 1, floorTile: "5", prop: "crate", color: "#3b82f6" },
-  { id: "testbench",label: "Test",    role: "Bench ✦",  homeX: 1, homeY: 2, floorTile: "4", prop: "column", color: "#a855f7" },
-]
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Pipeline Config
-// ═══════════════════════════════════════════════════════════════════════════
-
-const PIPELINE_STEPS = [
-  { id: 0, name: "SCAN",  agentId: "scout",    label: "Scanning markets..." },
-  { id: 1, name: "FORGE", agentId: "forge",    label: "Forging assets..." },
-  { id: 2, name: "QC",    agentId: "curator",  label: "Inspecting quality..." },
-  { id: 3, name: "BUNDLE",agentId: "packager", label: "Bundling packs..." },
-  { id: 4, name: "LIST",  agentId: "lister",   label: "Listing for sale..." },
-] as const
-
-function nextPipelineStep(current: number): number {
-  return (current + 1) % PIPELINE_STEPS.length
-}
-
-function prevPipelineStep(current: number): number {
-  return (current - 1 + PIPELINE_STEPS.length) % PIPELINE_STEPS.length
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Soul Dialogues
-// ═══════════════════════════════════════════════════════════════════════════
-
-const SOUL_LINES: Record<string, string[]> = {
-  scout: [
-    "Intel incoming!", "The markets are whispering...", "I found something BIG!",
-    "Trend spotted!", "My eyes don't miss a thing!",
-  ],
-  forge: [
-    "By the hammer!", "The forge is HOT!", "Another masterpiece!",
-    "Feel the HEAT!", "I'll forge you something magnificent!",
-  ],
-  curator: [
-    "Inspecting...", "Quality check in progress.", "Flawless. Passed with honors.",
-    "This needs rework.", "I am the shield that guards the standard!",
-  ],
-  packager: [
-    "BUNDLE TIME!", "So many assets to organize!", "PERFECT bundle!",
-    "This goes with THAT!", "Beautiful organization!",
-  ],
-  lister: [
-    "A fine choice!", "Let me make this irresistible!", "LISTED!",
-    "This pack writes its own ticket!", "LIMITED EDITION!",
-  ],
-  popo: [
-    "All agents report!", "The factory thrives!", "Excellent work, team!",
-    "Keep the forge burning!", "Popo is watching!",
-  ],
-  testbench: [
-    "Come see the latest forges!", "Asset showcase ready!",
-    "Share-worthy preview!", "Zoom in on the details!",
-    "Spin it, zoom it, share it!",
-  ],
-}
-
-const MEETING_LINES: Record<string, string> = {
-  "scout-forge": "Found a hot trend, Forge! Get your hammer ready!",
-  "forge-curator": "Fresh off the anvil! Tell me it's perfect.",
-  "curator-packager": "Approved assets ready for bundling.",
-  "packager-lister": "Premium packs ready for the market!",
-  "popo-scout": "How's the factory running?",
-  "popo-forge": "How's the factory running?",
-  "popo-curator": "How's the factory running?",
-  "popo-packager": "How's the factory running?",
-  "popo-lister": "How's the factory running?",
-}
-
-function randomSoulLine(agentId: string): string {
-  const lines = SOUL_LINES[agentId] ?? ["..."]
-  return lines[Math.floor(Math.random() * lines.length)]
-}
-
-function meetingLine(a: string, b: string): string {
-  const key = `${a}-${b}`
-  const reverseKey = `${b}-${a}`
-  return MEETING_LINES[key] ?? MEETING_LINES[reverseKey] ?? "Hey there!"
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Types
-// ═══════════════════════════════════════════════════════════════════════════
-
-type AgentStatus = "idle" | "walking" | "meeting" | "working" | "done"
-
-interface WalkTarget {
-  targetX: number; targetY: number
-  walkProgress: number // 0 → 1
-  fromX: number; fromY: number
-}
-
-interface AgentState {
-  status: AgentStatus
-  message: string
-  gridX: number; gridY: number
-  pulse: boolean
-  frame: number
-  facing: "right" | "left"
-  animMode: "idle" | "run"
-  walk: WalkTarget | null
-  dialogueTimer: number // countdown ticks until next random line
-}
-
-interface LogEntry {
-  id: number; time: string; agent: string; msg: string
-  type: "info" | "ok" | "warn" | "err"
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════════════════════════════
-
-function now(): string { return new Date().toLocaleTimeString("en-US", { hour12: false }) }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Status helpers
-// ═══════════════════════════════════════════════════════════════════════════
-
-const statusVariants: Record<string, { cls: string; icon: typeof CheckCircle2 }> = {
-  idle:     { cls: "border-stone-600/30 bg-stone-800/30 text-stone-400", icon: Monitor },
-  scanning: { cls: "border-blue-500/30 bg-blue-950/30 text-blue-400", icon: Activity },
-  forging:  { cls: "border-amber-500/30 bg-amber-950/30 text-amber-400", icon: Zap },
-  packaging:{ cls: "border-violet-500/30 bg-violet-950/30 text-violet-400", icon: Package },
-  publishing:{cls: "border-emerald-500/30 bg-emerald-950/30 text-emerald-400", icon: TrendingUp },
-  blocked:  { cls: "border-red-500/30 bg-red-950/30 text-red-400", icon: AlertTriangle },
-  paused:   { cls: "border-yellow-500/30 bg-yellow-950/30 text-yellow-400", icon: Pause },
-}
-
-function logTypeColor(type: string) {
-  switch (type) {
-    case "ok": return "#34d399"
-    case "warn": return "#fbbf24"
-    case "err": return "#f87171"
-    default: return "#a1a1aa"
-  }
-}
+import {
+  FRAME_INTERVAL, SCALE, PIPELINE_TICK_MS, PIPELINE_STEP_DURATION, WALK_SPEED,
+  AGENTS, PIPELINE_STEPS, nextPipelineStep, prevPipelineStep,
+  SOUL_LINES, MEETING_LINES, randomSoulLine, meetingLine,
+  now, logTypeColor,
+  type AgentDef, type AgentStatus, type WalkTarget, type AgentState, type LogEntry,
+} from "@/lib/workstation-config"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Sprite component (with animMode support)
@@ -308,7 +146,6 @@ export default function WorkstationPage() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [showLogModal, setShowLogModal] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
-  const [showForgeModal, setShowForgeModal] = useState(false)
 
   // Pipeline state
   const [currentPipelineStep, setCurrentPipelineStep] = useState(0)
@@ -346,6 +183,95 @@ export default function WorkstationPage() {
   const [bgMode, setBgMode] = useState<"transparent" | "grid" | "dungeon">("grid")
   const [testBenchZoom, setTestBenchZoom] = useState(3)
 
+  // 🎮 XP / Gold / Level system
+  const [xp, setXp] = useState(0)
+  const [gold, setGold] = useState(0)
+  const [level, setLevel] = useState(1)
+  const xpToNext = level * 100
+
+  // 🏆 Achievement system
+  interface Achievement { id: string; title: string; desc: string; icon: string; unlocked: boolean }
+  const [achievements, setAchievements] = useState<Achievement[]>([
+    { id: "first_cycle", title: "First Cycle!", desc: "Complete your first pipeline cycle", icon: "🔄", unlocked: false },
+    { id: "forge_10", title: "Mass Production", desc: "Reach 10 pipeline cycles", icon: "🔨", unlocked: false },
+    { id: "forge_25", title: "Factory Veteran", desc: "Reach 25 pipeline cycles", icon: "⚡", unlocked: false },
+    { id: "forge_50", title: "Master Forger!", desc: "Reach 50 pipeline cycles", icon: "👑", unlocked: false },
+    { id: "meeting", title: "Team Meeting!", desc: "Witness agents meet for the first time", icon: "🤝", unlocked: false },
+    { id: "rich_100", title: "Gold Hoarder", desc: "Accumulate 100 gold", icon: "💰", unlocked: false },
+    { id: "rich_500", title: "Treasure Vault", desc: "Accumulate 500 gold", icon: "🏦", unlocked: false },
+    { id: "level_5", title: "Rising Star", desc: "Reach Level 5", icon: "⭐", unlocked: false },
+  ])
+  const [showAchievement, setShowAchievement] = useState(false)
+  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null)
+  const achievementTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 🔨 Forge Modal state
+  const [forgeModalOpen, setForgeModalOpen] = useState(false)
+  const [forgeTheme, setForgeTheme] = useState("fantasy creatures")
+  const [forgeCount, setForgeCount] = useState(3)
+  const [forgeSubmitting, setForgeSubmitting] = useState(false)
+  const [forgeResult, setForgeResult] = useState<string | null>(null)
+
+  // ⚡ Killswitch
+  const [pipelinePaused, setPipelinePaused] = useState(false)
+
+  // 📚 Asset Pack Library state
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [selectedPack, setSelectedPack] = useState<PackLibraryEntry | null>(null)
+  const [librarySort, setLibrarySort] = useState<"quality" | "newest" | "price">("quality")
+  const [libraryFilter, setLibraryFilter] = useState<string>("all")
+
+  // Generate pack library from pipeline progress
+  const packLibrary = useMemo<PackLibraryEntry[]>(() => {
+    const themes = [
+      { name: "Dragon Hoard", theme: "dragon eggs & treasure", category: "creatures", baseScore: 8 },
+      { name: "Crystal Cavern", theme: "magic crystals & gems", category: "items", baseScore: 7 },
+      { name: "Shadow Realm", theme: "dark rituals & demons", category: "creatures", baseScore: 9 },
+      { name: "Forest Spirits", theme: "nature sprites & fairies", category: "creatures", baseScore: 6 },
+      { name: "Forged Steel", theme: "weapons & armor", category: "weapons", baseScore: 8 },
+      { name: "Arcane Tomes", theme: "spell books & scrolls", category: "ui", baseScore: 7 },
+      { name: "Potion Cabinet", theme: "alchemy bottles & elixirs", category: "items", baseScore: 8 },
+      { name: "Dungeon Decor", theme: "torches, chains, banners", category: "environment", baseScore: 6 },
+      { name: "Monster Manual", theme: "creature sprites pack", category: "creatures", baseScore: 9 },
+      { name: "Treasure Vault", theme: "gold coins, crowns, gems", category: "mixed", baseScore: 8 },
+      { name: "Battle Arena", theme: "arena tiles & props", category: "environment", baseScore: 7 },
+      { name: "Inferno Forge", theme: "fire & lava assets", category: "weapons", baseScore: 9 },
+    ]
+
+    // More pipeline cycles = more packs unlocked
+    const unlockedCount = Math.min(themes.length, Math.floor(pipelineCycle / 2) + 1)
+    
+    return themes.slice(0, unlockedCount).map((t, i) => {
+      const quality = Math.min(10, t.baseScore + Math.floor(pipelineCycle / 10) + (Math.random() > 0.5 ? 1 : 0))
+      const assetCount = 3 + Math.floor(Math.random() * 5) + Math.floor(pipelineCycle / 2)
+      const price = quality >= 8 ? 7.99 : quality >= 6 ? 4.99 : 2.99
+      const status: PackLibraryEntry["status"] = quality >= 7 ? "ready" : quality >= 5 ? "ready" : "draft"
+      
+      return {
+        id: `pack-${i}`,
+        title: t.name,
+        theme: t.theme,
+        qualityScore: quality,
+        assetCount: Math.min(assetCount, 8),
+        previewUrls: [],
+        status,
+        price,
+        category: t.category,
+        description: `A curated pack of ${t.theme} — ${assetCount} hand-crafted pixel art assets forged in the dungeon depths. Quality rated ${quality}/10 by the Curator.`,
+        tags: t.theme.split(/[,\s&]+/).filter(w => w.length > 2).concat(["pixel-art", "game-assets"]),
+      }
+    })
+  }, [pipelineCycle])
+
+  const sortedLibrary = useMemo(() => {
+    const sorted = [...packLibrary]
+    if (librarySort === "quality") sorted.sort((a, b) => b.qualityScore - a.qualityScore)
+    if (librarySort === "newest") sorted.reverse()
+    if (librarySort === "price") sorted.sort((a, b) => b.price - a.price)
+    if (libraryFilter !== "all") return sorted.filter(p => p.category === libraryFilter)
+    return sorted
+  }, [packLibrary, librarySort, libraryFilter])
+
   // Fetch assets for Test Bench
   const fetchAssets = useCallback(async () => {
     setAssetsLoading(true)
@@ -371,6 +297,8 @@ export default function WorkstationPage() {
   pipelineStepRef.current = currentPipelineStep
   const pipelineCycleRef = useRef(pipelineCycle)
   pipelineCycleRef.current = pipelineCycle
+  const pipelinePausedRef = useRef(pipelinePaused)
+  pipelinePausedRef.current = pipelinePaused
 
   // ── Logging ──
   const addLog = useCallback((agent: string, msg: string, type: LogEntry["type"] = "info") => {
@@ -383,6 +311,32 @@ export default function WorkstationPage() {
   useEffect(() => {
     const i = setInterval(() => setUptime((u) => u + 1), 1000)
     return () => clearInterval(i)
+  }, [])
+
+  // ── Real Agent Data (Hermes Kanban API) ──
+  interface AgentApiTask {
+    id: string; status: string; assignee: string; title: string
+    hasFiles: boolean; fileCount: number; summary?: string
+  }
+  interface AgentApiData {
+    agents: Record<string, { tasks: AgentApiTask[]; activeCount: number; doneCount: number; blockedCount: number }>
+    totalTasks: number; kanbanStats: string; timestamp: number
+  }
+  const [agentApiData, setAgentApiData] = useState<AgentApiData | null>(null)
+  
+  useEffect(() => {
+    async function poll() {
+      try {
+        const res = await fetch("/api/agents/status")
+        if (res.ok) {
+          const data = await res.json()
+          setAgentApiData(data)
+        }
+      } catch { /* API not available yet */ }
+    }
+    poll()
+    const interval = setInterval(poll, 15000) // every 15s
+    return () => clearInterval(interval)
   }, [])
 
   // ── Frame animation (single rAF) ──
@@ -473,6 +427,9 @@ export default function WorkstationPage() {
     let stepTimer = 0
 
     schedulerRef.current = setInterval(() => {
+      // ⚡ Killswitch guard — skip if paused
+      if (pipelinePausedRef.current) return
+
       const currentStepIdx = pipelineStepRef.current
       const currentCycle = pipelineCycleRef.current
       stepTimer += PIPELINE_TICK_MS
@@ -820,12 +777,81 @@ export default function WorkstationPage() {
     return () => clearInterval(doneReset)
   }, [])
 
+  // ── Achievement detection + XP/Gold earning ──
+  const levelRef = useRef(level)
+  levelRef.current = level
+  const goldRef = useRef(gold)
+  goldRef.current = gold
+
+  useEffect(() => {
+    // Earn XP and gold per cycle
+    if (pipelineCycle > 0) {
+      const earnedXp = 10 + Math.floor(Math.random() * 15)
+      const earnedGold = 3 + Math.floor(Math.random() * 8)
+      setXp((x) => {
+        const newXp = x + earnedXp
+        if (newXp >= levelRef.current * 100) {
+          setLevel((l) => l + 1)
+          return newXp - levelRef.current * 100
+        }
+        return newXp
+      })
+      setGold((g) => g + earnedGold)
+    }
+
+    // Check achievements (runs slightly after state update via setTimeout)
+    setTimeout(() => {
+      setAchievements((prev) => {
+        const unlocked = prev.find(a => !a.unlocked && (
+          (a.id === "first_cycle" && pipelineCycle >= 1) ||
+          (a.id === "forge_10" && pipelineCycle >= 10) ||
+          (a.id === "forge_25" && pipelineCycle >= 25) ||
+          (a.id === "forge_50" && pipelineCycle >= 50) ||
+          (a.id === "rich_100" && goldRef.current >= 100) ||
+          (a.id === "rich_500" && goldRef.current >= 500) ||
+          (a.id === "level_5" && levelRef.current >= 5)
+        ))
+        if (unlocked) {
+          setCurrentAchievement(unlocked)
+          setShowAchievement(true)
+          if (achievementTimer.current) clearTimeout(achievementTimer.current)
+          achievementTimer.current = setTimeout(() => setShowAchievement(false), 4000)
+          addLog("popo", `🏆 Achievement: ${unlocked.title}!`, "ok")
+          return prev.map(a => a.id === unlocked.id ? { ...a, unlocked: true } : a)
+        }
+        return prev
+      })
+    }, 100)
+  }, [pipelineCycle])
+
+  // ── Meeting achievement check ──
+  useEffect(() => {
+    const hasMeeting = Object.values(agents).some(a => a.status === "meeting")
+    if (hasMeeting) {
+      setAchievements((prev) => {
+        const ach = prev.find(a => a.id === "meeting" && !a.unlocked)
+        if (ach) {
+          setCurrentAchievement(ach)
+          setShowAchievement(true)
+          if (achievementTimer.current) clearTimeout(achievementTimer.current)
+          achievementTimer.current = setTimeout(() => setShowAchievement(false), 4000)
+          addLog("popo", `🏆 Achievement: ${ach.title}!`, "ok")
+          return prev.map(a => a.id === "meeting" ? { ...a, unlocked: true } : a)
+        }
+        return prev
+      })
+    }
+  }, [agents])
+
   // ── Keyboard shortcuts ──
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       switch (e.key.toLowerCase()) {
-        case "escape": setSelectedAgent(null); setShowForgeModal(false); setShowLogModal(false); break
+        case "escape": setSelectedAgent(null); setShowLogModal(false); setForgeModalOpen(false); setLibraryOpen(false); setSelectedPack(null); break
+        case "l": setLibraryOpen(true); break
+        case "f": setForgeModalOpen(true); break
+        case "k": setPipelinePaused((p) => !p); addLog("popo", pipelinePaused ? "Killswitch RELEASED — pipeline resuming!" : "⚠ KILLSWITCH ENGAGED — pipeline halted!", pipelinePaused ? "ok" : "warn"); break
         default:
           if (e.key >= "1" && e.key <= "9") {
             const idx = parseInt(e.key) - 1
@@ -861,8 +887,8 @@ export default function WorkstationPage() {
       <div className="shrink-0 flex items-center gap-4 px-4 py-1.5 bg-stone-900/95 border-b border-yellow-900/30 font-mono text-[11px] z-30 relative">
         {/* Status */}
         <div className="flex items-center gap-1.5">
-          <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#34d399] animate-pulse" />
-          <span className="text-emerald-400">LIVE</span>
+          <div className={`h-2 w-2 rounded-full ${pipelinePaused ? "bg-red-500 shadow-[0_0_6px_#ef4444] animate-pulse" : "bg-emerald-500 shadow-[0_0_6px_#34d399] animate-pulse"}`} />
+          <span className={pipelinePaused ? "text-red-400" : "text-emerald-400"}>{pipelinePaused ? "HALTED" : "LIVE"}</span>
         </div>
 
         <div className="w-px h-4 bg-yellow-900/40" />
@@ -896,10 +922,46 @@ export default function WorkstationPage() {
             <Cpu className="h-3 w-3 text-stone-500" />
             <span className="font-mono tabular-nums">Cycle #{pipelineCycle}</span>
           </span>
+          {/* XP Bar */}
+          <span className="flex items-center gap-1 text-[10px]">
+            <Star className="h-3 w-3 text-yellow-500" />
+            <span className="font-mono text-yellow-400 tabular-nums">Lv.{level}</span>
+            <div className="w-16 h-1.5 bg-stone-800 rounded-full overflow-hidden border border-stone-700/50">
+              <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full transition-all duration-500" style={{ width: `${(xp / xpToNext) * 100}%` }} />
+            </div>
+            <span className="font-mono text-stone-500 text-[9px]">{xp}/{xpToNext}</span>
+          </span>
+          {/* Gold */}
+          <span className="flex items-center gap-1 text-[10px]">
+            <Coins className="h-3 w-3 text-amber-400" />
+            <span className="font-mono text-amber-300 tabular-nums">{gold}</span>
+          </span>
         </div>
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Real Agent Activity (from Hermes Kanban) */}
+        {agentApiData && (
+          <div className="flex items-center gap-3 text-[10px]">
+            <span className="text-stone-500">KANBAN</span>
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+              <span className="text-stone-400">{agentApiData.totalTasks} tasks</span>
+            </span>
+            {["scout","forge","curator","packager","lister"].map((id) => {
+              const a = agentApiData.agents[id]
+              return a ? (
+                <span key={id} className="flex items-center gap-0.5">
+                  <span className={a.blockedCount > 0 ? "text-red-400" : a.activeCount > 0 ? "text-emerald-400" : "text-stone-500"}>
+                    {id[0].toUpperCase()}
+                  </span>
+                  <span className="text-stone-600">{a.doneCount}</span>
+                </span>
+              ) : null
+            })}
+          </div>
+        )}
 
         {/* Uptime */}
         <div className="flex items-center gap-1 text-stone-500 text-[10px]">
@@ -913,7 +975,28 @@ export default function WorkstationPage() {
           <ScrollText className="h-3 w-3" />
           LOG
         </button>
+
+        {/* Library button */}
+        <button onClick={() => setLibraryOpen(true)}
+          className="flex items-center gap-1 px-2 py-0.5 rounded border border-violet-700/30 hover:border-violet-500/50 text-violet-400 hover:text-violet-300 transition-colors text-[10px] bg-violet-950/20">
+          <BookOpen className="h-3 w-3" />
+          LIBRARY
+        </button>
       </div>
+
+      {/* ═══════ ACHIEVEMENT TOAST ═══════ */}
+      {showAchievement && currentAchievement && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[60] animate-slide-down pointer-events-none">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-yellow-500/60 bg-stone-900/95 shadow-[0_0_30px_rgba(255,200,50,0.3)] backdrop-blur">
+            <span className="text-2xl">{currentAchievement.icon}</span>
+            <div>
+              <p className="font-mono text-sm text-yellow-300 font-bold tracking-wider">{currentAchievement.title}</p>
+              <p className="font-mono text-[10px] text-stone-400">{currentAchievement.desc}</p>
+            </div>
+            <Trophy className="h-5 w-5 text-yellow-500" />
+          </div>
+        </div>
+      )}
 
       {/* ═══════ DUNGEON FLOOR — FULL SCREEN ═══════ */}
       <div className="flex-1 relative overflow-hidden">
@@ -1013,7 +1096,7 @@ export default function WorkstationPage() {
                         width: 16 * SCALE,
                         height: 16 * SCALE,
                       }}>
-                        <Image src={`/sprites/tiles/${agent.prop}.png`} alt="" width={16 * SCALE} height={16 * SCALE} className="pixelated" unoptimized />
+                        <Image src={`/sprites/${agent.propDir || "tiles"}/${agent.prop}.png`} alt="" width={16 * SCALE} height={16 * SCALE} className="pixelated" unoptimized />
                       </div>
                     )}
 
@@ -1125,6 +1208,44 @@ export default function WorkstationPage() {
         <div className="absolute bottom-8 left-6 z-20 flex gap-3 text-[9px] font-mono text-stone-600">
           <span><span className="text-stone-500">1-6</span> Focus</span>
           <span><span className="text-stone-500">Esc</span> Close</span>
+          <span><span className="text-yellow-500">F</span> Forge</span>
+          <span><span className="text-red-500">K</span> Kill</span>
+          <span><span className="text-violet-400">L</span> Library</span>
+        </div>
+
+        {/* ═══════ FLOATING FORGE BUTTON ═══════ */}
+        <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-2">
+          {/* KILLSWITCH */}
+          <button
+            onClick={() => {
+              setPipelinePaused((p) => {
+                const next = !p
+                addLog("popo", next ? "⚠ KILLSWITCH ENGAGED — pipeline halted!" : "▶ Killswitch RELEASED — pipeline resuming!", next ? "warn" : "ok")
+                return next
+              })
+            }}
+            className={`group relative flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-300 ${
+              pipelinePaused
+                ? "border-red-500 bg-red-950/80 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse"
+                : "border-stone-700/50 bg-stone-900/60 hover:border-red-500/60 hover:bg-red-950/40"
+            }`}
+            title="KILLSWITCH (K)"
+          >
+            <Skull className={`h-5 w-5 transition-colors ${pipelinePaused ? "text-red-400" : "text-stone-500 group-hover:text-red-400"}`} />
+          </button>
+
+          {/* FORGE */}
+          <button
+            onClick={() => {
+              setForgeModalOpen(true)
+              if (soundEnabled) playAgentClick()
+            }}
+            className="group relative flex items-center justify-center w-16 h-16 rounded-full border-2 border-amber-500/60 bg-amber-950/80 hover:bg-amber-900/80 transition-all duration-300 shadow-[0_0_30px_rgba(255,200,50,0.3)] hover:shadow-[0_0_50px_rgba(255,200,50,0.5)] hover:scale-110"
+            title="FORGE (F)"
+          >
+            <Hammer className="h-7 w-7 text-amber-400 group-hover:text-yellow-300 transition-colors animate-bob-slow" />
+            <div className="absolute -inset-1 rounded-full border border-amber-500/20 animate-ping-slow" />
+          </button>
         </div>
       </div>
 
@@ -1142,6 +1263,8 @@ export default function WorkstationPage() {
               case "scout": return <ListChecks className="h-4 w-4" />
               case "lister": return <FileText className="h-4 w-4" />
               case "testbench": return <Eye className="h-4 w-4" />
+              case "treasure": return <Sparkles className="h-4 w-4" />
+              case "armory": return <Zap className="h-4 w-4" />
               default: return <Activity className="h-4 w-4" />
             }
           })()}
@@ -1230,6 +1353,23 @@ export default function WorkstationPage() {
                   </div>
                 </div>
               </div>
+              {/* 🎒 Inventory */}
+              <div className="kairosoft-dept-card col-span-2">
+                <div className="card-title"><span className="card-icon">🎒</span>Inventory</div>
+                <div className="flex gap-2 flex-wrap mt-1">
+                  {[
+                    { name: "Iron Ore", icon: "🪨", qty: 12 + pipelineCycle },
+                    { name: "Gold Bar", icon: "🟡", qty: Math.floor(pipelineCycle / 2) + 2 },
+                    { name: "Dragon Scale", icon: "🛡️", qty: Math.max(1, pipelineCycle) },
+                  ].map((item) => (
+                    <div key={item.name} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-800/60 border border-stone-700/30">
+                      <span className="text-[11px]">{item.icon}</span>
+                      <span className="text-[8px] font-mono text-stone-400">{item.name}</span>
+                      <span className="text-[8px] font-mono text-amber-400">×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1252,6 +1392,23 @@ export default function WorkstationPage() {
                   </div>
                 </div>
               </div>
+              {/* 🎒 Inventory */}
+              <div className="kairosoft-dept-card col-span-2">
+                <div className="card-title"><span className="card-icon">🎒</span>Inventory</div>
+                <div className="flex gap-2 flex-wrap mt-1">
+                  {[
+                    { name: "Magnifying Glass", icon: "🔍", qty: 1 },
+                    { name: "QC Stamp", icon: "✅", qty: 3 + pipelineCycle },
+                    { name: "Reject Notice", icon: "📋", qty: Math.max(0, Math.floor(pipelineCycle / 5)) },
+                  ].map((item) => (
+                    <div key={item.name} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-800/60 border border-stone-700/30">
+                      <span className="text-[11px]">{item.icon}</span>
+                      <span className="text-[8px] font-mono text-stone-400">{item.name}</span>
+                      <span className="text-[8px] font-mono text-amber-400">×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1264,6 +1421,23 @@ export default function WorkstationPage() {
               <div className="kairosoft-dept-card">
                 <div className="card-title"><span className="card-icon">📈</span>Market Pulse</div>
                 <div className="text-[7px] text-[#8a7a4a]">Summer Beach pack trending</div>
+              </div>
+              {/* 🎒 Inventory */}
+              <div className="kairosoft-dept-card col-span-2">
+                <div className="card-title"><span className="card-icon">🎒</span>Inventory</div>
+                <div className="flex gap-2 flex-wrap mt-1">
+                  {[
+                    { name: "Spyglass", icon: "🔭", qty: 1 },
+                    { name: "Market Intel", icon: "📊", qty: 2 + pipelineCycle },
+                    { name: "Bounty Poster", icon: "📜", qty: Math.floor(pipelineCycle / 3) + 1 },
+                  ].map((item) => (
+                    <div key={item.name} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-800/60 border border-stone-700/30">
+                      <span className="text-[11px]">{item.icon}</span>
+                      <span className="text-[8px] font-mono text-stone-400">{item.name}</span>
+                      <span className="text-[8px] font-mono text-amber-400">×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1282,6 +1456,23 @@ export default function WorkstationPage() {
                   <span className="kairosoft-badge amber">game-assets</span>
                 </div>
               </div>
+              {/* 🎒 Inventory */}
+              <div className="kairosoft-dept-card col-span-2">
+                <div className="card-title"><span className="card-icon">🎒</span>Inventory</div>
+                <div className="flex gap-2 flex-wrap mt-1">
+                  {[
+                    { name: "Bundle Wrapper", icon: "🎁", qty: 1 + Math.floor(pipelineCycle / 2) },
+                    { name: "Packing Tape", icon: "📎", qty: 5 + pipelineCycle },
+                    { name: "Label Maker", icon: "🏷️", qty: 1 },
+                  ].map((item) => (
+                    <div key={item.name} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-800/60 border border-stone-700/30">
+                      <span className="text-[11px]">{item.icon}</span>
+                      <span className="text-[8px] font-mono text-stone-400">{item.name}</span>
+                      <span className="text-[8px] font-mono text-amber-400">×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1294,6 +1485,23 @@ export default function WorkstationPage() {
               <div className="kairosoft-dept-card">
                 <div className="card-title"><span className="card-icon">💰</span>Pricing</div>
                 <div className="text-[7px] text-[#8a7a4a]">$3.99 - $8.99 range</div>
+              </div>
+              {/* 🎒 Inventory */}
+              <div className="kairosoft-dept-card col-span-2">
+                <div className="card-title"><span className="card-icon">🎒</span>Inventory</div>
+                <div className="flex gap-2 flex-wrap mt-1">
+                  {[
+                    { name: "Listing Sheet", icon: "📄", qty: 1 + Math.floor(pipelineCycle / 2) },
+                    { name: "Price Tags", icon: "💰", qty: 3 + pipelineCycle },
+                    { name: "Sales Ledger", icon: "📒", qty: 1 },
+                  ].map((item) => (
+                    <div key={item.name} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-800/60 border border-stone-700/30">
+                      <span className="text-[11px]">{item.icon}</span>
+                      <span className="text-[8px] font-mono text-stone-400">{item.name}</span>
+                      <span className="text-[8px] font-mono text-amber-400">×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1393,10 +1601,46 @@ export default function WorkstationPage() {
                 </div>
               </div>
 
+              {/* 🏆 Achievements */}
+              <div>
+                <p className="text-stone-500 text-[10px] font-mono uppercase mb-2">🏆 Achievements ({achievements.filter(a => a.unlocked).length}/{achievements.length})</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {achievements.map((ach) => (
+                    <div key={ach.id} className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-mono ${
+                      ach.unlocked
+                        ? "border-yellow-600/30 bg-yellow-950/20 text-yellow-300"
+                        : "border-stone-700/20 bg-stone-800/20 text-stone-600"
+                    }`}>
+                      <span className={ach.unlocked ? "" : "grayscale opacity-50"}>{ach.icon}</span>
+                      <span className="truncate">{ach.title}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Agent sprite preview */}
               <div className="flex justify-center py-1">
                 <AgentSprite agentId="popo" frame={selectedAgentState.frame} size={64} facing="right"
                   className="drop-shadow-[0_0_14px_rgba(255,215,0,0.4)]" />
+              </div>
+
+              {/* 🎒 Popo's Inventory */}
+              <div>
+                <p className="text-stone-500 text-[10px] font-mono uppercase mb-2">🎒 Popo's Inventory</p>
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { name: "CEO Badge", icon: "👑", qty: 1 },
+                    { name: "Factory Keys", icon: "🔑", qty: 1 },
+                    { name: "Gold Coins", icon: "🪙", qty: gold },
+                    { name: "Reports", icon: "📋", qty: Math.floor(pipelineCycle / 5) + 1 },
+                  ].map((item) => (
+                    <div key={item.name} className="flex items-center gap-1 px-2 py-1 rounded bg-stone-800/60 border border-stone-700/30">
+                      <span className="text-sm">{item.icon}</span>
+                      <span className="text-[9px] font-mono text-stone-400">{item.name}</span>
+                      <span className="text-[9px] font-mono text-amber-400">×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1563,8 +1807,68 @@ export default function WorkstationPage() {
             </div>
           )}
 
+          {/* 💰 Treasure Vault */}
+          {selectedAgent === "treasure" && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
+                <Sparkles className="h-4 w-4 text-yellow-400" />
+                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">
+                  Treasure Vault · The Factory's Riches
+                </span>
+              </div>
+              <p className="text-stone-500 text-[11px] font-mono leading-relaxed">
+                Glittering gold and precious gems fill this chamber. Every asset the factory
+                produces adds to the treasury. The Vault Guardian watches over the accumulated
+                wealth — coins, gems, crowns, and legendary artifacts.
+              </p>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {["chest_large", "icon_gem", "icon_coin"].map((item) => (
+                  <div key={item} className="bg-stone-800/40 rounded-lg border border-yellow-600/20 p-3 flex flex-col items-center gap-1 hover:border-yellow-500/40 transition-all">
+                    <Image src={`/sprites/${item.startsWith("icon_") ? "ui" : "furniture"}/${item}.png`}
+                      alt={item} width={32} height={32} className="pixelated" unoptimized />
+                    <span className="text-stone-400 text-[9px] font-mono capitalize">{item.replace(/_/g, " ")}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-yellow-900/10 rounded border border-yellow-700/20">
+                <Sparkles className="h-3 w-3 text-yellow-400" />
+                <p className="text-yellow-400/70 text-[10px] font-mono">Pipeline cycle: {pipelineCycle} · Treasury grows with every forge!</p>
+              </div>
+            </div>
+          )}
+
+          {/* ⚔️ Armory */}
+          {selectedAgent === "armory" && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
+                <Zap className="h-4 w-4 text-stone-300" />
+                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">
+                  Armory · Weapons & Gear
+                </span>
+              </div>
+              <p className="text-stone-500 text-[11px] font-mono leading-relaxed">
+                Steel sings and shields gleam. The Armory holds the factory's combat-ready
+                arsenal — axes, bows, staffs, and armor forged in dragon fire. Equip your
+                agents for the battles ahead!
+              </p>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {["axe_battle", "bow", "mace", "dagger", "spear", "wand", "helmet_iron", "crown"].map((item) => (
+                  <div key={item} className="bg-stone-800/40 rounded-lg border border-stone-600/20 p-2 flex flex-col items-center gap-1 hover:border-stone-400/40 transition-all">
+                    <Image src={`/sprites/weapons/${item}.png`}
+                      alt={item} width={24} height={24} className="pixelated" unoptimized />
+                    <span className="text-stone-500 text-[7px] font-mono capitalize text-center leading-tight">{item.replace(/_/g, " ")}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-stone-800/40 rounded border border-stone-700/20">
+                <Zap className="h-3 w-3 text-amber-400" />
+                <p className="text-stone-400 text-[10px] font-mono">14 weapons · 5 armor pieces · Forged in the dungeon depths</p>
+              </div>
+            </div>
+          )}
+
           {/* 🔍 Unknown agent fallback */}
-          {!["popo", "testbench", "forge", "curator", "scout", "packager", "lister"].includes(selectedAgent) && (
+          {!["popo", "testbench", "forge", "curator", "scout", "packager", "lister", "treasure", "armory"].includes(selectedAgent) && (
             <div className="space-y-4">
               {/* Agent sprite preview */}
               <div className="flex justify-center py-2">
@@ -1652,6 +1956,330 @@ export default function WorkstationPage() {
         </GameWindow>
       )}
 
+      {/* ═══════ POPUP: ASSET PACK LIBRARY ═══════ */}
+      {libraryOpen && (
+        <GameWindow
+          title={`📚 ASSET PACK LIBRARY · ${packLibrary.length} Packs`}
+          icon={<BookOpen className="h-4 w-4" />}
+          onClose={() => { setLibraryOpen(false); setSelectedPack(null); setLibraryFilter("all") }}
+          className="kairosoft-window-v2 max-w-2xl! !max-w-[640px]"
+        >
+          <div className="space-y-3">
+            {selectedPack ? (
+              /* 📦 Pack Detail View */
+              <div className="space-y-3">
+                <button onClick={() => setSelectedPack(null)}
+                  className="text-[10px] font-mono text-violet-400 hover:text-violet-300 flex items-center gap-1">
+                  ← Back to Library
+                </button>
+
+                {/* Pack header */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-stone-800/40 border border-violet-700/20">
+                  <div className="shrink-0 w-16 h-16 rounded-lg bg-stone-900/80 border border-stone-700/30 flex items-center justify-center">
+                    <BookOpen className="h-8 w-8 text-violet-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-mono text-sm text-stone-200 font-bold truncate">{selectedPack.title}</h3>
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded text-[8px] font-mono uppercase ${
+                        selectedPack.qualityScore >= 8 ? "bg-emerald-900/40 text-emerald-400 border border-emerald-700/30" :
+                        selectedPack.qualityScore >= 6 ? "bg-amber-900/40 text-amber-400 border border-amber-700/30" :
+                        "bg-red-900/30 text-red-400 border border-red-700/20"
+                      }`}>
+                        {selectedPack.qualityScore}/10
+                      </span>
+                    </div>
+                    <p className="font-mono text-[9px] text-stone-500 mb-2">{selectedPack.description}</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <span className="text-[8px] font-mono text-stone-600 bg-stone-800/50 px-1.5 py-0.5 rounded">
+                        📦 {selectedPack.assetCount} assets
+                      </span>
+                      <span className="text-[8px] font-mono text-stone-600 bg-stone-800/50 px-1.5 py-0.5 rounded">
+                        💰 ${selectedPack.price}
+                      </span>
+                      <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${
+                        selectedPack.status === "ready" ? "bg-emerald-900/30 text-emerald-400" :
+                        selectedPack.status === "published" ? "bg-blue-900/30 text-blue-400" :
+                        "bg-stone-800/30 text-stone-500"
+                      }`}>
+                        {selectedPack.status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pack contents — asset grid */}
+                <div>
+                  <p className="font-mono text-[9px] text-stone-500 uppercase tracking-wider mb-2">
+                    📋 Pack Contents
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Array.from({ length: selectedPack.assetCount }).map((_, i) => {
+                      const assetNames = [
+                        "Dragon Egg", "Gold Coin", "Magic Crystal", "Enchanted Sword",
+                        "Shadow Orb", "Forest Sprite", "Iron Shield", "Spell Scroll",
+                        "Health Potion", "Torch Sconce", "Demon Horn", "Treasure Chest",
+                        "Fire Staff", "Ice Shard", "Thunder Axe", "Void Gem",
+                      ]
+                      const name = assetNames[i % assetNames.length]
+                      const colors = ["#fbbf24", "#a78bfa", "#34d399", "#f97316", "#3b82f6", "#f87171", "#22c55e", "#eab308"]
+                      const color = colors[i % colors.length]
+                      return (
+                        <div key={i} className="bg-stone-800/40 rounded-lg border border-stone-700/20 p-2 flex flex-col items-center gap-1 hover:border-violet-500/30 transition-all">
+                          <div className="w-10 h-10 rounded flex items-center justify-center" style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
+                            <Gem className="h-5 w-5" style={{ color }} />
+                          </div>
+                          <span className="text-[7px] font-mono text-stone-500 text-center leading-tight truncate w-full">
+                            {name}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <div className="h-1 w-1 rounded-full bg-emerald-500" />
+                            <span className="text-[6px] font-mono text-stone-600">
+                              {selectedPack.qualityScore + Math.floor(Math.random() * 2)}/10
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-wrap gap-1">
+                  {selectedPack.tags.map((tag) => (
+                    <span key={tag} className="px-1.5 py-0.5 rounded bg-stone-800/60 text-stone-500 text-[8px] font-mono border border-stone-700/20">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* 📚 Library Grid View */
+              <>
+                {/* Controls */}
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-stone-700/30">
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setLibraryFilter("all")}
+                      className={`px-2 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                        libraryFilter === "all" ? "border-violet-500/50 bg-violet-950/30 text-violet-300" : "border-stone-700/30 text-stone-500 hover:border-stone-600/50"
+                      }`}>
+                      All
+                    </button>
+                    {["creatures", "weapons", "items", "environment", "mixed"].map((cat) => (
+                      <button key={cat} onClick={() => setLibraryFilter(cat)}
+                        className={`px-2 py-0.5 rounded text-[9px] font-mono border transition-all capitalize ${
+                          libraryFilter === cat ? "border-violet-500/50 bg-violet-950/30 text-violet-300" : "border-stone-700/30 text-stone-500 hover:border-stone-600/50"
+                        }`}>
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <ArrowUpDown className="h-3 w-3 text-stone-600" />
+                    {(["quality", "newest", "price"] as const).map((s) => (
+                      <button key={s} onClick={() => setLibrarySort(s)}
+                        className={`px-1.5 py-0.5 rounded text-[8px] font-mono border transition-all ${
+                          librarySort === s ? "border-violet-500/50 bg-violet-950/30 text-violet-300" : "border-stone-700/30 text-stone-500"
+                        }`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pack count */}
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-[9px] text-stone-500">
+                    {sortedLibrary.length} packs · Sorted by <span className="text-violet-400">{librarySort}</span>
+                  </p>
+                  <p className="font-mono text-[8px] text-stone-600">
+                    Unlocks every 2 cycles · {pipelineCycle} cycles
+                  </p>
+                </div>
+
+                {/* Empty state */}
+                {sortedLibrary.length === 0 && (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-8 w-8 text-stone-700 mx-auto mb-2" />
+                    <p className="font-mono text-xs text-stone-600">
+                      No packs yet! Run the pipeline to unlock packs.
+                    </p>
+                  </div>
+                )}
+
+                {/* Pack grid */}
+                <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-1">
+                  {sortedLibrary.map((pack) => {
+                    const scoreColor = pack.qualityScore >= 8 ? "emerald" : pack.qualityScore >= 6 ? "amber" : "red"
+                    const scoreBg = pack.qualityScore >= 8 ? "bg-emerald-900/30 border-emerald-700/30" : pack.qualityScore >= 6 ? "bg-amber-900/30 border-amber-700/30" : "bg-red-900/20 border-red-700/20"
+                    const scoreText = pack.qualityScore >= 8 ? "text-emerald-400" : pack.qualityScore >= 6 ? "text-amber-400" : "text-red-400"
+                    
+                    return (
+                      <button
+                        key={pack.id}
+                        onClick={() => setSelectedPack(pack)}
+                        className="group relative bg-stone-800/40 rounded-lg border border-stone-700/20 p-3 hover:border-violet-500/40 hover:bg-stone-800/70 transition-all text-left"
+                      >
+                        {/* Quality badge */}
+                        <div className={`absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-mono border ${scoreBg} ${scoreText}`}>
+                          {pack.qualityScore}/10
+                        </div>
+
+                        {/* Title */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <Gem className={`h-4 w-4 ${
+                            scoreColor === "emerald" ? "text-emerald-400" : scoreColor === "amber" ? "text-amber-400" : "text-red-400"
+                          }`} />
+                          <span className="font-mono text-xs text-stone-300 font-bold truncate">{pack.title}</span>
+                        </div>
+
+                        {/* Description excerpt */}
+                        <p className="text-[9px] text-stone-500 font-mono leading-relaxed mb-2 line-clamp-2">
+                          {pack.theme}
+                        </p>
+
+                        {/* Stats row */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] font-mono text-stone-600">
+                            📦 {pack.assetCount} assets
+                          </span>
+                          <span className={`text-[8px] font-mono ${
+                            pack.status === "ready" ? "text-emerald-500" : "text-stone-600"
+                          }`}>
+                            ${pack.price} · {pack.status}
+                          </span>
+                        </div>
+
+                        {/* Hover glow */}
+                        <div className="absolute inset-0 rounded-lg border border-violet-500/0 group-hover:border-violet-500/20 transition-all pointer-events-none" />
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </GameWindow>
+      )}
+
+      {/* ═══════ POPUP: FORGE MODAL ═══════ */}
+      {forgeModalOpen && (
+        <GameWindow
+          title="🔨 FORGE · Commission New Assets"
+          icon={<Hammer className="h-4 w-4" />}
+          onClose={() => { setForgeModalOpen(false); setForgeResult(null) }}
+        >
+          <div className="space-y-4">
+            {forgeResult ? (
+              /* 🎉 Success state */
+              <div className="text-center py-6 space-y-3">
+                <div className="text-4xl animate-bounce-in">🔥</div>
+                <p className="font-mono text-sm text-emerald-400 font-bold">{forgeResult}</p>
+                <p className="font-mono text-[10px] text-stone-500">
+                  The agents are hard at work! Check the Test Bench for results.
+                </p>
+                <button
+                  onClick={() => { setForgeModalOpen(false); setForgeResult(null); setForgeTheme("fantasy creatures"); setForgeCount(3) }}
+                  className="kairosoft-btn px-4 py-1 text-xs"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Theme Input */}
+                <div>
+                  <label className="font-mono text-[10px] text-stone-400 uppercase tracking-wider block mb-1">
+                    🎨 Theme
+                  </label>
+                  <input
+                    type="text"
+                    value={forgeTheme}
+                    onChange={(e) => setForgeTheme(e.target.value)}
+                    className="w-full bg-stone-800/80 border border-stone-600/50 rounded px-3 py-2 font-mono text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none placeholder:text-stone-600"
+                    placeholder="e.g. dragon eggs, magic crystals..."
+                  />
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {["fantasy creatures", "magic weapons", "dragon eggs", "pixel potions", "dark rituals", "treasure hoards"].map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setForgeTheme(t)}
+                        className={`px-2 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                          forgeTheme === t
+                            ? "border-amber-500/50 bg-amber-950/30 text-amber-300"
+                            : "border-stone-700/30 text-stone-500 hover:border-stone-600/50"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Asset Count Slider */}
+                <div>
+                  <label className="font-mono text-[10px] text-stone-400 uppercase tracking-wider block mb-1">
+                    📦 Asset Count: <span className="text-amber-400">{forgeCount}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={6}
+                    value={forgeCount}
+                    onChange={(e) => setForgeCount(parseInt(e.target.value))}
+                    className="w-full h-2 bg-stone-800 rounded-lg appearance-none cursor-pointer accent-amber-500 forge-slider"
+                  />
+                  <div className="flex justify-between text-[8px] font-mono text-stone-600 mt-1">
+                    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span>
+                  </div>
+                </div>
+
+                {/* Pipeline Preview */}
+                <div className="bg-stone-800/40 rounded-lg p-3 border border-stone-700/20">
+                  <p className="font-mono text-[9px] text-stone-500 uppercase tracking-wider mb-2">Pipeline Preview</p>
+                  <div className="flex items-center gap-2">
+                    {["Scout", "Forge", "Curator", "Packager", "Lister"].map((name, i) => (
+                      <div key={name} className="flex items-center gap-1 flex-1">
+                        <div className="flex flex-col items-center">
+                          <div className="h-1.5 w-1.5 rounded-full bg-stone-700" />
+                          <span className="text-[7px] font-mono text-stone-600 mt-0.5">{name}</span>
+                        </div>
+                        {i < 4 && <div className="flex-1 h-px bg-stone-700" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit */}
+                <button
+                  disabled={forgeSubmitting}
+                  onClick={() => {
+                    setForgeSubmitting(true)
+                    addLog("forge", `🔨 FORGE COMMISSION: "${forgeTheme}" ×${forgeCount}`, "info")
+                    // Show loading state briefly, then show success
+                    setTimeout(() => {
+                      setForgeSubmitting(false)
+                      setForgeResult(`Commission submitted! "${forgeTheme}" ×${forgeCount} — agents dispatched!`)
+                      // Trigger a pipeline run by resetting step
+                      setStepProgress(0)
+                      setCurrentPipelineStep(0)
+                      setPipelineCycle((c) => c + 1)
+                    }, 800)
+                  }}
+                  className="w-full kairosoft-btn py-2 text-sm font-mono flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {forgeSubmitting ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Forging...</>
+                  ) : (
+                    <><Flame className="h-4 w-4" /> COMMISSION FORGE</>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </GameWindow>
+      )}
+
       {/* ═══════ ANIMATIONS ═══════ */}
       <style jsx>{`
         @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
@@ -1662,6 +2290,13 @@ export default function WorkstationPage() {
         .animate-shake { animation: shake 0.3s ease-in-out infinite; }
         .animate-bounce-in { animation: bounce-in 0.2s ease-out; }
         .animate-meeting-bounce { animation: meeting-bounce 0.8s ease-in-out infinite; }
+        .animate-bob-slow { animation: bob 2s ease-in-out infinite; }
+        .animate-ping-slow { animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+        .animate-slide-down { animation: slide-down 0.3s ease-out; }
+        .animate-slide-up { animation: slide-up 0.3s ease-out; }
+        @keyframes ping-slow { 0% { transform: scale(1); opacity: 1; } 75%, 100% { transform: scale(1.4); opacity: 0; } }
+        @keyframes slide-down { 0% { transform: translateY(-20px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        @keyframes slide-up { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-20px); opacity: 0; } }
         :global(.pixelated) { image-rendering: pixelated; image-rendering: crisp-edges; }
       `}</style>
     </div>
