@@ -134,6 +134,7 @@ function sfxCycleComplete() { [523, 659, 784, 1047].forEach((f, i) => setTimeout
 function sfxAgentClick() { playBeep(660, 0.05, "sine", 0.04) }
 function sfxChatPop() { playBeep(1200, 0.06, "sine", 0.03); setTimeout(() => playBeep(800, 0.06, "sine", 0.03), 60) }
 function sfxForgeStart() { [220, 330, 440, 660].forEach((f, i) => setTimeout(() => playBeep(f, 0.1, "sawtooth", 0.04), i * 80)) }
+function sfxCommandCenter() { [523, 659, 784, 1047, 1318].forEach((f, i) => setTimeout(() => playBeep(f, 0.12, "triangle", 0.06), i * 70)); setTimeout(() => playBeep(1568, 0.3, "triangle", 0.08), 350) }
 
 // ═══════════════════════════════════════════════════════════
 // Neon Pathway SVG
@@ -231,28 +232,38 @@ function SpeechBubble({ text, color, onDone }: { text: string; color: string; on
 // ═══════════════════════════════════════════════════════════
 
 function RoomNode({
-  agent, status, isSelected, onClick, isWalkingAway, speech, frame,
+  agent, status, isSelected, onClick, isWalkingAway, speech, frame, soundOn,
 }: {
   agent: { id: string; label: string; role: string; icon: string; color: string; gridX: number; gridY: number }
   status: KanbanAgent | undefined; isSelected: boolean; onClick: () => void
-  isWalkingAway: boolean; speech: string | undefined; frame: number
+  isWalkingAway: boolean; speech: string | undefined; frame: number; soundOn: boolean
 }) {
   const isWorking = (status?.activeCount ?? 0) > 0
   const isReady = (status?.readyCount ?? 0) > 0 && !isWorking
   const isBlocked = (status?.blockedCount ?? 0) > 0
   const doneCount = status?.doneCount ?? 0
+  const isPopo = agent.id === "popo"
 
   const glowColor = isBlocked ? "rgba(255,51,68,0.5)" : isWorking ? `${agent.color}66` : isReady ? "rgba(0,255,136,0.25)" : "rgba(212,160,60,0.1)"
   const borderColor = isBlocked ? "#ff3344" : isWorking ? agent.color : isSelected ? "#ffd700" : "#d4a03c"
 
+  const spriteSize = isPopo ? 40 : 32
+
   return (
-    <button onClick={() => { onClick(); sfxAgentClick() }}
-      className="relative flex flex-col items-center justify-center rounded-lg transition-all duration-500 group"
+    <button onClick={() => { onClick(); sfxAgentClick(); if (isPopo && soundOn) sfxCommandCenter() }}
+      className={`relative flex flex-col items-center justify-center rounded-lg transition-all duration-500 group ${isPopo ? "popo-room" : ""}`}
       style={{
-        gridColumn: agent.gridX + 1, gridRow: agent.gridY + 1,
-        background: `linear-gradient(135deg, rgba(18,18,26,0.95), rgba(10,10,18,0.95))`,
-        border: `2px solid ${borderColor}`,
-        boxShadow: isWorking || isSelected ? `0 0 20px ${glowColor}, inset 0 0 15px ${glowColor}` : `0 0 8px ${glowColor}`,
+        gridColumn: isPopo ? `${agent.gridX + 1} / span 1` : agent.gridX + 1,
+        gridRow: agent.gridY + 1,
+        background: isPopo
+          ? `linear-gradient(135deg, rgba(30,25,10,0.98), rgba(15,12,5,0.98))`
+          : `linear-gradient(135deg, rgba(18,18,26,0.95), rgba(10,10,18,0.95))`,
+        border: isPopo ? `2.5px solid #ffd700` : `2px solid ${borderColor}`,
+        boxShadow: isPopo
+          ? `0 0 20px rgba(255,215,0,0.3), inset 0 0 15px rgba(255,215,0,0.08)`
+          : (isWorking || isSelected ? `0 0 20px ${glowColor}, inset 0 0 15px ${glowColor}` : `0 0 8px ${glowColor}`),
+        transform: isPopo ? "scale(1.12)" : "scale(1)",
+        zIndex: isPopo ? 5 : 1,
       }}>
       <div className="absolute inset-0 rounded-lg opacity-5" style={{ backgroundImage: "linear-gradient(rgba(212,160,60,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(212,160,60,0.3) 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
 
@@ -261,12 +272,12 @@ function RoomNode({
 
       <div className="relative z-10 mb-1">
         <div className="relative">
-          <Image src={`/sprites/agents/${agent.id}/idle_f${frame % 4}.png`} alt={agent.label} width={32} height={56} className={`pixelated ${isWalkingAway ? "opacity-30" : ""}`} unoptimized />
+          <Image src={`/sprites/agents/${agent.id}/idle_f${frame % 4}.png`} alt={agent.label} width={spriteSize} height={spriteSize * 1.75} className={`pixelated ${isWalkingAway ? "opacity-30" : ""}`} unoptimized />
           <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full border border-black/50" style={{ backgroundColor: isBlocked ? "#ff3344" : isWorking ? "#00ff88" : isReady ? "#ffaa00" : "#555", boxShadow: isWorking ? "0 0 6px #00ff88" : isBlocked ? "0 0 6px #ff3344" : "none" }} />
         </div>
       </div>
       <span className="font-mono text-[9px] tracking-widest z-10" style={{ color: agent.color, textShadow: `0 0 6px ${agent.color}66` }}>{agent.label}</span>
-      <span className="font-mono text-[7px] text-stone-500 z-10">{agent.role}</span>
+      <span className="font-mono text-[7px] text-stone-500 z-10">{isPopo ? "COMMAND" : agent.role}</span>
       {doneCount > 0 && (
         <div className="absolute top-1.5 right-1.5 z-10 bg-stone-900/90 border border-stone-700/50 rounded px-1.5 py-0.5">
           <span className="font-mono text-[8px] text-emerald-400">{doneCount}✓</span>
@@ -594,6 +605,44 @@ export default function WorkstationPage() {
     setForgeLoading(false)
   }, [forgeTheme, soundOn])
 
+  // ═══ AGENT QUICK DISPATCH ═══
+  const [agentDispatchLoading, setAgentDispatchLoading] = useState<string | null>(null)
+  const [agentDispatchSuccess, setAgentDispatchSuccess] = useState<string | null>(null)
+  const dispatchAgentTask = useCallback(async (agentId: string, taskLabel: string) => {
+    setAgentDispatchLoading(agentId)
+    if (soundOn) sfxForgeStart()
+    try {
+      const agent = AGENTS.find(a => a.id === agentId)
+      const res = await fetch("/api/agents/task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          theme: `${agent?.label ?? agentId}: ${taskLabel} — ${forgeTheme || "dungeon pixel art"}`,
+          count: 3,
+          platform: "itch.io",
+        }),
+      })
+      if (res.ok) {
+        setAgentDispatchSuccess(agentId)
+        setTimeout(() => setAgentDispatchSuccess(null), 3000)
+      }
+    } catch {}
+    setAgentDispatchLoading(null)
+  }, [forgeTheme, soundOn])
+
+  // ═══ RECENT ACTIVITY ═══
+  const recentTasks = useMemo(() => {
+    if (!kanban) return []
+    const tasks: { agent: string; title: string; id: string; color: string }[] = []
+    for (const [id, a] of Object.entries(kanban.agents)) {
+      if (a.currentTask) {
+        const agent = AGENTS.find(ag => ag.id === id)
+        tasks.push({ agent: id, title: a.currentTask.title, id: a.currentTask.id, color: agent?.color ?? "#555" })
+      }
+    }
+    return tasks.slice(0, 5)
+  }, [kanban])
+
   // Computed
   const selectedDef = AGENTS.find(a => a.id === selectedAgent)
   const selectedData = selectedAgent ? kanban?.agents[selectedAgent] : undefined
@@ -695,6 +744,7 @@ export default function WorkstationPage() {
                 isWalkingAway={walks.some(w => w.agentId === agent.id)}
                 speech={speeches[agent.id]}
                 frame={spriteFrame}
+                soundOn={soundOn}
               />
             ))}
           </div>
@@ -833,8 +883,147 @@ export default function WorkstationPage() {
         </div>
       )}
 
-      {/* ═══ AGENT POPUP ═══ */}
-      {selectedAgent && selectedDef && (
+      {/* ═══ POPO COMMAND CENTER ═══ */}
+      {selectedAgent === "popo" && selectedDef && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md" onClick={() => setSelectedAgent(null)}>
+          <div className="animate-command-in rounded-lg border-[2.5px] border-amber-400/70 bg-[#0d0d18]/98 shadow-[0_0_60px_rgba(255,200,0,0.25),0_0_120px_rgba(255,180,0,0.1)] max-w-2xl w-[92vw] max-h-[88vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* ── TITLE BAR ── */}
+            <div className="flex items-center justify-between px-4 py-3 border-b-2 border-amber-500/30 bg-gradient-to-r from-amber-950/60 via-amber-900/40 to-amber-950/60">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl animate-bounce">👑</span>
+                <div>
+                  <div className="text-lg font-bold text-amber-300 tracking-[0.15em] drop-shadow-[0_0_10px_rgba(255,200,0,0.5)]">COMMAND CENTER</div>
+                  <div className="text-[9px] text-amber-500/70 tracking-widest">POPO · DUNGEON OVERLORD</div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedAgent(null)} className="p-1.5 rounded hover:bg-red-900/60 text-stone-500 hover:text-red-400 transition-colors"><X className="size-5" /></button>
+            </div>
+
+            {/* ── CONTENT ── */}
+            <div className="p-4 overflow-y-auto flex-1 space-y-4">
+              {/* ── ALL AGENTS STATUS GRID ── */}
+              <div>
+                <div className="text-[9px] text-stone-500 tracking-widest mb-2 flex items-center gap-1.5"><Activity className="h-3 w-3 text-amber-400" />AGENT STATUS OVERVIEW</div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {AGENTS.map(a => {
+                    const d = kanban?.agents[a.id]
+                    const isPopoAgent = a.id === "popo"
+                    return (
+                      <div key={a.id}
+                        className={`rounded p-1.5 border text-center ${isPopoAgent ? "border-amber-400/40 bg-amber-950/20" : "border-stone-700/30 bg-stone-900/40"}`}>
+                        <div className="text-[8px] font-bold mb-0.5" style={{ color: a.color }}>{a.label}</div>
+                        <div className="flex items-center justify-center gap-1 text-[7px] text-stone-500">
+                          <span className="text-emerald-400 font-bold">{d?.activeCount ?? 0}</span>
+                          <span className="text-amber-400">{d?.readyCount ?? 0}</span>
+                          <span className="text-cyan-400">{d?.doneCount ?? 0}</span>
+                          <span className={d?.blockedCount ? "text-red-400 font-bold" : "text-stone-600"}>{(d?.blockedCount ?? 0) > 0 ? d?.blockedCount : 0}</span>
+                        </div>
+                        <div className="text-[6px] text-stone-600 mt-0.5">▶⏳✓⚠</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ── DISPATCH PIPELINE ── */}
+              <button onClick={dispatchForge} disabled={forgeLoading}
+                className="w-full py-3 rounded-lg font-bold text-sm tracking-[0.2em] transition-all duration-300 disabled:opacity-50 gold-shimmer"
+                style={{
+                  background: forgeLoading ? "#444" : "linear-gradient(135deg, #b8860b, #ffd700, #b8860b)",
+                  border: "2.5px solid #ffd700",
+                  boxShadow: forgeLoading ? "none" : "0 0 30px rgba(255,215,0,0.4), 0 0 60px rgba(255,180,0,0.15)",
+                  color: "#1a1a00",
+                  textShadow: "0 1px 0 rgba(255,255,200,0.5)",
+                }}>
+                {forgeLoading ? (
+                  <span className="flex items-center justify-center gap-2"><Sparkles className="h-4 w-4 animate-spin" />DISPATCHING...</span>
+                ) : forgeSuccess ? (
+                  <span className="flex items-center justify-center gap-2">✅ PIPELINE DISPATCHED!</span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">⚡ DISPATCH PIPELINE ⚡</span>
+                )}
+              </button>
+              {agentDispatchSuccess && (
+                <div className="text-center text-[9px] text-emerald-400 animate-slide-up">✓ Agent task dispatched!</div>
+              )}
+
+              {/* ── QUICK ACTION BUTTONS ── */}
+              <div>
+                <div className="text-[9px] text-stone-500 tracking-widest mb-2 flex items-center gap-1.5"><Zap className="h-3 w-3 text-amber-400" />QUICK DISPATCH</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "scout", label: "🔍 SCOUT MARKETS", color: "#00ccff" },
+                    { id: "forge", label: "⚒️ FIRE FORGE", color: "#ff6600" },
+                    { id: "curator", label: "🔬 AUDIT QUALITY", color: "#aa55ff" },
+                    { id: "packager", label: "📦 BUNDLE ASSETS", color: "#ffaa00" },
+                    { id: "lister", label: "📋 LIST PRODUCTS", color: "#00ff88" },
+                  ].map(btn => {
+                    const isLoading = agentDispatchLoading === btn.id
+                    const isDone = agentDispatchSuccess === btn.id
+                    return (
+                      <button key={btn.id} onClick={() => dispatchAgentTask(btn.id, btn.label.replace(/[🔍⚒️🔬📦📋]/g, "").trim())}
+                        disabled={isLoading}
+                        className="text-[8px] font-bold py-2 rounded border transition-all duration-200 hover:scale-105 disabled:opacity-50 tracking-wider"
+                        style={{
+                          background: isDone ? `${btn.color}22` : `${btn.color}10`,
+                          borderColor: isDone ? `${btn.color}66` : `${btn.color}33`,
+                          color: isDone ? btn.color : `${btn.color}aa`,
+                          boxShadow: isDone ? `0 0 10px ${btn.color}22` : "none",
+                        }}>
+                        {isLoading ? "⏳..." : isDone ? "✓ DONE" : btn.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ── LIVE STATS ── */}
+              <div>
+                <div className="text-[9px] text-stone-500 tracking-widest mb-2 flex items-center gap-1.5"><BarChart3 className="h-3 w-3 text-amber-400" />DUNGEON METRICS</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: "CYCLES", val: cycleCount, icon: "🔄", color: "text-amber-400" },
+                    { label: "ASSETS", val: stats.totalAssets, icon: "🎨", color: "text-purple-400" },
+                    { label: "PACKS", val: stats.packsCount, icon: "📦", color: "text-cyan-400" },
+                    { label: "REVENUE", val: `$${stats.revenue.toFixed(2)}`, icon: "💰", color: "text-emerald-400" },
+                  ].map(s => (
+                    <div key={s.label} className="bg-stone-900/50 rounded-lg p-2.5 border border-stone-700/30 text-center">
+                      <div className="text-[7px] text-stone-500 mb-1 tracking-wider">{s.icon} {s.label}</div>
+                      <div className={`font-bold text-base ${s.color}`}>{s.val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── RECENT ACTIVITY LOG ── */}
+              <div>
+                <div className="text-[9px] text-stone-500 tracking-widest mb-2 flex items-center gap-1.5"><Clock className="h-3 w-3 text-amber-400" />RECENT ACTIVITY</div>
+                {recentTasks.length > 0 ? (
+                  <div className="space-y-1">
+                    {recentTasks.map((t, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-stone-900/40 rounded px-2.5 py-1.5 border border-stone-800/20">
+                        <span className="text-[7px] font-bold w-16 truncate" style={{ color: t.color }}>{AGENTS.find(a => a.id === t.agent)?.label ?? t.agent}</span>
+                        <span className="text-[8px] text-stone-400 truncate flex-1">{t.title}</span>
+                        <span className="text-[7px] text-stone-600 font-mono">{t.id.substring(0, 10)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-stone-600 text-[9px] py-3 bg-stone-900/30 rounded border border-stone-800/20">No active tasks — dispatch to begin</div>
+                )}
+              </div>
+            </div>
+
+            {/* ── FOOTER ── */}
+            <div className="px-4 py-2 border-t border-amber-500/20 bg-amber-950/20 text-center">
+              <span className="text-[7px] text-amber-500/40 tracking-[0.3em]">POPO COMMAND CENTER · KAI ASSET FORGE</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ AGENT POPUP (non-Popo) ═══ */}
+      {selectedAgent && selectedAgent !== "popo" && selectedDef && (
         <GameWindow title={`${selectedDef.label} · ${selectedDef.role}`} icon={<span>{selectedDef.icon}</span>} onClose={() => setSelectedAgent(null)}>
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-3 rounded-lg border" style={{ borderColor: `${selectedDef.color}33`, background: `${selectedDef.color}08` }}>

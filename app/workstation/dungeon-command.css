@@ -49,6 +49,29 @@
 }
 .animate-count { animation: count-up 0.4s ease-out; }
 
+/* ═══ POPO COMMAND CENTER ═══ */
+@keyframes gold-pulse {
+  0%, 100% { border-color: #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.25), inset 0 0 12px rgba(255,215,0,0.08); }
+  50% { border-color: #ffec80; box-shadow: 0 0 24px rgba(255,215,0,0.5), inset 0 0 20px rgba(255,215,0,0.18); }
+}
+.popo-room { animation: gold-pulse 2s ease-in-out infinite; }
+
+@keyframes command-slide-in {
+  0% { transform: scale(0.85); opacity: 0; }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-command-in { animation: command-slide-in 0.35s ease-out; }
+
+@keyframes gold-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.gold-shimmer {
+  background: linear-gradient(90deg, rgba(255,215,0,0) 0%, rgba(255,215,0,0.15) 50%, rgba(255,215,0,0) 100%);
+  background-size: 200% 100%;
+}
+
 .pixelated {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
