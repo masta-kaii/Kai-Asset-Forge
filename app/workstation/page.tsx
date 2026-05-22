@@ -867,13 +867,21 @@ export default function WorkstationPage() {
 
         <div className="w-px h-4 bg-yellow-900/40" />
 
-        {/* Pipeline info */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-stone-500 uppercase tracking-wider text-[9px]">Cycle</span>
-          <Badge variant="outline" className="gap-1 font-mono text-[10px] h-5 border-yellow-600/30 bg-yellow-950/20 text-yellow-400">
-            <Activity className="h-2.5 w-2.5" />
-            {PIPELINE_STEPS[currentPipelineStep]?.name ?? "IDLE"}
-          </Badge>
+        {/* Pipeline info + step progress */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-stone-500 uppercase tracking-wider text-[9px]">Cycle</span>
+            <Badge variant="outline" className="gap-1 font-mono text-[10px] h-5 border-yellow-600/30 bg-yellow-950/20 text-yellow-400">
+              <Activity className="h-2.5 w-2.5" />
+              {PIPELINE_STEPS[currentPipelineStep]?.name ?? "IDLE"}
+            </Badge>
+          </div>
+          {/* Step progress bar */}
+          <div className="kairosoft-step-progress">
+            <div className="step-track">
+              <div className="step-fill" style={{ width: `${stepProgress * 100}%` }} />
+            </div>
+          </div>
         </div>
 
         <div className="w-px h-4 bg-yellow-900/40" />
@@ -1138,75 +1146,183 @@ export default function WorkstationPage() {
             }
           })()}
           onClose={() => setSelectedAgent(null)}
+          className="kairosoft-window-v2"
         >
-          {/* Kairosoft Agent Stats Card */}
+          {/* 🏗️ V2 — Agent Header with Large Portrait + Compact Stats */}
           {selectedAgent !== "testbench" && selectedAgentState && (
-            <div className="kairosoft-agent-card">
-              <div className="flex items-center gap-3 mb-2">
-                <AgentSprite agentId={selectedAgent} frame={selectedAgentState.frame} size={48} facing="right" />
-                <div className="flex-1">
-                  <div className="agent-name">{selectedAgentDef.label}</div>
-                  <div className="agent-role">{selectedAgentDef.role}</div>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Star className="h-3 w-3 text-yellow-500" />
-                    <span className="agent-level">Lv.{Math.floor((pipelineCycle + 1) / 3) + 1}</span>
+            <div className="kairosoft-agent-header">
+              <div className="agent-portrait">
+                <AgentSprite agentId={selectedAgent} frame={selectedAgentState.frame} size={72} facing="right" />
+                <div className={`status-dot ${
+                  selectedAgentState.status === "working" ? "bg-emerald-500 border-emerald-400" :
+                  selectedAgentState.status === "walking" ? "bg-blue-400 border-blue-300" :
+                  selectedAgentState.status === "meeting" ? "bg-violet-400 border-violet-300" :
+                  selectedAgentState.status === "done" ? "bg-emerald-400 border-emerald-300" :
+                  "bg-stone-700 border-stone-600"
+                }`} />
+              </div>
+              <div className="header-info">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="agent-name">{selectedAgentDef.label}</div>
+                    <div className="agent-role">{selectedAgentDef.role}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`kairosoft-badge ${
+                      selectedAgentState.status === "working" ? "amber" :
+                      selectedAgentState.status === "walking" ? "blue" :
+                      selectedAgentState.status === "done" ? "green" : "amber"
+                    }`}>
+                      {selectedAgentState.status}
+                    </span>
+                    <div className="agent-level mt-1">Lv.{Math.floor((pipelineCycle + 1) / 3) + 1}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[9px] font-mono text-stone-500">STATUS</div>
-                  <div className={`text-[10px] font-mono uppercase ${selectedAgentState.status === "working" ? "text-emerald-400" : "text-stone-400"}`}>
-                    {selectedAgentState.status}
+                {/* 3-column stat grid */}
+                <div className="kairosoft-stat-grid">
+                  <div className="k-stat">
+                    <div className="k-stat-label"><span>⚡ Speed</span><span className="val">{Math.min(10, 4 + pipelineCycle)}</span></div>
+                    <div className="k-stat-bar"><div className="fill" style={{ width: `${Math.min(100, 40 + pipelineCycle * 10)}%`, background: "linear-gradient(90deg, #d4a03c, #f5d98a)" }} /></div>
+                  </div>
+                  <div className="k-stat">
+                    <div className="k-stat-label"><span>🎨 Quality</span><span className="val">{Math.min(10, 3 + pipelineCycle)}</span></div>
+                    <div className="k-stat-bar"><div className="fill" style={{ width: `${Math.min(100, 30 + pipelineCycle * 10)}%`, background: "linear-gradient(90deg, #6b8e23, #8fbc3f)" }} /></div>
+                  </div>
+                  <div className="k-stat">
+                    <div className="k-stat-label"><span>🔬 Research</span><span className="val">{Math.min(10, 5 + pipelineCycle)}</span></div>
+                    <div className="k-stat-bar"><div className="fill" style={{ width: `${Math.min(100, 50 + pipelineCycle * 8)}%`, background: "linear-gradient(90deg, #25608b, #4299e0)" }} /></div>
                   </div>
                 </div>
-              </div>
-
-              {/* Stat Bars */}
-              <div className="kairosoft-stat">
-                <div className="stat-label"><span>⚡ Speed</span><span>{Math.min(10, 4 + pipelineCycle)}</span></div>
-                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 40 + pipelineCycle * 10)}%`, background: "#22c55e" }} /></div>
-              </div>
-              <div className="kairosoft-stat">
-                <div className="stat-label"><span>🎨 Quality</span><span>{Math.min(10, 3 + pipelineCycle)}</span></div>
-                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 30 + pipelineCycle * 10)}%`, background: "#eab308" }} /></div>
-              </div>
-              <div className="kairosoft-stat">
-                <div className="stat-label"><span>📊 Research</span><span>{Math.min(10, 5 + pipelineCycle)}</span></div>
-                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 50 + pipelineCycle * 8)}%`, background: "#3b82f6" }} /></div>
-              </div>
-              <div className="kairosoft-stat">
-                <div className="stat-label"><span>🔧 Reliability</span><span>{Math.min(10, 6 + pipelineCycle)}</span></div>
-                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 60 + pipelineCycle * 5)}%`, background: "#a855f7" }} /></div>
               </div>
             </div>
           )}
 
-          {/* Department-specific content */}
-          {selectedAgent === "curator" ? (
-            <div>
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-stone-700/30">
-                <Library className="h-4 w-4 text-yellow-500" />
-                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Asset Library · Quality Control</span>
+          {/* 📊 V2 — Department Content in 2-Column Card Grid */}
+          {selectedAgent === "forge" && (
+            <div className="kairosoft-dept-grid">
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">🔨</span>Production Queue</div>
+                <div className="text-[7px] text-[#8a7a4a] mb-1">"Pixel Asset Pack Vol.1"</div>
+                <div className="flex gap-1 mb-2">
+                  <div className="flex-1 h-1 bg-[#2a1f0a] border border-[#5c4510]">
+                    <div className="h-full w-[45%]" style={{ background: "#d4a03c" }} />
+                  </div>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  <span className="kairosoft-badge blue">Dragon 🐉</span>
+                  <span className="kairosoft-badge" style={{ background: "#1a1206", borderColor: "#3a2a0a", color: "#5c5010" }}>Sword 🗡️</span>
+                </div>
               </div>
-              <CuratorPanel />
-            </div>
-          ) : selectedAgent === "scout" ? (
-            <div>
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-stone-700/30">
-                <ListChecks className="h-4 w-4 text-green-500" />
-                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Wishlist · Bounty Board</span>
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">📊</span>Quality Metrics</div>
+                <div className="flex justify-center gap-3 py-1">
+                  <div className="text-center">
+                    <div className="text-[13px] text-[#34d399]">92%</div>
+                    <div className="text-[6px] text-[#5c5010] tracking-wider">Pass Rate</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[13px] text-[#f5d98a]">{pipelineCycle + 3}</div>
+                    <div className="text-[6px] text-[#5c5010] tracking-wider">Total Forged</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[13px] text-[#f87171]">0</div>
+                    <div className="text-[6px] text-[#5c5010] tracking-wider">Reworks</div>
+                  </div>
+                </div>
               </div>
-              <ScoutPanel />
             </div>
-          ) : selectedAgent === "lister" ? (
-            <div>
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-stone-700/30">
-                <FileText className="h-4 w-4 text-blue-400" />
-                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Listing Drafts · Marketing</span>
+          )}
+
+          {selectedAgent === "curator" && (
+            <div className="kairosoft-dept-grid">
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">🔬</span>QC Queue</div>
+                <div className="text-[7px] text-[#8a7a4a] mb-1">2 assets pending review</div>
               </div>
-              <ListerPanel />
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">✅</span>Approval Rate</div>
+                <div className="flex justify-center gap-3 py-1">
+                  <div className="text-center">
+                    <div className="text-[13px] text-[#34d399]">85%</div>
+                    <div className="text-[6px] text-[#5c5010] tracking-wider">Approved</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[13px] text-[#f87171]">15%</div>
+                    <div className="text-[6px] text-[#5c5010] tracking-wider">Rejected</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          ) : selectedAgent === "popo" ? (
-            /* Popo CEO Overview — Command Center */
+          )}
+
+          {selectedAgent === "scout" && (
+            <div className="kairosoft-dept-grid">
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">🎯</span>Active Bounties</div>
+                <div className="text-[7px] text-[#8a7a4a]">3 trending themes identified</div>
+              </div>
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">📈</span>Market Pulse</div>
+                <div className="text-[7px] text-[#8a7a4a]">Summer Beach pack trending</div>
+              </div>
+            </div>
+          )}
+
+          {selectedAgent === "packager" && (
+            <div className="kairosoft-dept-grid">
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">📦</span>Active Bundles</div>
+                <div className="text-[7px] text-[#8a7a4a]">1 pack being assembled</div>
+              </div>
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">🏷️</span>Tags</div>
+                <div className="flex gap-1 flex-wrap">
+                  <span className="kairosoft-badge green">pixel-art</span>
+                  <span className="kairosoft-badge blue">sprites</span>
+                  <span className="kairosoft-badge amber">game-assets</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedAgent === "lister" && (
+            <div className="kairosoft-dept-grid">
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">📝</span>Pending Listings</div>
+                <div className="text-[7px] text-[#8a7a4a]">Waiting for Popo approval</div>
+              </div>
+              <div className="kairosoft-dept-card">
+                <div className="card-title"><span className="card-icon">💰</span>Pricing</div>
+                <div className="text-[7px] text-[#8a7a4a]">$3.99 - $8.99 range</div>
+              </div>
+            </div>
+          )}
+
+          {/* 🗺️ V2 — Pipeline Kanban Mini View */}
+          {selectedAgent !== "testbench" && selectedAgent !== "popo" && (
+            <div className="mt-2">
+              <div className="text-[8px] text-[#c8b88a] tracking-[1px] uppercase mb-1">Pipeline Kanban</div>
+              <div className="kairosoft-kanban-mini">
+                {["Scout", "Forge", "Curator", "Packager", "Lister"].map((name, i) => {
+                  const isCurrent = PIPELINE_STEPS[currentPipelineStep]?.name === name.toUpperCase()
+                  const isPast = PIPELINE_STEPS.findIndex(s => s.name === name.toUpperCase()) < currentPipelineStep % PIPELINE_STEPS.length
+                  return (
+                    <div key={name} className="kb-col">
+                      <div className="kb-title">{
+                        name === "Scout" ? "🔍" : name === "Forge" ? "⚒️" : name === "Curator" ? "🔬" : name === "Packager" ? "📦" : "📋"
+                      } {name}</div>
+                      <div className={`kb-card ${isCurrent ? "active" : ""}`} style={{ opacity: isPast ? 1 : isCurrent ? 1 : 0.3 }}>
+                        {isPast ? "✓ Done" : isCurrent ? "Active" : "—"}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 👑 Popo CEO Overview — Command Center */}
+          {selectedAgent === "popo" && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
                 <Activity className="h-4 w-4 text-yellow-500" />
@@ -1283,8 +1399,10 @@ export default function WorkstationPage() {
                   className="drop-shadow-[0_0_14px_rgba(255,215,0,0.4)]" />
               </div>
             </div>
-          ) : selectedAgent === "testbench" ? (
-            /* 🏟️ Test Bench — REAL ASSET SHOWCASE */
+          )}
+
+          {/* 🏟️ Test Bench — REAL ASSET SHOWCASE */}
+          {selectedAgent === "testbench" && (
             <div className="space-y-3">
               {/* Header */}
               <div className="flex items-center justify-between pb-2 border-b border-stone-700/30">
@@ -1443,7 +1561,10 @@ export default function WorkstationPage() {
                 </div>
               )}
             </div>
-          ) : (
+          )}
+
+          {/* 🔍 Unknown agent fallback */}
+          {!["popo", "testbench", "forge", "curator", "scout", "packager", "lister"].includes(selectedAgent) && (
             <div className="space-y-4">
               {/* Agent sprite preview */}
               <div className="flex justify-center py-2">

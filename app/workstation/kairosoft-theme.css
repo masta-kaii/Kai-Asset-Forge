@@ -252,3 +252,205 @@
 .kairosoft-console .log-msg {
   color: #a09060;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   V2 — FULL WIDTH CARDS POPUP STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Agent header with large portrait */
+.kairosoft-agent-header {
+  display: flex;
+  gap: 14px;
+  padding: 10px;
+  background: linear-gradient(135deg, #1e1408 0%, #0d0a04 100%);
+  border: 2px solid #5c4510;
+  margin-bottom: 10px;
+}
+
+.kairosoft-agent-header .agent-portrait {
+  width: 72px;
+  height: 96px;
+  flex-shrink: 0;
+  background: #1a1206;
+  border: 1px solid #3a2a0a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  image-rendering: pixelated;
+  position: relative;
+}
+
+.kairosoft-agent-header .agent-portrait .status-dot {
+  position: absolute;
+  bottom: 4px; right: 4px;
+  width: 8px; height: 8px;
+  border: 1px solid;
+}
+
+.kairosoft-agent-header .header-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kairosoft-agent-header .header-info .agent-name {
+  font-size: 12px;
+  color: #ffd700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 #5c4510;
+}
+
+.kairosoft-agent-header .header-info .agent-role {
+  font-size: 8px;
+  color: #a08040;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.kairosoft-agent-header .header-info .agent-level {
+  font-size: 15px;
+  color: #ffd700;
+  text-shadow: 2px 2px 0 #5c4510;
+}
+
+/* Compact stat grid (3 columns) */
+.kairosoft-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.kairosoft-stat-grid .k-stat { margin-bottom: 0; }
+.kairosoft-stat-grid .k-stat .k-stat-label {
+  display: flex; justify-content: space-between;
+  font-size: 8px; color: #c8b88a; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 2px;
+}
+.kairosoft-stat-grid .k-stat .k-stat-label .val { color: #ffd700; }
+.kairosoft-stat-grid .k-stat .k-stat-bar {
+  height: 6px; background: #2a1f0a;
+  border: 1px solid #5c4510; position: relative; overflow: hidden;
+}
+.kairosoft-stat-grid .k-stat .k-stat-bar .fill {
+  height: 100%; transition: width 0.5s;
+  position: relative;
+}
+.kairosoft-stat-grid .k-stat .k-stat-bar .fill::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: rgba(255,255,255,0.12);
+}
+
+/* Department card grid (2 columns) */
+.kairosoft-dept-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.kairosoft-dept-card {
+  background: linear-gradient(135deg, #1e1408 0%, #0d0a04 100%);
+  border: 1px solid #3a2a0a;
+  padding: 8px;
+}
+
+.kairosoft-dept-card .card-title {
+  font-size: 8px;
+  color: #c8b88a;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid #2a1a0a;
+  padding-bottom: 4px;
+}
+
+.kairosoft-dept-card .card-title .card-icon {
+  filter: none;
+}
+
+/* Pixel badges */
+.kairosoft-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 7px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 1px solid;
+  font-family: monospace;
+}
+.kairosoft-badge.green { background: #1a2a0a; border-color: #4a6b20; color: #8abb4a; }
+.kairosoft-badge.amber { background: #2a1f0a; border-color: #8b6914; color: #f5d98a; }
+.kairosoft-badge.red   { background: #2a0a0a; border-color: #8b2500; color: #f87171; }
+.kairosoft-badge.blue  { background: #0a1a2a; border-color: #25608b; color: #71a8f8; }
+
+/* Kanban mini view (5-column pipeline) */
+.kairosoft-kanban-mini {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.kairosoft-kanban-mini .kb-col {
+  background: #0d0a04;
+  border: 1px solid #2a1a0a;
+  padding: 4px;
+}
+
+.kairosoft-kanban-mini .kb-col .kb-title {
+  font-size: 7px;
+  color: #5c5010;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-align: center;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #2a1a0a;
+  margin-bottom: 3px;
+}
+
+.kairosoft-kanban-mini .kb-col .kb-card {
+  font-size: 6px;
+  color: #8a7a4a;
+  padding: 2px 3px;
+  margin-bottom: 2px;
+  border: 1px solid #2a1a0a;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kairosoft-kanban-mini .kb-col .kb-card.active {
+  border-color: #5c4510;
+  color: #c8b88a;
+  background: #1a1206;
+}
+
+/* HUD Step Progress Bar */
+.kairosoft-step-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kairosoft-step-progress .step-track {
+  width: 50px;
+  height: 4px;
+  background: #1a1206;
+  border: 1px solid #3a2a0a;
+  position: relative;
+}
+
+.kairosoft-step-progress .step-track .step-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d4a03c, #f5d98a);
+  transition: width 0.3s;
+}
+
+/* V2 Popup Overrides */
+.kairosoft-window-v2 {
+  max-width: 600px !important;
+}
