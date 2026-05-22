@@ -25,7 +25,8 @@ export async function GET(request: Request) {
     const category = searchParams.get("category") || "all"
     const source = searchParams.get("source") || "enhanced" // or "aseprite"
 
-    const forgeDir = path.resolve(process.cwd(), "forge-output", source)
+    // Read from public/sprites/ so Vercel can serve them too
+    const forgeDir = path.resolve(process.cwd(), "public", "sprites", source)
     
     // Debug: log what we're scanning  
     console.log(`[assets] Scanning: ${forgeDir}, exists: ${existsSync(forgeDir)}`)

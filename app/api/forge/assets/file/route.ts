@@ -24,7 +24,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const fullPath = path.join(process.cwd(), "forge-output", normalized)
+    // Read from public/sprites/ so Vercel can serve them too
+    const fullPath = path.join(process.cwd(), "public", "sprites", normalized)
 
     if (!existsSync(fullPath)) {
       return NextResponse.json({ error: "File not found" }, { status: 404 })
