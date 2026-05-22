@@ -32,7 +32,7 @@ const RANDOM_WALK_INTERVAL_MS = 12000 // agents randomly walk to visit buddies
 const POPO_CHECK_INTERVAL_MS = 15000 // popo checks on agents
 
 interface AgentDef {
-  id: string; label: string; role: string; sprite: string
+  id: string; label: string; role: string
   homeX: number; homeY: number
   floorTile: string
   wallDecor?: string
@@ -41,13 +41,13 @@ interface AgentDef {
 }
 
 const AGENTS: AgentDef[] = [
-  { id: "scout",    label: "Scout",   role: "Intel",    sprite: "elf_f",     homeX: 0, homeY: 0, floorTile: "2", color: "#22c55e" },
-  { id: "forge",    label: "Forge",   role: "Prod",     sprite: "dwarf_m",   homeX: 1, homeY: 0, floorTile: "3", prop: "floor_ladder", color: "#f97316" },
-  { id: "curator",  label: "Curator", role: "QA",       sprite: "knight_f",  homeX: 2, homeY: 0, floorTile: "1", prop: "column", color: "#eab308" },
-  { id: "popo",     label: "Popo",    role: "CEO ✦ CMD",sprite: "wizzard_m", homeX: 0, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column", color: "#fbbf24" },
-  { id: "packager", label: "Packager",role: "Assembly", sprite: "goblin",    homeX: 1, homeY: 1, floorTile: "7", prop: "crate", color: "#fb923c" },
-  { id: "lister",   label: "Lister",  role: "Sales",    sprite: "elf_m",     homeX: 2, homeY: 1, floorTile: "5", prop: "crate", color: "#3b82f6" },
-  { id: "testbench",label: "Test",    role: "Bench ✦", sprite: "wizzard_f",  homeX: 1, homeY: 2, floorTile: "4", prop: "column", color: "#a855f7" },
+  { id: "scout",    label: "Scout",   role: "Intel",    homeX: 0, homeY: 0, floorTile: "2", color: "#22c55e" },
+  { id: "forge",    label: "Forge",   role: "Prod",     homeX: 1, homeY: 0, floorTile: "3", prop: "floor_ladder", color: "#f97316" },
+  { id: "curator",  label: "Curator", role: "QA",       homeX: 2, homeY: 0, floorTile: "1", prop: "column", color: "#eab308" },
+  { id: "popo",     label: "Popo",    role: "CEO ✦ CMD",homeX: 0, homeY: 1, floorTile: "8", wallDecor: "wall_banner_red", prop: "column", color: "#fbbf24" },
+  { id: "packager", label: "Packager",role: "Assembly", homeX: 1, homeY: 1, floorTile: "7", prop: "crate", color: "#fb923c" },
+  { id: "lister",   label: "Lister",  role: "Sales",    homeX: 2, homeY: 1, floorTile: "5", prop: "crate", color: "#3b82f6" },
+  { id: "testbench",label: "Test",    role: "Bench ✦",  homeX: 1, homeY: 2, floorTile: "4", prop: "column", color: "#a855f7" },
 ]
 
 // ═══════════════════════════════════════════════════════════════════════════
