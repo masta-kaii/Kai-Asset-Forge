@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   DUNGEON COMMAND CENTER — Phase 2 Animations
+   DUNGEON COMMAND CENTER — Phase 3
    ═══════════════════════════════════════════════════════ */
 
 @keyframes bounce-in {
@@ -9,23 +9,24 @@
 }
 .animate-bounce-in { animation: bounce-in 0.2s ease-out; }
 
-@keyframes status-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-.status-pulse { animation: status-pulse 2s ease-in-out infinite; }
-
-@keyframes walk-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-.animate-walk { animation: walk-bob 0.3s ease-in-out infinite; }
-
 @keyframes slide-up {
-  0% { transform: translateY(8px); opacity: 0; }
+  0% { transform: translateY(6px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
 .animate-slide-up { animation: slide-up 0.3s ease-out; }
+
+@keyframes pop-in {
+  0% { transform: scale(0.8); opacity: 0; }
+  80% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop-in { animation: pop-in 0.3s ease-out; }
+
+@keyframes forge-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(255,102,0,0.4); }
+  50% { box-shadow: 0 0 40px rgba(255,102,0,0.8), 0 0 60px rgba(255,102,0,0.3); }
+}
+.forge-pulse { animation: forge-glow 1.5s ease-in-out infinite; }
 
 .pixelated {
   image-rendering: pixelated;
