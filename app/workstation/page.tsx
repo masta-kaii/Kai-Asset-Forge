@@ -426,6 +426,83 @@ export default function WorkstationPage() {
     return () => clearInterval(interval)
   }, [])
 
+  // 🏭 REAL KANBAN OVERLAY — pulls actual agent statuses from the factory floor
+  // Overrides the visual simulation with real Kanban task data
+  const [kanbanOverride, setKanbanOverride] = useState(false)
+  useEffect(() => {
+    async function pollKanban() {
+      try {
+        const res = await fetch("/api/kanban/status")
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data?.agents) return
+
+        const pipelineStepMap: Record<string, number> = {
+          scout: 0, forge: 1, curator: 2, packager: 3, lister: 4,
+        }
+
+        setKanbanOverride(true)
+
+        // Update agent statuses based on real Kanban data
+        setAgents((prev) => {
+          const next: Record<string, AgentState> = { ...prev }
+          let changed = false
+
+          for (const [agentId, kanbanAgent] of Object.entries(data.agents) as [string, any][]) {
+            const st = next[agentId]
+            if (!st) continue
+
+            const hasActive = kanbanAgent.activeCount > 0
+            const hasReady = kanbanAgent.readyCount > 0
+            const hasBlocked = kanbanAgent.blockedCount > 0
+            const isWorking = hasActive || hasReady
+
+            if (hasBlocked && st.status !== "working") {
+              next[agentId] = {
+                ...st, status: "idle", pulse: true,
+                message: `⚠ Blocked: ${kanbanAgent.blockedCount} task(s)`,
+                animMode: "idle",
+              }
+              changed = true
+            } else if (isWorking && st.status !== "working") {
+              next[agentId] = {
+                ...st, status: "working", pulse: true,
+                message: hasActive
+                  ? `🔨 Working: ${kanbanAgent.currentTask?.title?.slice(0, 40) ?? "Active task"}`
+                  : `⏳ Ready: ${kanbanAgent.readyCount} task(s) queued`,
+                animMode: "idle",
+              }
+              changed = true
+            } else if (!isWorking && !hasBlocked && st.status !== "idle" && st.status !== "done") {
+              next[agentId] = {
+                ...st, status: "idle", pulse: false,
+                message: kanbanAgent.doneCount > 0 ? `✅ ${kanbanAgent.doneCount} completed` : "",
+                animMode: "idle",
+              }
+              changed = true
+            }
+          }
+
+          return changed ? next : prev
+        })
+
+        // Set current pipeline step from real data
+        if (data.pipeline?.currentStep !== undefined && data.pipeline.currentStep >= 0) {
+          setCurrentPipelineStep(data.pipeline.currentStep)
+        }
+
+        // Update board stats
+        if (data.board) {
+          setPipelineCycle(data.board.doneTotal)
+        }
+      } catch {}
+    }
+
+    pollKanban()
+    const kanbanInterval = setInterval(pollKanban, 8000) // every 8s
+    return () => clearInterval(kanbanInterval)
+  }, [])
+
   // ── Frame animation (single rAF) ──
   useEffect(() => {
     function tick(ts: number) {
@@ -980,7 +1057,7 @@ export default function WorkstationPage() {
         {/* Status */}
         <div className="flex items-center gap-1.5">
           <div className={`h-2 w-2 rounded-full ${pipelinePaused ? "bg-red-500 shadow-[0_0_6px_#ef4444] animate-pulse" : "bg-emerald-500 shadow-[0_0_6px_#34d399] animate-pulse"}`} />
-          <span className={pipelinePaused ? "text-red-400" : "text-emerald-400"}>{pipelinePaused ? "HALTED" : "LIVE"}</span>
+          <span className={pipelinePaused ? "text-red-400" : "text-emerald-400"}>{pipelinePaused ? "HALTED" : kanbanOverride ? "KANBAN LIVE" : "SIM"}</span>
         </div>
 
         <div className="w-px h-4 bg-yellow-900/40" />
