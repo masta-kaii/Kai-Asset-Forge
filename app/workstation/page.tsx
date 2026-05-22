@@ -17,6 +17,7 @@ import { ScoutPanel } from "@/components/workstation/scout-panel"
 import { ListerPanel } from "@/components/workstation/lister-panel"
 import type { Asset, PackLibraryEntry } from "@/lib/types"
 import "./kairosoft-theme.css"
+import "./dungeon-maze.css"
 import {
   playPipelineStart, playStepComplete, playCycleComplete,
   playAgentClick, playLogNotification,
@@ -221,6 +222,19 @@ export default function WorkstationPage() {
   const [librarySort, setLibrarySort] = useState<"quality" | "newest" | "price">("quality")
   const [libraryFilter, setLibraryFilter] = useState<string>("all")
 
+  // 🎯 Decision Popup state (Game Dev Story style)
+  const [decisionOpen, setDecisionOpen] = useState(false)
+  const [decisionData, setDecisionData] = useState<{
+    title: string
+    body: string
+    choices: { label: string; effect: string; action: () => void }[]
+  } | null>(null)
+
+  // 📊 Stats bar state (from real data)
+  const [forgeStats, setForgeStats] = useState<{ trend: number; quality: number; hype: number; revenue: number }>({
+    trend: 0, quality: 0, hype: 0, revenue: 0
+  })
+
   // Generate pack library from pipeline progress
   const packLibrary = useMemo<PackLibraryEntry[]>(() => {
     const themes = [
@@ -286,8 +300,81 @@ export default function WorkstationPage() {
     } catch {}
     setAssetsLoading(false)
   }, [])
-  const spinRef = useRef(0)
 
+  // 🎯 Decision Popup trigger — fires at end of each cycle
+  const triggerDecisionPopup = useCallback((cycleNum: number) => {
+    const choices = [
+      {
+        label: "Dungeon Tiles (+3 Quality)",
+        effect: "forgePromptOverride",
+        action: () => {
+          setForgeTheme("16x16 dungeon floor and wall tiles, 0x72 palette")
+          addLog("popo", "👑 DECISION: Dungeon Tiles — Forge configured!", "ok")
+          setDecisionOpen(false)
+        }
+      },
+      {
+        label: "Monster Sprites (+3 Hype)",
+        effect: "forgePromptOverride",
+        action: () => {
+          setForgeTheme("RPG monsters: goblin, skeleton, slime, dragon hatchling")
+          addLog("popo", "👑 DECISION: Monster Sprites — Forge configured!", "ok")
+          setDecisionOpen(false)
+        }
+      },
+      {
+        label: "UI Icons (+2 Revenue, +1 Speed)",
+        effect: "forgePromptOverride",
+        action: () => {
+          setForgeTheme("pixel art RPG UI elements: health bar, coin, sword icon, potion")
+          addLog("popo", "👑 DECISION: UI Icons — Forge configured!", "ok")
+          setDecisionOpen(false)
+        }
+      },
+      {
+        label: "Let Scout decide (random)",
+        effect: "random",
+        action: () => {
+          const allChoices = ["dungeon tiles", "RPG monsters", "UI icons"]
+          const rand = allChoices[Math.floor(Math.random() * allChoices.length)]
+          setForgeTheme(rand)
+          addLog("popo", `👑 DECISION: Scout chose — ${rand}!`, "ok")
+          setDecisionOpen(false)
+        }
+      },
+    ]
+    setDecisionData({
+      title: `Cycle ${cycleNum} Complete!`,
+      body: `The factory has finished another cycle. Scout detected market trends — what should the Forge produce next?`,
+      choices,
+    })
+    setDecisionOpen(true)
+    addLog("popo", `🎯 Decision time! Cycle ${cycleNum} complete.`, "info")
+  }, [addLog, setForgeTheme])
+
+  // 📊 Real Stats Polling
+  useEffect(() => {
+    async function pollStats() {
+      try {
+        const res = await fetch("/api/forge/stats")
+        if (res.ok) {
+          const data = await res.json()
+          setForgeStats({
+            trend: data.trend ?? 0,
+            quality: data.quality ?? 0,
+            hype: data.hype ?? 0,
+            revenue: data.revenue ?? 0,
+          })
+        }
+      } catch {}
+    }
+    pollStats()
+    const interval = setInterval(pollStats, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Fetch assets for Test Bench
+  const spinRef = useRef(0)
   const logsEnd = useRef<HTMLDivElement>(null)
   const logCounter = useRef(0)
   const rafRef = useRef<number>(0)
@@ -506,6 +593,11 @@ export default function WorkstationPage() {
           // Play cycle complete at the end of a full cycle (every 5 steps)
           if (soundEnabled && newCycle % PIPELINE_STEPS.length === 0) {
             playCycleComplete()
+          }
+          // 🎯 Trigger decision popup every full cycle (every 5 steps)
+          if (newCycle % PIPELINE_STEPS.length === 0) {
+            const cycleNum = Math.floor(newCycle / PIPELINE_STEPS.length)
+            triggerDecisionPopup(cycleNum)
           }
           return newCycle
         })
@@ -848,7 +940,7 @@ export default function WorkstationPage() {
     function handleKey(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       switch (e.key.toLowerCase()) {
-        case "escape": setSelectedAgent(null); setShowLogModal(false); setForgeModalOpen(false); setLibraryOpen(false); setSelectedPack(null); break
+        case "escape": setSelectedAgent(null); setShowLogModal(false); setForgeModalOpen(false); setLibraryOpen(false); setSelectedPack(null); setDecisionOpen(false); break
         case "l": setLibraryOpen(true); break
         case "f": setForgeModalOpen(true); break
         case "k": setPipelinePaused((p) => !p); addLog("popo", pipelinePaused ? "Killswitch RELEASED — pipeline resuming!" : "⚠ KILLSWITCH ENGAGED — pipeline halted!", pipelinePaused ? "ok" : "warn"); break
@@ -1005,6 +1097,35 @@ export default function WorkstationPage() {
           background: "radial-gradient(ellipse at 50% 50%, rgba(255,180,40,0.06) 0%, transparent 60%), radial-gradient(ellipse at 25% 25%, rgba(255,140,40,0.03) 0%, transparent 50%), radial-gradient(ellipse at 75% 75%, rgba(255,140,40,0.03) 0%, transparent 50%)",
         }} />
 
+        {/* 🏰 Wing ambient overlays */}
+        <div className="pointer-events-none absolute inset-0 z-11">
+          <div className="wing-ambient wing-discovery-bg" style={{ top: 0, height: "33.33%" }} />
+          <div className="wing-ambient wing-command-bg" style={{ top: "33.33%", height: "33.33%" }} />
+          <div className="wing-ambient wing-commerce-bg" style={{ top: "66.66%", height: "33.34%" }} />
+        </div>
+
+        {/* 🌀 Maze corridor SVG overlay */}
+        <svg className="absolute inset-0 z-5 w-full h-full pointer-events-none" viewBox="0 0 300 300" preserveAspectRatio="none">
+          <defs>
+            <filter id="mazeGlow">
+              <feGaussianBlur stdDeviation="1.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          {/* Horizontal maze corridors — staggered for dungeon feel */}
+          <line x1="0" y1="100" x2="115" y2="100" stroke="rgba(168,85,247,0.25)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="185" y1="100" x2="300" y2="100" stroke="rgba(168,85,247,0.25)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="0" y1="200" x2="115" y2="200" stroke="rgba(251,191,36,0.2)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="185" y1="200" x2="300" y2="200" stroke="rgba(251,191,36,0.2)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          {/* Vertical maze corridors */}
+          <line x1="100" y1="0" y2="90" x2="100" stroke="rgba(168,85,247,0.25)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="100" y1="110" y2="190" x2="100" stroke="rgba(251,191,36,0.2)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="100" y1="210" y2="300" x2="100" stroke="rgba(52,211,153,0.2)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="200" y1="0" y2="90" x2="200" stroke="rgba(168,85,247,0.25)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="200" y1="110" y2="190" x2="200" stroke="rgba(251,191,36,0.2)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+          <line x1="200" y1="210" y2="300" x2="200" stroke="rgba(52,211,153,0.2)" strokeWidth="1.5" strokeDasharray="4,6" filter="url(#mazeGlow)" className="maze-corridor-glow" />
+        </svg>
+
         {/* Kairosoft Day Counter + Factory Controls */}
         <div className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
           <div className="kairosoft-day-counter pointer-events-auto">
@@ -1053,7 +1174,7 @@ export default function WorkstationPage() {
               return (
                 <div
                   key={agent.id}
-                  className="relative cursor-pointer group"
+                  className={`relative cursor-pointer group ${agent.homeY === 0 ? "wing-discovery" : agent.homeY === 1 ? "wing-command" : "wing-commerce"}`}
                   style={{ gridColumn: agent.homeX + 1, gridRow: agent.homeY + 1 }}
                   onClick={() => {
                     if (soundEnabled) playAgentClick()
@@ -1249,8 +1370,55 @@ export default function WorkstationPage() {
         </div>
       </div>
 
+      {/* ═══════ STATS BAR (Game Dev Story style) ═══════ */}
+      <div className="stats-bar shrink-0 flex items-center justify-around px-2 py-2 border-t border-yellow-900/30">
+        <div className="stat-item flex flex-col items-center px-6">
+          <span className="stat-label">📈 TREND</span>
+          <span className="stat-value">{forgeStats.trend}</span>
+        </div>
+        <div className="stat-item flex flex-col items-center px-6">
+          <span className="stat-label">⭐ QUALITY</span>
+          <span className="stat-value">{forgeStats.quality > 0 ? forgeStats.quality.toFixed(1) : "-"}</span>
+        </div>
+        <div className="stat-item flex flex-col items-center px-6">
+          <span className="stat-label">🔥 HYPE</span>
+          <span className="stat-value">{forgeStats.hype}</span>
+        </div>
+        <div className="flex flex-col items-center px-6">
+          <span className="stat-label">💰 REVENUE</span>
+          <span className="stat-value">${forgeStats.revenue.toFixed(2)}</span>
+        </div>
+      </div>
+
       {/* ═══════ PIPELINE PROGRESS BAR ═══════ */}
       <PipelineBar currentStep={currentPipelineStep} stepProgress={stepProgress} />
+
+      {/* ═══════ DECISION POPUP (Game Dev Story style) ═══════ */}
+      {decisionOpen && decisionData && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setDecisionOpen(false)}>
+          <div className="decision-popup animate-decision-enter max-w-sm w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <div className="decision-title-bar">
+              👑 {decisionData.title}
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="font-mono text-xs text-stone-300 leading-relaxed">{decisionData.body}</p>
+              <div className="space-y-2">
+                {decisionData.choices.map((choice, i) => (
+                  <button
+                    key={i}
+                    onClick={choice.action}
+                    className="decision-btn w-full text-left flex items-center gap-2"
+                  >
+                    <span className="text-yellow-500 text-sm">{String.fromCharCode(65 + i)}</span>
+                    <span className="flex-1">{choice.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="font-mono text-[8px] text-stone-600 text-center mt-2">Click a choice or press Esc to skip</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════ POPUP: AGENT DETAIL / DEPARTMENT VIEW ═══════ */}
       {selectedAgent && selectedAgentDef && selectedAgentState && (
