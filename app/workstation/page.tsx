@@ -10,11 +10,12 @@ import {
   Cpu, Brain, Activity, TrendingUp, CheckCircle2, XCircle,
   AlertTriangle, Package, Sparkles, ScrollText,
   X, Monitor, MessageSquare, ChevronRight, Library, FileText, ListChecks,
-  MapPin, Eye, Footprints,
+  MapPin, Eye, Footprints, RefreshCw, Grid, Wallpaper,
 } from "lucide-react"
 import { CuratorPanel } from "@/components/workstation/curator-panel"
 import { ScoutPanel } from "@/components/workstation/scout-panel"
 import { ListerPanel } from "@/components/workstation/lister-panel"
+import type { Asset } from "@/lib/types"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -330,6 +331,29 @@ export default function WorkstationPage() {
   const [forgeRunning, setForgeRunning] = useState(false)
   const [uptime, setUptime] = useState(0)
 
+  // Test Bench state
+  const [recentAssets, setRecentAssets] = useState<Asset[]>([])
+  const [assetsLoading, setAssetsLoading] = useState(true)
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
+  const [bgMode, setBgMode] = useState<"transparent" | "grid" | "dungeon">("grid")
+  const [testBenchZoom, setTestBenchZoom] = useState(3)
+
+  // Fetch assets for Test Bench
+  const fetchAssets = useCallback(async () => {
+    setAssetsLoading(true)
+    try {
+      const res = await fetch("/api/agents/dashboard", {
+        headers: { "Authorization": "Bearer kaf_e864d42e9b6c0653c9ec9e4c281f1479f40db4d21d365df5" }
+      })
+      const data = await res.json()
+      if (data?.recentAssets) {
+        setRecentAssets(data.recentAssets)
+      }
+    } catch {}
+    setAssetsLoading(false)
+  }, [])
+  const spinRef = useRef(0)
+
   const logsEnd = useRef<HTMLDivElement>(null)
   const logCounter = useRef(0)
   const rafRef = useRef<number>(0)
@@ -427,6 +451,9 @@ export default function WorkstationPage() {
   useEffect(() => {
     // Initial loading delay
     const loadTimer = setTimeout(() => setLoading(false), 800)
+
+    // Fetch recent assets for Test Bench
+    fetchAssets()
 
     // Pipeline scheduler
     let stepTimer = 0
@@ -1157,41 +1184,164 @@ export default function WorkstationPage() {
               </div>
             </div>
           ) : selectedAgent === "testbench" ? (
-            /* 🏟️ Test Bench — Asset Showcase Arena */
+            /* 🏟️ Test Bench — REAL ASSET SHOWCASE */
             <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
-                <Eye className="h-4 w-4 text-violet-400" />
-                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">
-                  Test Bench · Asset Showcase
-                </span>
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-stone-700/30">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-violet-400" />
+                  <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">
+                    Test Bench · {recentAssets.length} Assets
+                  </span>
+                </div>
+                <button onClick={() => { setAssetsLoading(true); fetchAssets(); }}
+                  className="text-stone-500 hover:text-violet-400 transition-colors">
+                  <RefreshCw className="h-3 w-3" />
+                </button>
               </div>
-              <p className="text-stone-500 text-[11px] font-mono leading-relaxed">
-                The Test Bench is coming soon! Here you'll be able to preview, animate, and share your pixel art assets.
-              </p>
-              <div className="flex justify-center py-4">
-                <div className="p-3 rounded-lg border border-violet-700/30 bg-violet-950/20 flex flex-col items-center gap-2">
-                  <AgentSprite agentId="testbench" frame={0} size={64} facing="right" />
-                  <span className="font-mono text-[10px] text-violet-300">⚡ Showcase Arena</span>
+
+              {/* Loading spinner */}
+              {assetsLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
-                  <p className="text-stone-500 text-[10px] font-mono mb-1">Preview</p>
-                  <p className="text-stone-400 text-[11px] font-mono">Animated spin + bob + zoom</p>
+              ) : recentAssets.length === 0 ? (
+                <p className="text-stone-500 text-[11px] font-mono text-center py-6">
+                  No assets yet. Run the pipeline to generate some!
+                </p>
+              ) : selectedAsset ? (
+                /* 🎬 Asset preview (zoomed) */
+                <div className="space-y-3">
+                  {/* Preview canvas */}
+                  <div className="flex justify-center">
+                    <div className={`rounded-lg border-2 p-4 ${
+                      bgMode === "dungeon" ? "border-stone-600/30 bg-stone-800/60" :
+                      bgMode === "grid" ? "border-stone-600/30 bg-stone-900/80" :
+                      "border-stone-700/30 bg-black/40"
+                    }`}>
+                      <div className="relative" style={{
+                        width: 64 * testBenchZoom,
+                        height: 64 * testBenchZoom,
+                        background: bgMode === "grid" ?
+                          "repeating-conic-gradient(#2a2a2a 0% 25%, #1a1a1a 0% 50%) 0 0 / 16px 16px" :
+                          bgMode === "dungeon" ?
+                          "url(/sprites/tiles/floor_1.png) repeat" :
+                          "transparent",
+                        imageRendering: bgMode === "dungeon" ? "pixelated" : undefined,
+                      }}>
+                        <img
+                          src={selectedAsset.previewUrl}
+                          alt={selectedAsset.name}
+                          className="absolute inset-0 pixelated animate-bob"
+                          style={{
+                            width: 64 * testBenchZoom,
+                            height: 64 * testBenchZoom,
+                            imageRendering: "pixelated",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Controls row */}
+                  <div className="flex items-center justify-center gap-2">
+                    {(["transparent", "grid", "dungeon"] as const).map((mode) => (
+                      <button key={mode}
+                        onClick={() => setBgMode(mode)}
+                        className={`px-2 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                          bgMode === mode
+                            ? "border-violet-500/50 bg-violet-900/30 text-violet-300"
+                            : "border-stone-700/30 text-stone-500 hover:border-stone-600/50"
+                        }`}>
+                        {mode === "transparent" ? "⬤" : mode === "grid" ? "▦" : "◫"} {mode}
+                      </button>
+                    ))}
+                    <span className="text-stone-600 text-[9px] mx-1">|</span>
+                    {[2, 3, 4, 6].map((z) => (
+                      <button key={z}
+                        onClick={() => setTestBenchZoom(z)}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-mono border transition-all ${
+                          testBenchZoom === z
+                            ? "border-violet-500/50 bg-violet-900/30 text-violet-300"
+                            : "border-stone-700/30 text-stone-500 hover:border-stone-600/50"
+                        }`}>
+                        {z}×
+                      </button>
+                    ))}
+                    <button onClick={() => setSelectedAsset(null)}
+                      className="px-2 py-0.5 rounded text-[9px] font-mono border border-stone-700/30 text-stone-500 hover:text-stone-300">
+                      ← Back
+                    </button>
+                  </div>
+
+                  {/* Asset details */}
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                    <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                      <p className="text-stone-500 mb-0.5">Name</p>
+                      <p className="text-stone-300 truncate">{selectedAsset.name}</p>
+                    </div>
+                    <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                      <p className="text-stone-500 mb-0.5">Score</p>
+                      <p className={selectedAsset.qualityScore >= 6 ? "text-emerald-400" : "text-amber-400"}>
+                        {selectedAsset.qualityScore}/10
+                      </p>
+                    </div>
+                    <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                      <p className="text-stone-500 mb-0.5">Type</p>
+                      <p className="text-stone-300 capitalize">{selectedAsset.type}</p>
+                    </div>
+                    <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
+                      <p className="text-stone-500 mb-0.5">Style</p>
+                      <p className="text-stone-300">{selectedAsset.style}</p>
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  {selectedAsset.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {selectedAsset.tags.map((t, i) => (
+                        <span key={i} className="px-1.5 py-0.5 rounded bg-stone-800/60 text-stone-400 text-[9px] font-mono border border-stone-700/20">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
-                  <p className="text-stone-500 text-[10px] font-mono mb-1">Background</p>
-                  <p className="text-stone-400 text-[11px] font-mono">Transparent · Grid · Dungeon Floor</p>
+              ) : (
+                /* 🖼️ Asset grid */
+                <div className="grid grid-cols-3 gap-2">
+                  {recentAssets.slice(0, 12).map((asset) => (
+                    <button key={asset.id}
+                      onClick={() => setSelectedAsset(asset)}
+                      className="group relative bg-stone-800/40 rounded-lg border border-stone-700/20 p-2 hover:border-violet-500/40 hover:bg-stone-800/70 transition-all text-left"
+                    >
+                      <div className="flex justify-center mb-1.5">
+                        <img src={asset.previewUrl} alt={asset.name}
+                          className="pixelated rounded"
+                          style={{ width: 48, height: 48, imageRendering: "pixelated" }}
+                        />
+                      </div>
+                      <p className="text-stone-400 text-[9px] font-mono truncate">{asset.name}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${
+                          asset.qualityScore >= 6 ? "bg-emerald-900/30 text-emerald-400" :
+                          asset.qualityScore >= 4 ? "bg-amber-900/30 text-amber-400" :
+                          "bg-stone-800/50 text-stone-500"
+                        }`}>
+                          {asset.qualityScore}/10
+                        </span>
+                        <span className={`text-[8px] font-mono uppercase ${
+                          asset.status === "approved" ? "text-emerald-500" :
+                          asset.status === "review" ? "text-amber-500" :
+                          "text-stone-600"
+                        }`}>
+                          {asset.status}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
-                  <p className="text-stone-500 text-[10px] font-mono mb-1">Record</p>
-                  <p className="text-stone-400 text-[11px] font-mono">Export animated GIF for sharing</p>
-                </div>
-                <div className="bg-stone-800/40 rounded p-2 border border-stone-700/20">
-                  <p className="text-stone-500 text-[10px] font-mono mb-1">Share</p>
-                  <p className="text-stone-400 text-[11px] font-mono">Twitter · Discord · itch.io</p>
-                </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">

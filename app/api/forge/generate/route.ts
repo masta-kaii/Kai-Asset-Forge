@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import fs from "fs/promises"
 import path from "path"
 import crypto from "crypto"
+import { Jimp } from "jimp"
 
 // ComfyUI runs locally on :8188
 const COMFY_UI_BASE = "http://127.0.0.1:8188"
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // 2. Read the workflow template
-    const workflowPath = path.join(process.cwd(), "forge-workflow.json")
+    const workflowPath = path.join(process.cwd(), "forge-workflow-v3.json")
     let workflow: Record<string, any>
     try {
       const raw = await fs.readFile(workflowPath, "utf-8")
@@ -161,6 +162,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Ensure output directory exists
     await fs.mkdir(OUTPUT_DIR, { recursive: true })
     await fs.writeFile(outputPath, imageBuffer)
+
+    // 10b. Color quantize to 32 colors for true pixel art feel
+    try {
+      const sprite = await Jimp.read(outputPath)
+      await sprite.quantize({ colors: 32, paletteQuantization: "wuquant", imageQuantization: "nearest" })
+      await sprite.write(outputPath as `${string}.${string}`)
+      console.log(`[forge/generate] Quantized to 32 colors`)
+    } catch (quantErr) {
+      // Quantization is optional — don't fail if jimp errors
+      console.warn(`[forge/generate] Color quantization skipped:`, quantErr)
+    }
 
     const assetUrl = `/generated-assets/${assetId}.png`
 
