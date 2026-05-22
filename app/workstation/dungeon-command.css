@@ -1,8 +1,7 @@
 /* ═══════════════════════════════════════════════════════
-   DUNGEON COMMAND CENTER — Neon Dark Theme
+   DUNGEON COMMAND CENTER — Phase 2 Animations
    ═══════════════════════════════════════════════════════ */
 
-/* Animations */
 @keyframes bounce-in {
   0% { transform: scale(0.9); opacity: 0; }
   60% { transform: scale(1.02); }
@@ -10,59 +9,31 @@
 }
 .animate-bounce-in { animation: bounce-in 0.2s ease-out; }
 
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; }
+@keyframes status-pulse {
+  0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
+.status-pulse { animation: status-pulse 2s ease-in-out infinite; }
 
-@keyframes pathway-flow {
-  0% { stroke-dashoffset: 14; }
-  100% { stroke-dashoffset: 0; }
+@keyframes walk-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
+.animate-walk { animation: walk-bob 0.3s ease-in-out infinite; }
 
-@keyframes tick-up {
+@keyframes slide-up {
   0% { transform: translateY(8px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
+.animate-slide-up { animation: slide-up 0.3s ease-out; }
 
-/* Neon glow for active pathway lines */
-.neon-pathway-active {
-  animation: pathway-flow 1s linear infinite;
-}
-
-/* Pixelated rendering */
 .pixelated {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: #0a0a14; }
 ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a4a; }
-
-/* Room hover effect */
-.room-glow:hover {
-  box-shadow: 0 0 20px rgba(212, 160, 60, 0.3), inset 0 0 15px rgba(212, 160, 60, 0.1);
-}
-
-/* Tab bar active indicator glow */
-.tab-active {
-  box-shadow: 0 -2px 10px rgba(255, 170, 0, 0.2);
-}
-
-/* Selection ring */
-.selection-ring {
-  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.3);
-}
-
-/* Status pulse animation */
-@keyframes status-pulse {
-  0%, 100% { box-shadow: 0 0 4px currentColor; }
-  50% { box-shadow: 0 0 12px currentColor; }
-}
-.status-pulse {
-  animation: status-pulse 2s ease-in-out infinite;
-}
