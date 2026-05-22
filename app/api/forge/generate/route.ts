@@ -173,7 +173,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const postProcessorPy = path.join(process.cwd(), "pixel-post-processor.py")
       const cleanOutputPath = path.join(OUTPUT_DIR, `${assetId}-clean.png`)
       execSync(
-        `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64`,
+        `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64 --no-outline`,
         { timeout: 30000 }
       )
       // Replace original with cleaned version

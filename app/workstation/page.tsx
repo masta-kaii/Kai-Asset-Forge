@@ -16,6 +16,7 @@ import { CuratorPanel } from "@/components/workstation/curator-panel"
 import { ScoutPanel } from "@/components/workstation/scout-panel"
 import { ListerPanel } from "@/components/workstation/lister-panel"
 import type { Asset } from "@/lib/types"
+import "./kairosoft-theme.css"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -216,10 +217,10 @@ function GameWindow({ title, icon, onClose, children, className }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
          onClick={onClose}>
-      <div className={`animate-bounce-in rounded-lg border-2 border-yellow-600/60 bg-stone-900/95 shadow-[0_0_30px_rgba(255,200,50,0.15)] max-w-lg w-[90vw] max-h-[80vh] flex flex-col ${className ?? ""}`}
+      <div className={`animate-bounce-in kairosoft-window max-w-lg w-[90vw] max-h-[80vh] flex flex-col ${className ?? ""}`}
            onClick={(e) => e.stopPropagation()}>
         {/* Window title bar */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-yellow-600/30 bg-stone-800/80 rounded-t-lg">
+        <div className="window-title flex items-center justify-between px-3 py-2 rounded-t-lg">
           <div className="flex items-center gap-2 text-sm font-mono text-yellow-300">
             {icon}
             <span>{title}</span>
@@ -230,7 +231,7 @@ function GameWindow({ title, icon, onClose, children, className }: {
           </button>
         </div>
         {/* Window body */}
-        <div className="p-3 overflow-y-auto flex-1">
+        <div className="window-body p-3 overflow-y-auto flex-1">
           {children}
         </div>
       </div>
@@ -891,9 +892,20 @@ export default function WorkstationPage() {
           background: "radial-gradient(ellipse at 50% 50%, rgba(255,180,40,0.06) 0%, transparent 60%), radial-gradient(ellipse at 25% 25%, rgba(255,140,40,0.03) 0%, transparent 50%), radial-gradient(ellipse at 75% 75%, rgba(255,140,40,0.03) 0%, transparent 50%)",
         }} />
 
-        {/* Factory name watermark */}
-        <div className="absolute top-3 left-4 z-20 font-mono text-[10px] text-yellow-700/30 tracking-[0.2em] uppercase pointer-events-none">
-          Kai Asset Forge · Factory Floor
+        {/* Kairosoft Day Counter + Factory Controls */}
+        <div className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
+          <div className="kairosoft-day-counter pointer-events-auto">
+            <Building2 className="h-3 w-3" />
+            <span className="day-number">Day {pipelineCycle + 1}</span>
+          </div>
+          <div className="flex gap-2 pointer-events-auto">
+            <button className="kairosoft-btn" onClick={() => setShowLogModal(true)}>
+              <ScrollText className="h-3 w-3 inline-block mr-1" />LOG
+            </button>
+            <button className="kairosoft-btn kairosoft-btn-danger" onClick={() => addLog("popo", "Factory shutting down for the day...", "warning")}>
+              <Moon className="h-3 w-3 inline-block mr-1" />CLOSE
+            </button>
+          </div>
         </div>
 
         {/* Grid — 3x2 layout */}
@@ -985,6 +997,14 @@ export default function WorkstationPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Kairosoft building roof */}
+                    <div className="kairosoft-building absolute -top-1 left-1/2 -translate-x-1/2 z-4">
+                      <div className="roof" />
+                      <div className="building-body" style={{ width: 50 }}>
+                        <div className="sign">{agent.label}</div>
+                      </div>
+                    </div>
 
                     {/* Agent sprite */}
                     <div className={`relative z-10 transition-transform duration-700 ${
@@ -1080,6 +1100,47 @@ export default function WorkstationPage() {
           })()}
           onClose={() => setSelectedAgent(null)}
         >
+          {/* Kairosoft Agent Stats Card */}
+          {selectedAgent !== "testbench" && selectedAgentState && (
+            <div className="kairosoft-agent-card">
+              <div className="flex items-center gap-3 mb-2">
+                <AgentSprite agentId={selectedAgent} frame={selectedAgentState.frame} size={48} facing="right" />
+                <div className="flex-1">
+                  <div className="agent-name">{selectedAgentDef.label}</div>
+                  <div className="agent-role">{selectedAgentDef.role}</div>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Star className="h-3 w-3 text-yellow-500" />
+                    <span className="agent-level">Lv.{Math.floor((pipelineCycle + 1) / 3) + 1}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[9px] font-mono text-stone-500">STATUS</div>
+                  <div className={`text-[10px] font-mono uppercase ${selectedAgentState.status === "working" ? "text-emerald-400" : "text-stone-400"}`}>
+                    {selectedAgentState.status}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stat Bars */}
+              <div className="kairosoft-stat">
+                <div className="stat-label"><span>⚡ Speed</span><span>{Math.min(10, 4 + pipelineCycle)}</span></div>
+                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 40 + pipelineCycle * 10)}%`, background: "#22c55e" }} /></div>
+              </div>
+              <div className="kairosoft-stat">
+                <div className="stat-label"><span>🎨 Quality</span><span>{Math.min(10, 3 + pipelineCycle)}</span></div>
+                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 30 + pipelineCycle * 10)}%`, background: "#eab308" }} /></div>
+              </div>
+              <div className="kairosoft-stat">
+                <div className="stat-label"><span>📊 Research</span><span>{Math.min(10, 5 + pipelineCycle)}</span></div>
+                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 50 + pipelineCycle * 8)}%`, background: "#3b82f6" }} /></div>
+              </div>
+              <div className="kairosoft-stat">
+                <div className="stat-label"><span>🔧 Reliability</span><span>{Math.min(10, 6 + pipelineCycle)}</span></div>
+                <div className="stat-bar-bg"><div className="stat-bar-fill" style={{ width: `${Math.min(100, 60 + pipelineCycle * 5)}%`, background: "#a855f7" }} /></div>
+              </div>
+            </div>
+          )}
+
           {/* Department-specific content */}
           {selectedAgent === "curator" ? (
             <div>

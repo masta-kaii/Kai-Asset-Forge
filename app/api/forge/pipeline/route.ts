@@ -87,7 +87,7 @@ async function generateSprite(prompt: string, style?: string): Promise<string> {
     const postProcessorPy = path.join(process.cwd(), "pixel-post-processor.py")
     const cleanOutputPath = path.join(OUTPUT_DIR, `${path.basename(outputPath, ".png")}-clean.png`)
     execSync(
-      `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64`,
+      `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64 --no-outline`,
       { timeout: 30000 }
     )
     await fs.rename(cleanOutputPath, outputPath)

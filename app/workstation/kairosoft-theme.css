@@ -1,0 +1,254 @@
+/* ═══════════════════════════════════════════════════════════════
+   KAIROSOFT FACTORY THEME
+   Pixel art management sim styling for Kai Asset Forge
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Kairosoft-style window frame ── */
+.kairosoft-window {
+  border: 3px solid #d4a03c !important;
+  border-radius: 0 !important;
+  box-shadow: 
+    4px 4px 0 0 #8b6914,
+    inset 0 0 0 1px #f5d98a !important;
+  background: linear-gradient(180deg, #1a1206 0%, #0d0a04 100%) !important;
+  max-width: 440px !important;
+}
+
+.kairosoft-window .window-title {
+  background: linear-gradient(90deg, #8b6914, #d4a03c, #8b6914) !important;
+  color: #fff5d6 !important;
+  padding: 6px 12px !important;
+  font-family: monospace !important;
+  font-size: 11px !important;
+  text-shadow: 1px 1px 0 #5c4510 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+}
+
+.kairosoft-window .window-title .title-icon {
+  filter: drop-shadow(0 1px 0 #5c4510);
+}
+
+.kairosoft-window .window-body {
+  padding: 12px !important;
+  image-rendering: pixelated !important;
+}
+
+/* ── Kairosoft stat bars ── */
+.kairosoft-stat {
+  margin-bottom: 6px;
+}
+
+.kairosoft-stat .stat-label {
+  font-family: monospace;
+  font-size: 10px;
+  color: #c8b88a;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kairosoft-stat .stat-bar-bg {
+  height: 8px;
+  background: #2a1f0a;
+  border: 1px solid #5c4510;
+  border-radius: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.kairosoft-stat .stat-bar-fill {
+  height: 100%;
+  border-radius: 0;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.kairosoft-stat .stat-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.15);
+}
+
+/* ── Building roof — pixel art triangle roof ── */
+.kairosoft-building {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.kairosoft-building .roof {
+  width: 0;
+  height: 0;
+  border-left: 20px solid transparent;
+  border-right: 20px solid transparent;
+  border-bottom: 14px solid #8b4513;
+  margin: 0 auto;
+}
+
+.kairosoft-building .roof-accent {
+  width: 0;
+  height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-bottom: 10px solid #a0522d;
+  margin: 0 auto;
+  margin-top: -10px;
+}
+
+.kairosoft-building .building-body {
+  background: #3a2010;
+  border: 2px solid #5c3018;
+  border-top: none;
+  margin: 0 auto;
+  position: relative;
+  min-height: 12px;
+}
+
+.kairosoft-building .sign {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #d4a03c;
+  color: #1a1206;
+  font-family: monospace;
+  font-size: 7px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  border: 1px solid #f5d98a;
+}
+
+/* ── Day counter ── */
+.kairosoft-day-counter {
+  background: #1a1206;
+  border: 2px solid #d4a03c;
+  padding: 3px 10px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #f5d98a;
+  text-shadow: 1px 1px 0 #5c4510;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kairosoft-day-counter .day-number {
+  font-size: 14px;
+  color: #ffd700;
+  font-weight: bold;
+}
+
+/* ── Factory button ── */
+.kairosoft-btn {
+  background: linear-gradient(180deg, #6b8e23 0%, #556b2f 100%) !important;
+  border: 2px solid #8fbc3f !important;
+  border-radius: 0 !important;
+  color: #fff !important;
+  font-family: monospace !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  text-shadow: 1px 1px 0 #3a4f1a !important;
+  cursor: pointer !important;
+  padding: 4px 14px !important;
+  box-shadow: 2px 2px 0 0 #3a4f1a !important;
+  transition: all 0.1s !important;
+}
+
+.kairosoft-btn:hover {
+  background: linear-gradient(180deg, #7c9e2e 0%, #6b8e23 100%) !important;
+  box-shadow: 1px 1px 0 0 #3a4f1a !important;
+  transform: translate(1px, 1px) !important;
+}
+
+.kairosoft-btn:active {
+  box-shadow: 0 0 0 0 #3a4f1a !important;
+  transform: translate(2px, 2px) !important;
+}
+
+.kairosoft-btn-danger {
+  background: linear-gradient(180deg, #8b2500 0%, #5c1800 100%) !important;
+  border-color: #c83c00 !important;
+  text-shadow: 1px 1px 0 #3a1000 !important;
+  box-shadow: 2px 2px 0 0 #3a1000 !important;
+}
+
+.kairosoft-btn-danger:hover {
+  background: linear-gradient(180deg, #a03200 0%, #8b2500 100%) !important;
+}
+
+/* ── Kairosoft agent stat card ── */
+.kairosoft-agent-card {
+  background: linear-gradient(135deg, #1e1408 0%, #0d0a04 100%);
+  border: 2px solid #5c4510;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.kairosoft-agent-card .agent-name {
+  font-family: monospace;
+  font-size: 12px;
+  color: #ffd700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 #5c4510;
+}
+
+.kairosoft-agent-card .agent-role {
+  font-family: monospace;
+  font-size: 9px;
+  color: #a08040;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.kairosoft-agent-card .agent-level {
+  font-family: monospace;
+  font-size: 16px;
+  color: #ffd700;
+  text-shadow: 2px 2px 0 #5c4510;
+}
+
+/* ── Pixel text utility ── */
+.pixel-text {
+  font-family: monospace;
+  image-rendering: pixelated;
+}
+
+/* ── Console style ── */
+.kairosoft-console {
+  background: #0a0702;
+  border: 2px solid #3a2a0a;
+  padding: 8px;
+  font-family: monospace;
+  font-size: 9px;
+  color: #8a8040;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.kairosoft-console .log-entry {
+  display: flex;
+  gap: 6px;
+  padding: 1px 0;
+}
+
+.kairosoft-console .log-time {
+  color: #5c5010;
+}
+
+.kairosoft-console .log-agent {
+  color: #d4a03c;
+}
+
+.kairosoft-console .log-msg {
+  color: #a09060;
+}
