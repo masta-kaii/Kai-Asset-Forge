@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kairosoft Factory — Agent Popup Redesigns</title>
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     BASE THEME
+     ═══════════════════════════════════════════════════════════════ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d0a04;
+    font-family: 'Courier New', 'Courier', monospace;
+    color: #ffd700;
+    padding: 20px;
+    image-rendering: pixelated;
+  }
+  :root {
+    --bg: #0d0a04;
+    --surface: #1a1206;
+    --border: #d4a03c;
+    --accent: #f5d98a;
+    --text: #ffd700;
+    --muted: #c8b88a;
+    --dim: #5c4510;
+    --btn: #6b8e23;
+    --danger: #8b2500;
+  }
+  h1 { font-size: 16px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  h2 { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
+  .section-title {
+    font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); padding: 12px 0 4px;
+    border-bottom: 1px solid var(--dim); margin-bottom: 16px;
+    text-shadow: 1px 1px 0 #5c4510;
+  }
+
+  .demo-section {
+    max-width: 960px;
+    margin: 0 auto 48px;
+  }
+  .variant-label {
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 8px;
+  }
+
+  /* ── Popup grid ── */
+  .popup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .popup-grid.single { grid-template-columns: 1fr; }
+  @media (max-width: 700px) { .popup-grid { grid-template-columns: 1fr; } }
+
+  /* ═══════════════════════════════════════════════════════════════
+     POPUP WINDOW BASE (shared frame)
+     ═══════════════════════════════════════════════════════════════ */
+  .popup-frame {
+    border: 3px solid #d4a03c;
+    box-shadow: 4px 4px 0 0 #8b6914, inset 0 0 0 1px #f5d98a;
+    background: linear-gradient(180deg, #1a1206 0%, #0d0a04 100%);
+    display: flex; flex-direction: column;
+    max-height: 480px;
+  }
+  .popup-frame .popup-title {
+    background: linear-gradient(90deg, #8b6914, #d4a03c, #8b6914);
+    color: #fff5d6;
+    padding: 8px 14px;
+    font-family: monospace;
+    font-size: 11px;
+    text-shadow: 1px 1px 0 #5c4510;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .popup-frame .popup-title .title-left {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .popup-frame .popup-title .close-btn {
+    padding: 2px 6px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #8b6914;
+    color: #fff5d6;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 9px;
+    transition: background 0.15s;
+  }
+  .popup-frame .popup-title .close-btn:hover {
+    background: rgba(139,37,0,0.5);
+    border-color: #c83c00;
+  }
+  .popup-frame .popup-body {
+    padding: 14px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     SHARED COMPONENTS
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* Pixel stat bar */
+  .k-stat { margin-bottom: 6px; }
+  .k-stat .k-stat-label {
+    display: flex; justify-content: space-between;
+    font-size: 9px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 2px;
+  }
+  .k-stat .k-stat-label .val { color: var(--text); }
+  .k-stat .k-stat-bar {
+    height: 8px; background: #2a1f0a;
+    border: 1px solid #5c4510; position: relative; overflow: hidden;
+  }
+  .k-stat .k-stat-bar .fill {
+    height: 100%; transition: width 0.5s;
+    position: relative;
+  }
+  .k-stat .k-stat-bar .fill::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: rgba(255,255,255,0.12);
+  }
+
+  /* Pixel tabs */
+  .pixel-tabs {
+    display: flex; gap: 2px; margin-bottom: 10px;
+  }
+  .pixel-tabs .tab {
+    padding: 3px 10px; font-size: 8px; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer;
+    border: 1px solid #3a2a0a; background: #0d0a04; color: #5c5010;
+    font-family: monospace; transition: all 0.15s;
+  }
+  .pixel-tabs .tab.active {
+    background: linear-gradient(180deg, #2a1f0a, #1a1206);
+    border-color: #5c4510; color: var(--accent);
+  }
+  .pixel-tabs .tab:hover:not(.active) { border-color: #5c4510; color: #8a7a4a; }
+
+  /* Pixel badge */
+  .pixel-badge {
+    display: inline-block;
+    padding: 1px 5px; font-size: 7px; letter-spacing: 1px;
+    text-transform: uppercase; border: 1px solid;
+    font-family: monospace;
+  }
+  .pixel-badge.green { background: #1a2a0a; border-color: #4a6b20; color: #8abb4a; }
+  .pixel-badge.amber { background: #2a1f0a; border-color: #8b6914; color: #f5d98a; }
+  .pixel-badge.red   { background: #2a0a0a; border-color: #8b2500; color: #f87171; }
+  .pixel-badge.blue  { background: #0a1a2a; border-color: #25608b; color: #71a8f8; }
+
+  /* Agent portrait card */
+  .agent-portrait-card {
+    display: flex; gap: 12px; padding: 10px;
+    background: linear-gradient(135deg, #1e1408 0%, #0d0a04 100%);
+    border: 2px solid #5c4510; margin-bottom: 10px;
+  }
+  .agent-portrait-card .portrait {
+    width: 64px; height: 96px; flex-shrink: 0;
+    background: #1a1206; border: 1px solid #3a2a0a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; image-rendering: pixelated;
+    position: relative;
+  }
+  .agent-portrait-card .portrait .status-dot {
+    position: absolute; bottom: 4px; right: 4px;
+    width: 8px; height: 8px; border-radius: 0;
+    border: 1px solid;
+  }
+  .agent-portrait-card .info { flex: 1; min-width: 0; }
+  .agent-portrait-card .info .name {
+    font-size: 11px; color: var(--text); letter-spacing: 1px;
+    text-transform: uppercase; text-shadow: 1px 1px 0 #5c4510;
+  }
+  .agent-portrait-card .info .role {
+    font-size: 8px; color: #a08040; letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .agent-portrait-card .info .level {
+    font-size: 14px; color: var(--text);
+    text-shadow: 2px 2px 0 #5c4510; margin-top: 2px;
+  }
+  .agent-portrait-card .info .stats { margin-top: 6px; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     POPUP VARIANT 1 — "Tabs & Sidebar" Layout
+     Tabbed panels, sidebar with agent portrait, content area
+     ═══════════════════════════════════════════════════════════════ */
+  .popup-v1 .popup-body {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 12px;
+    padding: 14px;
+  }
+  .popup-v1 .popup-body .sidebar {
+    border-right: 1px solid #2a1a0a;
+    padding-right: 12px;
+  }
+  .popup-v1 .popup-body .main-area { min-width: 0; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     POPUP VARIANT 2 — "Full Width Cards" Layout
+     Wide stat cards, large portrait, stacked content
+     ═══════════════════════════════════════════════════════════════ */
+  .popup-v2 .popup-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .popup-v2 .agent-header {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2a1a0a;
+  }
+  .popup-v2 .agent-header .big-portrait {
+    width: 80px; height: 112px; flex-shrink: 0;
+    background: #1a1206; border: 2px solid #3a2a0a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; position: relative;
+  }
+  .popup-v2 .agent-header .big-portrait .status-dot {
+    position: absolute; bottom: 4px; right: 4px;
+    width: 10px; height: 10px; border: 1px solid;
+  }
+  .popup-v2 .agent-header .header-stats { flex: 1; }
+  .popup-v2 .agent-header .header-stats .name {
+    font-size: 14px; color: var(--text); letter-spacing: 1px;
+    text-transform: uppercase; text-shadow: 2px 2px 0 #5c4510;
+  }
+  .popup-v2 .agent-header .header-stats .role {
+    font-size: 9px; color: #a08040; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .popup-v2 .agent-header .header-stats .level {
+    font-size: 16px; color: var(--text);
+    text-shadow: 2px 2px 0 #5c4510; margin: 4px 0 8px;
+  }
+
+  /* Department content grid */
+  .popup-v2 .dept-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .popup-v2 .dept-card {
+    padding: 10px;
+    background: #1a1206;
+    border: 1px solid #3a2a0a;
+  }
+  .popup-v2 .dept-card .card-title {
+    font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 6px;
+  }
+  .popup-v2 .dept-card .card-title .icon { margin-right: 4px; }
+
+  /* Asset preview mini grid */
+  .asset-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  .asset-mini-grid .asset-cell {
+    aspect-ratio: 1;
+    background: #0d0a04;
+    border: 1px solid #2a1a0a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    transition: border-color 0.2s;
+  }
+  .asset-mini-grid .asset-cell:hover { border-color: #5c4510; }
+
+  /* Kanban mini */
+  .kanban-mini {
+    display: flex; gap: 4px;
+  }
+  .kanban-mini .kb-col {
+    flex: 1;
+    padding: 4px;
+    background: #0d0a04;
+    border: 1px solid #2a1a0a;
+  }
+  .kanban-mini .kb-col .kb-title {
+    font-size: 6px; letter-spacing: 1px; text-transform: uppercase;
+    color: #5c5010; text-align: center; margin-bottom: 4px;
+  }
+  .kanban-mini .kb-col .kb-card {
+    padding: 3px; margin-bottom: 2px;
+    background: #1a1206; border: 1px solid #3a2a0a;
+    font-size: 6px; color: var(--muted);
+    text-align: center;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     POPUP VARIANT 3 — "Console Terminal" Layout
+     Dark, terminal-style, log-heavy with mini visualizations
+     ═══════════════════════════════════════════════════════════════ */
+  .popup-v3 .popup-body {
+    padding: 10px;
+    background: #0a0702;
+    border: 2px solid #3a2a0a;
+    margin: 8px;
+    font-size: 9px;
+    color: #8a8040;
+  }
+  .popup-v3 .console-line {
+    display: flex; gap: 6px; padding: 1px 0;
+    border-bottom: 1px solid #1a1206;
+  }
+  .popup-v3 .console-line .time { color: #5c5010; }
+  .popup-v3 .console-line .agent { color: #d4a03c; }
+  .popup-v3 .console-line .msg { color: #a09060; }
+  .popup-v3 .console-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px; background: #0d0a04; border: 1px solid #2a1a0a;
+    margin-bottom: 8px;
+  }
+  .popup-v3 .console-header .stat-row {
+    display: flex; gap: 10px;
+  }
+  .popup-v3 .console-header .stat-row .con-stat {
+    text-align: center;
+  }
+  .popup-v3 .console-header .stat-row .con-stat .val {
+    font-size: 12px; color: var(--accent);
+  }
+  .popup-v3 .console-header .stat-row .con-stat .lbl {
+    font-size: 7px; color: #5c5010; letter-spacing: 1px; text-transform: uppercase;
+  }
+
+  /* ── Comparison section ── */
+  .comparison-notes {
+    margin-top: 32px;
+    padding: 16px;
+    background: #1a1206;
+    border: 2px solid #3a2a0a;
+  }
+  .comparison-notes h3 {
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 8px;
+  }
+  .comparison-notes table {
+    width: 100%; border-collapse: collapse;
+    font-size: 9px; font-family: monospace;
+  }
+  .comparison-notes th {
+    text-align: left; padding: 4px 8px;
+    color: var(--accent); border-bottom: 1px solid var(--dim);
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .comparison-notes td {
+    padding: 4px 8px; color: var(--muted);
+    border-bottom: 1px solid #2a1a0a;
+  }
+  .comparison-notes td:first-child { color: var(--text); }
+  .comparison-notes tbody tr:hover td { background: #1e1408; }
+</style>
+</head>
+<body>
+
+<div class="demo-section">
+  <h1>🏭 Agent Popup Window Redesigns</h1>
+  <h2>3 Layout Variants for the Kairosoft GameWindow</h2>
+
+  <div class="popup-grid single">
+
+    <!-- ── CURRENT (reference) ── -->
+    <div>
+      <div class="variant-label">▸ CURRENT — Kairosoft Window (440px max-width, cramped)</div>
+      <div class="popup-frame" style="max-width:440px;">
+        <div class="popup-title">
+          <div class="title-left">🔍 · Forge Forge</div>
+          <button class="close-btn">✕</button>
+        </div>
+        <div class="popup-body">
+          <div class="agent-portrait-card">
+            <div class="portrait" style="font-size:24px;">⚒️</div>
+            <div class="info">
+              <div class="name" style="font-size:10px;">Forge</div>
+              <div class="role">Prod</div>
+              <div class="level">Lv.5</div>
+              <div class="stats">
+                <div class="k-stat"><div class="k-stat-label"><span>SPEED</span><span class="val">7</span></div></div>
+                <div class="k-stat"><div class="k-stat-label"><span>QUALITY</span><span class="val">8</span></div></div>
+                <div class="k-stat"><div class="k-stat-label"><span>RESEARCH</span><span class="val">6</span></div></div>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:9px;color:#8a7a4a;text-align:center;padding:12px 0;">
+            Content feels cramped. Stat bars + department panels squeezed in 440px.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="section-title">▸ Redesigned Variants</div>
+  <div class="popup-grid">
+
+    <!-- ════════════════════════════════════════════════════════════
+         VARIANT 1 — Tabs & Sidebar
+         ════════════════════════════════════════════════════════════ -->
+    <div>
+      <div class="variant-label">▸ V1 — "Tabs & Sidebar" <span style="color:var(--accent)">★ BEST BALANCE</span></div>
+      <div class="popup-frame popup-v1">
+        <div class="popup-title">
+          <div class="title-left">
+            <span>⚒️</span>
+            <span>Forge · Production Bay</span>
+            <span class="pixel-badge green">Working</span>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <span style="font-size:7px;color:#8b6914;padding:2px 4px;border:1px solid #5c4510;">Lv.5</span>
+            <button class="close-btn">✕</button>
+          </div>
+        </div>
+        <div class="popup-body">
+          <!-- Sidebar: portrait + quick stats -->
+          <div class="sidebar">
+            <div class="agent-portrait-card" style="flex-direction:column;text-align:center;padding:8px;gap:6px;">
+              <div class="portrait" style="width:56px;height:84px;margin:0 auto;font-size:28px;">
+                ⚒️
+                <div class="status-dot" style="background:#34d399;border-color:#6ee7b0;"></div>
+              </div>
+              <div>
+                <div class="name" style="font-size:10px;">Forge</div>
+                <div class="role">Prod</div>
+                <div class="level" style="font-size:10px;text-shadow:1px 1px 0 #5c4510;">Lv.5</div>
+              </div>
+            </div>
+
+            <div>
+              <div class="k-stat">
+                <div class="k-stat-label"><span>⚡ Speed</span><span class="val">7</span></div>
+                <div class="k-stat-bar"><div class="fill" style="width:70%;background:linear-gradient(90deg,#d4a03c,#f5d98a);"></div></div>
+              </div>
+              <div class="k-stat">
+                <div class="k-stat-label"><span>✨ Quality</span><span class="val">8</span></div>
+                <div class="k-stat-bar"><div class="fill" style="width:80%;background:linear-gradient(90deg,#6b8e23,#8fbc3f);"></div></div>
+              </div>
+              <div class="k-stat">
+                <div class="k-stat-label"><span>🔬 Research</span><span class="val">6</span></div>
+                <div class="k-stat-bar"><div class="fill" style="width:60%;background:linear-gradient(90deg,#8b2500,#c83c00);"></div></div>
+              </div>
+              <div class="k-stat">
+                <div class="k-stat-label"><span>🛡️ Reliabil.</span><span class="val">9</span></div>
+                <div class="k-stat-bar"><div class="fill" style="width:90%;background:linear-gradient(90deg,#25608b,#4299e0);"></div></div>
+              </div>
+            </div>
+
+            <div style="margin-top:6px;padding:4px;background:#0d0a04;border:1px solid #2a1a0a;">
+              <div style="font-size:7px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;text-align:center;">Mood</div>
+              <div style="font-size:12px;text-align:center;margin-top:2px;">🔥 Inspired</div>
+            </div>
+          </div>
+
+          <!-- Main content: tabs + panels -->
+          <div class="main-area">
+            <div class="pixel-tabs">
+              <span class="tab active">Production</span>
+              <span class="tab">Assets</span>
+              <span class="tab">Log</span>
+            </div>
+
+            <div style="font-size:8px;color:#5c5010;margin-bottom:6px;">Currently forging: "Fantasy Creature Pack Vol.1"</div>
+
+            <!-- Production queue mini -->
+            <div style="margin-bottom:8px;">
+              <div style="font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Queue</div>
+              <div style="display:flex;gap:4px;">
+                <div style="flex:1;padding:4px;background:#0d0a04;border:1px solid #5c4510;">
+                  <div style="font-size:6px;color:var(--accent);">⏳ Active</div>
+                  <div style="font-size:7px;color:var(--muted);">Dragon Sprite</div>
+                  <div style="height:3px;background:#2a1f0a;margin-top:2px;"><div style="width:62%;height:100%;background:#d4a03c;"></div></div>
+                </div>
+                <div style="flex:1;padding:4px;background:#0d0a04;border:1px solid #2a1a0a;">
+                  <div style="font-size:6px;color:#5c5010;">Pending</div>
+                  <div style="font-size:7px;color:#5c5010;">Sword Icon</div>
+                </div>
+                <div style="flex:1;padding:4px;background:#0d0a04;border:1px solid #2a1a0a;">
+                  <div style="font-size:6px;color:#5c5010;">Pending</div>
+                  <div style="font-size:7px;color:#5c5010;">Potion Vial</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent assets mini grid -->
+            <div>
+              <div style="font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Recent Forges</div>
+              <div class="asset-mini-grid">
+                <div class="asset-cell">🐉</div>
+                <div class="asset-cell">🗡️</div>
+                <div class="asset-cell">🛡️</div>
+                <div class="asset-cell">🧪</div>
+                <div class="asset-cell">💎</div>
+                <div class="asset-cell">👑</div>
+                <div class="asset-cell">📜</div>
+                <div class="asset-cell">🏆</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+         VARIANT 2 — Full Width Cards (Wide)
+         ════════════════════════════════════════════════════════════ -->
+    <div>
+      <div class="variant-label">▸ V2 — "Full Width Cards" (widescreen, info-dense)</div>
+      <div class="popup-frame popup-v2">
+        <div class="popup-title">
+          <div class="title-left">
+            <span>⚒️</span>
+            <span>Forge · Production Bay</span>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <span class="pixel-badge amber">Working</span>
+            <span style="font-size:7px;color:#8b6914;padding:2px 5px;border:1px solid #5c4510;">Lv.5</span>
+            <button class="close-btn">✕</button>
+          </div>
+        </div>
+        <div class="popup-body">
+          <!-- Big header with large portrait -->
+          <div class="agent-header">
+            <div class="big-portrait">
+              ⚒️
+              <div class="status-dot" style="background:#f59e0b;border-color:#fbbf24;"></div>
+            </div>
+            <div class="header-stats">
+              <div class="name">Forge <span style="font-size:9px;color:#a08040;letter-spacing:2px;">· Prod</span></div>
+              <div class="level">Level 5</div>
+              <div class="k-stat">
+                <div class="k-stat-label"><span>⚡ Speed</span><span class="val">7</span></div>
+                <div class="k-stat-bar"><div class="fill" style="width:70%;background:linear-gradient(90deg,#d4a03c,#f5d98a);"></div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                <div class="k-stat">
+                  <div class="k-stat-label"><span>✨ Quality</span><span class="val">8</span></div>
+                  <div class="k-stat-bar"><div class="fill" style="width:80%;background:linear-gradient(90deg,#6b8e23,#8fbc3f);"></div></div>
+                </div>
+                <div class="k-stat">
+                  <div class="k-stat-label"><span>🔬 Research</span><span class="val">6</span></div>
+                  <div class="k-stat-bar"><div class="fill" style="width:60%;background:linear-gradient(90deg,#8b2500,#c83c00);"></div></div>
+                </div>
+                <div class="k-stat">
+                  <div class="k-stat-label"><span>🛡️ Reliabil.</span><span class="val">9</span></div>
+                  <div class="k-stat-bar"><div class="fill" style="width:90%;background:linear-gradient(90deg,#25608b,#4299e0);"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Department content grid -->
+          <div class="dept-grid">
+            <div class="dept-card">
+              <div class="card-title"><span class="icon">📋</span>Production Queue</div>
+              <div style="font-size:7px;color:#8a7a4a;margin-bottom:4px;">"Fantasy Creature Pack Vol.1"</div>
+              <div style="display:flex;gap:2px;">
+                <div style="flex:1;height:4px;background:#2a1f0a;border:1px solid #5c4510;">
+                  <div style="width:45%;height:100%;background:#d4a03c;"></div>
+                </div>
+              </div>
+              <div style="display:flex;gap:2px;margin-top:4px;">
+                <div class="pixel-badge blue">Dragon 🐉</div>
+                <div class="pixel-badge" style="background:#1a1206;border-color:#3a2a0a;color:#5c5010;">Sword 🗡️</div>
+              </div>
+            </div>
+            <div class="dept-card">
+              <div class="card-title"><span class="icon">📊</span>Quality Metrics</div>
+              <div style="display:flex;gap:6px;justify-content:center;padding:6px 0;">
+                <div style="text-align:center;">
+                  <div style="font-size:14px;color:#34d399;">92%</div>
+                  <div style="font-size:6px;color:#5c5010;letter-spacing:1px;">Pass Rate</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:14px;color:#f5d98a;">84</div>
+                  <div style="font-size:6px;color:#5c5010;letter-spacing:1px;">Total Forged</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:14px;color:#f87171;">3</div>
+                  <div style="font-size:6px;color:#5c5010;letter-spacing:1px;">Reworks</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kanban mini view -->
+          <div style="margin-top:4px;">
+            <div style="font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Pipeline Kanban</div>
+            <div class="kanban-mini">
+              <div class="kb-col">
+                <div class="kb-title">🔍 Scout</div>
+                <div class="kb-card">Trend Report</div>
+                <div class="kb-card" style="opacity:0.5;">Market Intel</div>
+              </div>
+              <div class="kb-col">
+                <div class="kb-title">⚒️ Forge</div>
+                <div class="kb-card" style="border-color:#5c4510;">Dragon Sprite</div>
+                <div class="kb-card">Sword Icon</div>
+              </div>
+              <div class="kb-col">
+                <div class="kb-title">🔬 Curator</div>
+                <div class="kb-card" style="opacity:0.5;">Dragon Sprite</div>
+              </div>
+              <div class="kb-col">
+                <div class="kb-title">📦 Pack</div>
+                <div class="kb-card" style="opacity:0.3;">—</div>
+              </div>
+              <div class="kb-col">
+                <div class="kb-title">📋 List</div>
+                <div class="kb-card" style="opacity:0.3;">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       VARIANT 3 — Console Terminal (full width)
+       ════════════════════════════════════════════════════════════ -->
+  <div class="popup-grid single" style="margin-top:24px;">
+    <div>
+      <div class="variant-label">▸ V3 — "Console Terminal" (minimal, activity-log focused)</div>
+      <div class="popup-frame popup-v3" style="max-width:500px;">
+        <div class="popup-title" style="background:linear-gradient(90deg,#3a2a0a,#5c4510,#3a2a0a);">
+          <div class="title-left">
+            <span>⚒️</span>
+            <span>forge@factory:~$</span>
+          </div>
+          <button class="close-btn">✕</button>
+        </div>
+        <div class="popup-body">
+          <!-- Header stats -->
+          <div class="console-header">
+            <div class="stat-row">
+              <div class="con-stat">
+                <div class="val">5</div>
+                <div class="lbl">Level</div>
+              </div>
+              <div class="con-stat">
+                <div class="val">⚡7</div>
+                <div class="lbl">Speed</div>
+              </div>
+              <div class="con-stat">
+                <div class="val">✨8</div>
+                <div class="lbl">Quality</div>
+              </div>
+              <div class="con-stat">
+                <div class="val">🔬6</div>
+                <div class="lbl">Research</div>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span class="pixel-badge amber">WORKING</span>
+              <div style="font-size:6px;color:#5c5010;margin-top:2px;">Status: 🔥 Inspired</div>
+            </div>
+          </div>
+
+          <!-- Activity log -->
+          <div style="font-size:7px;color:#5c5010;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Activity Log (recent)</div>
+          <div class="console-line"><span class="time">[12:34:56]</span><span class="agent">Forge</span><span class="msg">Started forging Dragon Sprite...</span></div>
+          <div class="console-line"><span class="time">[12:32:10]</span><span class="agent">Scout</span><span class="msg">Delivered trend report to Forge</span></div>
+          <div class="console-line"><span class="time">[12:30:44]</span><span class="agent">Forge</span><span class="msg">Sword Icon complete! QC pending...</span></div>
+          <div class="console-line"><span class="time">[12:28:01]</span><span class="agent">Forge</span><span class="msg">Forged Potion Vial — Quality: 8/10</span></div>
+          <div class="console-line"><span class="time">[12:25:33]</span><span class="agent">Popo</span><span class="msg">Checked on Forge — status: working</span></div>
+          <div class="console-line"><span class="time">[12:22:15]</span><span class="agent">Curator</span><span class="msg">Approved Helmet Asset — forwarding to Packager</span></div>
+          <div class="console-line"><span class="time">[12:20:00]</span><span class="agent">Forge</span><span class="msg">Forging complete — Helmet Asset</span></div>
+
+          <!-- Mini progress bar at bottom -->
+          <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px;background:#0d0a04;border:1px solid #2a1a0a;">
+            <span style="font-size:7px;color:#5c5010;letter-spacing:1px;">CURRENT JOB</span>
+            <div style="flex:1;height:4px;background:#1a1206;border:1px solid #3a2a0a;">
+              <div style="width:62%;height:100%;background:#d4a03c;"></div>
+            </div>
+            <span style="font-size:8px;color:var(--accent);">Dragon Sprite</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparison -->
+  <div class="comparison-notes" style="margin-top:32px;">
+    <h3>📊 Popup Variant Comparison</h3>
+    <table>
+      <thead>
+        <tr><th>Aspect</th><th>Current</th><th>V1 — Tabs & Sidebar</th><th>V2 — Full Width Cards</th><th>V3 — Console Terminal</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Layout</td><td>Single column, stacked</td><td>2-column sidebar + main</td><td>2-row header + card grid</td><td>Terminal log + header bar</td></tr>
+        <tr><td>Max width</td><td>440px (cramped)</td><td>520px+ (flexible)</td><td>600px+ (flexible)</td><td>500px</td></tr>
+        <tr><td>Stat bars</td><td>In card, small</td><td>Sidebar, full height</td><td>Header, 3-column grid</td><td>Condensed header row</td></tr>
+        <tr><td>Content density</td><td>Low — wasted space</td><td>High — tabs hide/show</td><td>Very high — all visible</td><td>Medium — log focused</td></tr>
+        <tr><td>Asset preview</td><td>None</td><td>8-cell grid</td><td>Kanban pipeline</td><td>Text log only</td></tr>
+        <tr><td>Kanban board</td><td>None</td><td>Queue mini-cards</td><td>5-column pipeline</td><td>None</td></tr>
+        <tr><td>Effort to implement</td><td>—</td><td>★★☆ (moderate)</td><td>★★★ (major)</td><td>★☆☆ (quick win)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="comparison-notes" style="margin-top:12px;">
+    <h3>💡 Key Design Decisions</h3>
+    <ul style="list-style:none;display:flex;flex-direction:column;gap:4px;">
+      <li style="font-size:9px;color:var(--muted);padding:4px 8px;border-left:2px solid var(--dim);">
+        <strong>V1 (Recommended)</strong> — The sidebar+main layout is the best balance. It keeps stat bars always visible while the main area uses tabs to switch between department panels. The 8-cell asset preview grid gives a quick visual of recent work. The queue mini-cards add the missing Kanban visibility.
+      </li>
+      <li style="font-size:9px;color:var(--muted);padding:4px 8px;border-left:2px solid var(--dim);">
+        <strong>V2</strong> — Best for widescreen desktops. Shows ALL info at once. The 5-column Kanban mini board is the standout feature — lets you see the full pipeline from any agent popup.
+      </li>
+      <li style="font-size:9px;color:var(--muted);padding:4px 8px;border-left:2px solid var(--dim);">
+        <strong>V3 (Quick win)</strong> — Minimal code change. Replaces the current cramped layout with a terminal-style log view. Easy to implement since it mostly reuses existing log data.
+      </li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

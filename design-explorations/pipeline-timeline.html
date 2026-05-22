@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kairosoft Factory — Pipeline Timeline Concepts</title>
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     BASE THEME
+     ═══════════════════════════════════════════════════════════════ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d0a04;
+    font-family: 'Courier New', 'Courier', monospace;
+    color: #ffd700;
+    padding: 20px;
+    image-rendering: pixelated;
+  }
+  :root {
+    --bg: #0d0a04;
+    --surface: #1a1206;
+    --border: #d4a03c;
+    --accent: #f5d98a;
+    --text: #ffd700;
+    --muted: #c8b88a;
+    --dim: #5c4510;
+    --btn: #6b8e23;
+    --danger: #8b2500;
+  }
+  h1 { font-size: 16px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  h2 { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
+
+  .demo-section {
+    max-width: 900px;
+    margin: 0 auto 48px;
+  }
+  .section-title {
+    font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); padding: 12px 0 4px;
+    border-bottom: 1px solid var(--dim); margin-bottom: 16px;
+    text-shadow: 1px 1px 0 #5c4510;
+  }
+  .variant-label {
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 8px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     SHARED
+     ═══════════════════════════════════════════════════════════════ */
+  .demo-floor {
+    background: linear-gradient(180deg, #1a1206 0%, #0d0a04 100%);
+    border: 2px solid #3a2a0a;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     TIMELINE A — Horizontal Step Pipeline (Bottom Bar)
+     Best as a footer bar under the dungeon floor
+     ═══════════════════════════════════════════════════════════════ */
+  .timeline-a {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 8px 16px;
+    background: linear-gradient(180deg, #1a1206, #0d0a04);
+    border: 2px solid #3a2a0a;
+    border-top: 1px solid #5c4510;
+  }
+  .timeline-a .tl-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    padding: 4px 6px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .timeline-a .tl-step::after {
+    content: '';
+    position: absolute;
+    top: 50%; right: -4px;
+    width: 8px; height: 8px;
+    background: #0d0a04;
+    border: 2px solid #3a2a0a;
+    transform: translateY(-50%) rotate(45deg);
+    z-index: 2;
+  }
+  .timeline-a .tl-step:last-child::after { display: none; }
+  .timeline-a .tl-step .tl-index {
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: bold;
+    border: 2px solid #3a2a0a;
+    background: #0d0a04;
+    color: #5c5010;
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .timeline-a .tl-step .tl-content {
+    flex: 1; min-width: 0;
+  }
+  .timeline-a .tl-step .tl-content .tl-name {
+    font-size: 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #5c5010;
+    transition: color 0.3s;
+  }
+  .timeline-a .tl-step .tl-content .tl-agent {
+    font-size: 7px;
+    color: #3a2a0a;
+  }
+  .timeline-a .tl-step .tl-progress {
+    width: 100%;
+    height: 3px;
+    background: #0d0a04;
+    border: 1px solid #2a1a0a;
+    margin-top: 2px;
+    overflow: hidden;
+  }
+  .timeline-a .tl-step .tl-progress .tl-fill {
+    height: 100%;
+    transition: width 0.5s;
+  }
+  /* Active step */
+  .timeline-a .tl-step.active {
+    background: linear-gradient(180deg, #2a1f0a, #1a1206);
+  }
+  .timeline-a .tl-step.active::after { border-color: #5c4510; }
+  .timeline-a .tl-step.active .tl-index {
+    background: #d4a03c;
+    border-color: #f5d98a;
+    color: #1a1206;
+  }
+  .timeline-a .tl-step.active .tl-content .tl-name { color: var(--accent); }
+  .timeline-a .tl-step.active .tl-content .tl-agent { color: var(--muted); }
+  .timeline-a .tl-step.active .tl-progress { border-color: #5c4510; }
+  /* Done step */
+  .timeline-a .tl-step.done {
+    background: linear-gradient(180deg, #1a2a0a, #0d1a04);
+  }
+  .timeline-a .tl-step.done::after { border-color: #4a6b20; }
+  .timeline-a .tl-step.done .tl-index {
+    background: #6b8e23;
+    border-color: #8fbc3f;
+    color: #fff;
+  }
+  .timeline-a .tl-step.done .tl-content .tl-name { color: #8abb4a; }
+  .timeline-a .tl-step.done .tl-content .tl-agent { color: #5a7a2a; }
+  .timeline-a .tl-step.done .tl-progress .tl-fill { background: #6b8e23; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     TIMELINE B — Vertical "Dungeon Map" Pipeline
+     Shows the full pipeline as a vertical flowchart with agent icons
+     Design for a side panel or dedicated view
+     ═══════════════════════════════════════════════════════════════ */
+  .timeline-b {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 12px;
+    background: linear-gradient(135deg, #1e1408, #0d0a04);
+    border: 2px solid #3a2a0a;
+    position: relative;
+  }
+  .timeline-b::before {
+    content: '';
+    position: absolute;
+    left: 32px; top: 8px; bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      180deg,
+      #5c4510 0px, #5c4510 4px,
+      transparent 4px, transparent 8px
+    );
+  }
+  .timeline-b .tb-step {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    padding: 8px 4px;
+    position: relative;
+    z-index: 1;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .timeline-b .tb-step:hover {
+    background: rgba(212,160,60,0.05);
+  }
+  .timeline-b .tb-step .tb-dot {
+    width: 20px; height: 20px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px;
+    background: #0d0a04;
+    border: 2px solid #3a2a0a;
+    z-index: 2;
+    transition: all 0.3s;
+  }
+  .timeline-b .tb-step .tb-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px;
+    background: #0d0a04;
+    border: 1px solid #2a1a0a;
+    transition: all 0.3s;
+    min-height: 40px;
+  }
+  .timeline-b .tb-step .tb-body .tb-icon { font-size: 16px; width: 32px; text-align: center; }
+  .timeline-b .tb-step .tb-body .tb-info { flex: 1; }
+  .timeline-b .tb-step .tb-body .tb-info .tb-name {
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    transition: color 0.3s;
+  }
+  .timeline-b .tb-step .tb-body .tb-info .tb-desc {
+    font-size: 7px; color: #5c5010;
+  }
+  .timeline-b .tb-step .tb-body .tb-eta {
+    font-size: 7px; color: #5c5010;
+    letter-spacing: 0.5px;
+    text-align: right;
+  }
+  /* Active */
+  .timeline-b .tb-step.active .tb-dot {
+    background: #d4a03c;
+    border-color: #f5d98a;
+    color: #1a1206;
+  }
+  .timeline-b .tb-step.active .tb-body {
+    border-color: #5c4510;
+    background: linear-gradient(135deg, #2a1f0a, #1a1206);
+  }
+  .timeline-b .tb-step.active .tb-body .tb-name { color: var(--accent); }
+  .timeline-b .tb-step.active .tb-body .tb-desc { color: var(--muted); }
+  .timeline-b .tb-step.active .tb-body .tb-eta { color: var(--muted); }
+  /* Done */
+  .timeline-b .tb-step.done .tb-dot {
+    background: #6b8e23;
+    border-color: #8fbc3f;
+    color: #fff;
+  }
+  .timeline-b .tb-step.done .tb-body {
+    border-color: #3a5a1a;
+    background: #0d1a04;
+  }
+  .timeline-b .tb-step.done .tb-body .tb-name { color: #8abb4a; }
+  .timeline-b .tb-step.done .tb-body .tb-desc { color: #5a7a2a; }
+  /* Pending */
+  .timeline-b .tb-step.pending .tb-body {
+    opacity: 0.6;
+  }
+  .timeline-b .tb-step.pending .tb-body .tb-name { color: #3a2a0a; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     TIMELINE C — "Cycle History" Gantt-style
+     Shows past cycle completions and upcoming cycles
+     ═══════════════════════════════════════════════════════════════ */
+  .timeline-c {
+    padding: 12px;
+    background: #0a0702;
+    border: 2px solid #3a2a0a;
+  }
+  .timeline-c .tc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+    color: #5c5010;
+  }
+  .timeline-c .tc-gantt {
+    display: flex; gap: 2px;
+    position: relative;
+    padding: 4px 0;
+  }
+  .timeline-c .tc-gantt .tc-cycle {
+    flex: 1;
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 2px;
+    background: #0d0a04;
+    border: 1px solid #2a1a0a;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .timeline-c .tc-gantt .tc-cycle .tc-cycle-label {
+    font-size: 6px; color: #5c5010; letter-spacing: 0.5px;
+    text-align: center;
+  }
+  .timeline-c .tc-gantt .tc-cycle .tc-step-bar {
+    display: flex; gap: 1px; height: 6px;
+  }
+  .timeline-c .tc-gantt .tc-cycle .tc-step-bar .tc-s {
+    flex: 1;
+    border: 1px solid #2a1a0a;
+    background: #1a1206;
+    transition: all 0.3s;
+  }
+  .timeline-c .tc-gantt .tc-cycle .tc-step-bar .tc-s.done {
+    background: #6b8e23;
+    border-color: #8fbc3f;
+  }
+  .timeline-c .tc-gantt .tc-cycle .tc-step-bar .tc-s.active {
+    background: #d4a03c;
+    border-color: #f5d98a;
+    animation: pulse-bar 1s ease-in-out infinite;
+  }
+  .timeline-c .tc-gantt .tc-cycle .tc-step-bar .tc-s.failed {
+    background: #8b2500;
+    border-color: #c83c00;
+  }
+  @keyframes pulse-bar {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .timeline-c .tc-gantt .tc-cycle.current {
+    border-color: #5c4510;
+    background: #1a1206;
+  }
+  .timeline-c .tc-gantt .tc-cycle.current .tc-cycle-label {
+    color: var(--accent);
+  }
+
+  /* Cycle summary legend */
+  .tc-legend {
+    display: flex; gap: 10px; margin-top: 6px;
+    font-size: 7px; color: #5c5010; justify-content: center;
+  }
+  .tc-legend span { display: flex; align-items: center; gap: 3px; }
+  .tc-legend .swatch {
+    width: 8px; height: 8px;
+    border: 1px solid #2a1a0a;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     Comparison
+     ═══════════════════════════════════════════════════════════════ */
+  .comparison-notes {
+    margin-top: 24px; padding: 16px;
+    background: #1a1206; border: 2px solid #3a2a0a;
+  }
+  .comparison-notes h3 {
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 8px;
+  }
+  .comparison-notes ul {
+    list-style: none; display: flex; flex-direction: column; gap: 4px;
+  }
+  .comparison-notes li {
+    font-size: 9px; color: var(--muted);
+    padding: 4px 8px; border-left: 2px solid var(--dim);
+  }
+  .comparison-notes li strong { color: var(--text); }
+  .comparison-notes li .tag {
+    display: inline-block; padding: 0 4px; font-size: 7px;
+    letter-spacing: 1px; background: #2a1f0a;
+    border: 1px solid #5c4510; margin-left: 6px; color: var(--accent);
+  }
+
+  /* ── Current reference bar ── */
+  .current-bar {
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 12px;
+    background: #1c1814;
+    border: 1px solid #3a3020;
+    font-size: 10px;
+    color: #5a5040;
+    opacity: 0.6;
+  }
+  .current-bar .strike { text-decoration: line-through; color: #3a3020; }
+</style>
+</head>
+<body>
+
+<div class="demo-section">
+  <h1>🏭 Pipeline Timeline & Progress Visualization</h1>
+  <h2>3 Concepts for Seeing What's Happening Across the Factory</h2>
+
+  <!-- Current reference -->
+  <div class="variant-label">▸ CURRENT — Simple step label + thin progress bar at bottom</div>
+  <div class="current-bar">
+    <span class="strike">[SCAN]───[FORGE]───[QC]───[BUNDLE]───[LIST]</span>
+    <span style="color:#3a3020;"> (no visual timeline — just highlights current step)</span>
+  </div>
+
+  <div class="section-title">▸ Redesigned Timelines</div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       TIMELINE A — Horizontal Step Pipeline
+       ════════════════════════════════════════════════════════════ -->
+  <div>
+    <div class="variant-label">▸ T1 — "Step Pipeline" Horizontal Bar <span style="color:var(--accent)">★ RECOMMENDED</span></div>
+    <div class="timeline-a">
+      <div class="tl-step done">
+        <div class="tl-index">✓</div>
+        <div class="tl-content">
+          <div class="tl-name">Scout</div>
+          <div class="tl-agent">🔍 Intel</div>
+        </div>
+        <div class="tl-progress"><div class="tl-fill" style="width:100%;background:#6b8e23;"></div></div>
+      </div>
+      <div class="tl-step active">
+        <div class="tl-index">2</div>
+        <div class="tl-content">
+          <div class="tl-name">Forge</div>
+          <div class="tl-agent">⚒️ Prod</div>
+          <div class="tl-progress"><div class="tl-fill" style="width:62%;background:linear-gradient(90deg,#d4a03c,#f5d98a);"></div></div>
+        </div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-index">3</div>
+        <div class="tl-content">
+          <div class="tl-name">Curator</div>
+          <div class="tl-agent">🔬 QA</div>
+          <div class="tl-progress"><div class="tl-fill" style="width:0%;"></div></div>
+        </div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-index">4</div>
+        <div class="tl-content">
+          <div class="tl-name">Packager</div>
+          <div class="tl-agent">📦 Assembly</div>
+          <div class="tl-progress"><div class="tl-fill" style="width:0%;"></div></div>
+        </div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-index">5</div>
+        <div class="tl-content">
+          <div class="tl-name">Lister</div>
+          <div class="tl-agent">📋 Sales</div>
+          <div class="tl-progress"><div class="tl-fill" style="width:0%;"></div></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:6px;font-size:7px;color:#5c5010;letter-spacing:0.5px;">
+      Replace current thin pipeline bar · Each step gets an index, progress bar, agent icon · Clickable to focus agent · Active step pulses
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       TIMELINE B — Vertical "Dungeon Map" Pipeline
+       ════════════════════════════════════════════════════════════ -->
+  <div style="margin-top:24px;">
+    <div class="variant-label">▸ T2 — "Dungeon Map" Vertical Pipeline</div>
+    <div style="display:flex;gap:16px;">
+      <div class="timeline-b" style="flex:1;">
+        <div class="tb-step done">
+          <div class="tb-dot">✓</div>
+          <div class="tb-body">
+            <div class="tb-icon">🔍</div>
+            <div class="tb-info">
+              <div class="tb-name">SCAN — Scout</div>
+              <div class="tb-desc">Scanning markets for trending assets</div>
+            </div>
+            <div class="tb-eta">Complete</div>
+          </div>
+        </div>
+        <div class="tb-step active">
+          <div class="tb-dot">▶</div>
+          <div class="tb-body">
+            <div class="tb-icon">⚒️</div>
+            <div class="tb-info">
+              <div class="tb-name">FORGE — Forge</div>
+              <div class="tb-desc">Forging Dragon Sprite (62%)</div>
+              <div style="width:100%;height:3px;background:#0d0a04;border:1px solid #2a1a0a;margin-top:2px;">
+                <div style="width:62%;height:100%;background:#d4a03c;"></div>
+              </div>
+            </div>
+            <div class="tb-eta">~3s remaining</div>
+          </div>
+        </div>
+        <div class="tb-step pending">
+          <div class="tb-dot">4</div>
+          <div class="tb-body">
+            <div class="tb-icon">🔬</div>
+            <div class="tb-info">
+              <div class="tb-name">QC — Curator</div>
+              <div class="tb-desc">Quality inspection pending</div>
+            </div>
+            <div class="tb-eta">~8s</div>
+          </div>
+        </div>
+        <div class="tb-step pending">
+          <div class="tb-dot">5</div>
+          <div class="tb-body">
+            <div class="tb-icon">📦</div>
+            <div class="tb-info">
+              <div class="tb-name">BUNDLE — Packager</div>
+              <div class="tb-desc">Asset bundling pending</div>
+            </div>
+            <div class="tb-eta">~16s</div>
+          </div>
+        </div>
+        <div class="tb-step pending">
+          <div class="tb-dot">6</div>
+          <div class="tb-body">
+            <div class="tb-icon">📋</div>
+            <div class="tb-info">
+              <div class="tb-name">LIST — Lister</div>
+              <div class="tb-desc">Market listing pending</div>
+            </div>
+            <div class="tb-eta">~24s</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:140px;flex-shrink:0;">
+        <div class="variant-label" style="margin-top:0;">Pipeline Info</div>
+        <div style="padding:10px;background:#0a0702;border:1px solid #3a2a0a;font-size:8px;color:#8a7a4a;">
+          <div style="margin-bottom:6px;">
+            <div style="color:var(--dim);font-size:7px;letter-spacing:1px;">CYCLE</div>
+            <div style="font-size:14px;color:var(--accent);">#12</div>
+          </div>
+          <div style="margin-bottom:6px;">
+            <div style="color:var(--dim);font-size:7px;letter-spacing:1px;">UPTIME</div>
+            <div style="font-size:10px;color:var(--muted);">01:23:45</div>
+          </div>
+          <div>
+            <div style="color:var(--dim);font-size:7px;letter-spacing:1px;">COMPLETION</div>
+            <div style="display:flex;gap:2px;margin-top:2px;">
+              <div style="flex:1;height:6px;background:#1a1206;border:1px solid #2a1a0a;">
+                <div style="width:40%;height:100%;background:#6b8e23;"></div>
+              </div>
+            </div>
+            <div style="font-size:6px;color:#3a2a0a;margin-top:1px;">2/5 steps done</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:6px;font-size:7px;color:#5c5010;letter-spacing:0.5px;">
+      Full vertical timeline with agent icons, descriptions, progress bars, and ETA · Side panel shows cycle stats · Best for side drawer or Popo command center
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       TIMELINE C — Cycle History Gantt
+       ════════════════════════════════════════════════════════════ -->
+  <div style="margin-top:24px;">
+    <div class="variant-label">▸ T3 — "Cycle History" Gantt-style</div>
+    <div class="timeline-c">
+      <div class="tc-header">
+        <span>Cycle History (last 8 cycles)</span>
+        <span style="color:var(--accent);">Cycle #12 · Active</span>
+      </div>
+      <div class="tc-gantt">
+        <div class="tc-cycle">
+          <div class="tc-cycle-label">#5</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+          </div>
+        </div>
+        <div class="tc-cycle">
+          <div class="tc-cycle-label">#6</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s failed"></div>
+          </div>
+        </div>
+        <div class="tc-cycle">
+          <div class="tc-cycle-label">#7</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+          </div>
+        </div>
+        <div class="tc-cycle">
+          <div class="tc-cycle-label">#8</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+          </div>
+        </div>
+        <div class="tc-cycle">
+          <div class="tc-cycle-label">#9</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+          </div>
+        </div>
+        <div class="tc-cycle">
+          <div class="tc-cycle-label">#10</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+          </div>
+        </div>
+        <div class="tc-cycle">
+          <div class="tc-cycle-label">#11</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+            <div class="tc-s done"></div>
+          </div>
+        </div>
+        <div class="tc-cycle current">
+          <div class="tc-cycle-label" style="color:var(--accent);">▶ #12</div>
+          <div class="tc-step-bar">
+            <div class="tc-s done"></div>
+            <div class="tc-s active"></div>
+            <div class="tc-s"></div>
+            <div class="tc-s"></div>
+            <div class="tc-s"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tc-legend">
+        <span><span class="swatch" style="background:#6b8e23;"></span> Complete</span>
+        <span><span class="swatch" style="background:#d4a03c;"></span> In Progress</span>
+        <span><span class="swatch" style="background:#1a1206;"></span> Pending</span>
+        <span><span class="swatch" style="background:#8b2500;"></span> Failed</span>
+      </div>
+    </div>
+    <div style="margin-top:6px;font-size:7px;color:#5c5010;letter-spacing:0.5px;">
+      Each column = one cycle · Each block = pipeline step (SCAN→FORGE→QC→BUNDLE→LIST) · Adds historical context and failure tracking · Best for Popo command center
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       COMBINED CONCEPT
+       ════════════════════════════════════════════════════════════ -->
+  <div style="margin-top:24px;">
+    <div class="variant-label">▸ COMBINED — Putting it all together</div>
+    <div class="demo-floor" style="padding:0;">
+      <!-- Top: HUD -->
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:linear-gradient(180deg,#1a1206,#0d0a04);border-bottom:1px solid #3a2a0a;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div style="width:6px;height:6px;background:#34d399;animation:pulse-dot 1.5s ease-in-out infinite;"></div>
+          <span style="color:#34d399;font-size:8px;letter-spacing:1px;">LIVE</span>
+        </div>
+        <div style="width:1px;height:14px;background:#3a2a0a;"></div>
+        <span style="font-size:8px;color:#5c5010;">CYCLE #12</span>
+        <div style="width:1px;height:14px;background:#3a2a0a;"></div>
+        <span style="font-size:8px;color:#8a7a4a;"><span style="color:var(--muted);">3</span>/6</span>
+        <div style="flex:1;"></div>
+        <span style="font-size:7px;color:#3a2a0a;">⏱ 01:23:45</span>
+      </div>
+      <!-- Middle: floor placeholder -->
+      <div style="height:80px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(255,180,40,0.04),transparent);border-bottom:1px solid #2a1a0a;">
+        <span style="font-size:10px;color:#3a2a0a;letter-spacing:2px;">[ DUNGEON FLOOR — 3×3 AGENT GRID ]</span>
+      </div>
+      <!-- Bottom: timeline -->
+      <div class="timeline-a" style="border:none;border-top:1px solid #5c4510;padding:6px 12px;">
+        <div class="tl-step done" style="padding:2px 4px;">
+          <div class="tl-index" style="width:16px;height:16px;font-size:7px;">✓</div>
+          <div class="tl-content">
+            <div class="tl-name" style="font-size:7px;">Scout</div>
+          </div>
+        </div>
+        <div class="tl-step active" style="padding:2px 4px;">
+          <div class="tl-index" style="width:16px;height:16px;font-size:7px;">2</div>
+          <div class="tl-content">
+            <div class="tl-name" style="font-size:7px;color:var(--accent);">Forge</div>
+            <div class="tl-progress" style="height:2px;"><div class="tl-fill" style="width:62%;background:#d4a03c;"></div></div>
+          </div>
+        </div>
+        <div class="tl-step" style="padding:2px 4px;">
+          <div class="tl-index" style="width:16px;height:16px;font-size:7px;">3</div>
+          <div class="tl-content">
+            <div class="tl-name" style="font-size:7px;">Curator</div>
+          </div>
+        </div>
+        <div class="tl-step" style="padding:2px 4px;">
+          <div class="tl-index" style="width:16px;height:16px;font-size:7px;">4</div>
+          <div class="tl-content">
+            <div class="tl-name" style="font-size:7px;">Packager</div>
+          </div>
+        </div>
+        <div class="tl-step" style="padding:2px 4px;">
+          <div class="tl-index" style="width:16px;height:16px;font-size:7px;">5</div>
+          <div class="tl-content">
+            <div class="tl-name" style="font-size:7px;">Lister</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:6px;font-size:7px;color:#5c5010;letter-spacing:0.5px;">
+      Combined concept: compact HUD row + dungeon floor + step pipeline timeline bar at bottom — all in one cohesive layout
+    </div>
+  </div>
+
+  <!-- Comparison -->
+  <div class="comparison-notes">
+    <h3>📊 Timeline Comparison & Recommendations</h3>
+    <ul>
+      <li>
+        <strong>T1 — Step Pipeline Bar</strong> is the <strong>highest-impact quick win</strong>. Replace the current PipelineBar component with this multi-step design. Each step shows an index number, progress bar, and agent icon. The arrow connectors between steps add game-like polish. Can be implemented in ~30 minutes.
+      </li>
+      <li>
+        <strong>T2 — Dungeon Map Vertical</strong> is best as a side drawer or in the Popo command center. Adds descriptions, ETA, and inline progress bars. Great for detailed pipeline monitoring but takes more screen space. ~1-2 hours to implement.
+      </li>
+      <li>
+        <strong>T3 — Cycle History Gantt</strong> adds a completely new dimension — historical data visualization. Each column is one cycle, each cell is a pipeline step (green=done, gold=active, red=failed). Best feature: shows failure tracking and throughput at a glance. ~2-3 hours to implement (needs cycle history state).
+      </li>
+      <li>
+        <strong>Combined concept</strong>: The compact HUD + timeline bar at the bottom of the dungeon floor creates a complete game-like HUD system. The timeline replaces the current bare-bones PipelineBar.
+      </li>
+    </ul>
+  </div>
+
+</div>
+
+<style>
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+</style>
+
+<script>
+  // Animate progress bars
+  let p = 0;
+  setInterval(() => {
+    p = (p + 1) % 101;
+    document.querySelectorAll('.tl-step.active .tl-fill').forEach(el => {
+      if (el.style.background !== 'rgb(107, 142, 35)') {
+        el.style.width = p + '%';
+      }
+    });
+    document.querySelectorAll('.tb-step.active .tb-info div[style*="margin-top:2px"] > div').forEach(el => {
+      el.style.width = p + '%';
+    });
+  }, 150);
+</script>
+</body>
+</html>

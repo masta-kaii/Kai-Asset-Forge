@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kairosoft Factory — HUD Redesign Concepts</title>
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     KAIROSOFT THEME TOKENS — Shared palette & basics
+     ═══════════════════════════════════════════════════════════════ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d0a04;
+    font-family: 'Courier New', monospace;
+    color: #ffd700;
+    padding: 20px;
+    image-rendering: pixelated;
+  }
+  :root {
+    --bg: #0d0a04;
+    --surface: #1a1206;
+    --border: #d4a03c;
+    --accent: #f5d98a;
+    --text: #ffd700;
+    --muted: #c8b88a;
+    --dim: #5c4510;
+    --btn: #6b8e23;
+    --danger: #8b2500;
+  }
+
+  h1 { font-size: 16px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+  h2 { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+  .section-title {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding: 12px 0 4px;
+    border-bottom: 1px solid var(--dim);
+    margin-bottom: 16px;
+    text-shadow: 1px 1px 0 #5c4510;
+  }
+
+  /* ── Demo containers ── */
+  .demo-section {
+    max-width: 900px;
+    margin: 0 auto 48px;
+  }
+  .variant-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     VARIANT A — "Compact Console" HUD
+     Dense, game-console inspired, vertical bars for step progress
+     ═══════════════════════════════════════════════════════════════ */
+  .hud-a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 16px;
+    background: linear-gradient(180deg, #1a1206 0%, #0d0a04 100%);
+    border: 2px solid #3a2a0a;
+    border-top: 2px solid #d4a03c;
+    font-size: 10px;
+    position: relative;
+  }
+  .hud-a::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #f5d98a80, transparent);
+  }
+  .hud-a .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 0;
+    background: #34d399;
+    box-shadow: 0 0 8px #34d39966;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+    image-rendering: pixelated;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .hud-a .live-label {
+    color: #34d399;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .hud-a .hud-sep {
+    width: 1px; height: 18px;
+    background: linear-gradient(180deg, transparent, #5c4510, transparent);
+  }
+  .hud-a .hud-step-badge {
+    display: flex; align-items: center; gap: 5px;
+    padding: 2px 8px;
+    background: #2a1f0a;
+    border: 1px solid #5c4510;
+  }
+  .hud-a .hud-step-badge .step-icon { font-size: 10px; }
+  .hud-a .hud-step-badge .step-name {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--accent);
+  }
+  .hud-a .step-progress-bar {
+    width: 40px; height: 4px;
+    background: #1a1206;
+    border: 1px solid #3a2a0a;
+    position: relative;
+  }
+  .hud-a .step-progress-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #d4a03c, #f5d98a);
+    transition: width 0.3s;
+  }
+  .hud-a .hud-stats {
+    display: flex; gap: 10px;
+    color: #8a7a4a;
+    font-size: 9px;
+  }
+  .hud-a .hud-stats span {
+    display: flex; align-items: center; gap: 3px;
+  }
+  .hud-a .hud-stats .stat-icon { font-size: 8px; }
+  .hud-a .hud-stats .stat-num { color: var(--muted); }
+  .hud-a .hud-spacer { flex: 1; }
+  .hud-a .hud-uptime {
+    color: #5c5010;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+  }
+  .hud-a .hud-btn {
+    padding: 2px 8px;
+    background: linear-gradient(180deg, #6b8e23, #556b2f);
+    border: 1px solid #8fbc3f;
+    color: #fff;
+    font-family: monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 1px 1px 0 #3a4f1a;
+    transition: all 0.1s;
+  }
+  .hud-a .hud-btn:hover {
+    background: linear-gradient(180deg, #7c9e2e, #6b8e23);
+    transform: translate(1px, 1px);
+    box-shadow: 0px 0px 0 #3a4f1a;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     VARIANT B — "Panel Dashboard" HUD
+     Multi-segment dashboard with meter bars, pixel icons
+     ═══════════════════════════════════════════════════════════════ */
+  .hud-b {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #1a1206 0%, #0d0a04 100%);
+    border: 2px solid #3a2a0a;
+    border-top: 2px solid #d4a03c;
+    position: relative;
+  }
+  .hud-b-row {
+    display: flex;
+    align-items: center;
+    padding: 4px 14px;
+    gap: 10px;
+    font-size: 10px;
+  }
+  .hud-b-row + .hud-b-row {
+    border-top: 1px solid #2a1a0a;
+  }
+
+  /* Left section */
+  .hud-b .hud-b-left {
+    display: flex; align-items: center; gap: 10px;
+    min-width: 200px;
+  }
+  .hud-b .hud-b-live {
+    display: flex; align-items: center; gap: 5px;
+  }
+  .hud-b .hud-b-live .dot {
+    width: 8px; height: 8px;
+    background: #34d399;
+    border: 1px solid #6ee7b0;
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+  .hud-b .hud-b-live .label {
+    color: #34d399;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px #34d39944;
+  }
+  .hud-b .hud-b-cycle {
+    display: flex; align-items: center; gap: 4px;
+    padding: 1px 6px;
+    background: #1a1206;
+    border: 1px solid #3a2a0a;
+  }
+  .hud-b .hud-b-cycle .num {
+    color: var(--accent);
+    font-size: 10px;
+  }
+  .hud-b .hud-b-cycle .lbl {
+    color: #5c5010;
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+
+  /* Pipeline step indicators */
+  .hud-b .pipeline-steps {
+    display: flex; gap: 2px;
+    flex: 1;
+  }
+  .hud-b .pipeline-steps .ps-item {
+    display: flex; align-items: center; gap: 3px;
+    padding: 2px 6px;
+    border: 1px solid #2a1a0a;
+    background: #0d0a04;
+    transition: all 0.3s;
+  }
+  .hud-b .pipeline-steps .ps-item.active {
+    border-color: #d4a03c;
+    background: linear-gradient(180deg, #2a1f0a, #1a1206);
+    box-shadow: 0 0 6px #d4a03c33;
+  }
+  .hud-b .pipeline-steps .ps-item.done {
+    border-color: #4a6b20;
+    background: #1a2a0a;
+  }
+  .hud-b .pipeline-steps .ps-item .ps-dot {
+    width: 5px; height: 5px;
+    border-radius: 0;
+    background: #3a2a0a;
+  }
+  .hud-b .pipeline-steps .ps-item.active .ps-dot {
+    background: #f5d98a;
+    animation: pulse-dot 1s ease-in-out infinite;
+  }
+  .hud-b .pipeline-steps .ps-item.done .ps-dot {
+    background: #6b8e23;
+  }
+  .hud-b .pipeline-steps .ps-item .ps-name {
+    font-size: 7px;
+    letter-spacing: 1px;
+    color: #5c5010;
+  }
+  .hud-b .pipeline-steps .ps-item.active .ps-name {
+    color: var(--accent);
+  }
+  .hud-b .pipeline-steps .ps-item.done .ps-name {
+    color: #8a9a4a;
+  }
+  .hud-b .pipeline-steps .ps-arrow {
+    color: #2a1a0a;
+    font-size: 6px;
+  }
+
+  /* Stats section */
+  .hud-b .hud-b-stats {
+    display: flex; gap: 12px;
+    color: #8a7a4a;
+    font-size: 8px;
+  }
+  .hud-b .hud-b-stats .stat {
+    display: flex; align-items: center; gap: 3px;
+  }
+  .hud-b .hud-b-stats .stat-icon { font-size: 9px; }
+  .hud-b .hud-b-stats .stat-val { color: var(--muted); font-size: 9px; }
+
+  /* Right actions */
+  .hud-b .hud-b-actions {
+    display: flex; gap: 4px;
+  }
+  .hud-b .hud-b-actions button {
+    padding: 1px 7px;
+    background: #1a1206;
+    border: 1px solid #3a2a0a;
+    color: #8a7a4a;
+    font-family: monospace;
+    font-size: 7px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .hud-b .hud-b-actions button:hover {
+    border-color: #5c4510;
+    color: var(--muted);
+    background: #2a1f0a;
+  }
+
+  /* Bottom row — step progress meter */
+  .hud-b .hud-b-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 14px;
+    background: #0a0702;
+  }
+  .hud-b .hud-b-progress .pbar-label {
+    font-size: 7px;
+    color: #5c5010;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .hud-b .hud-b-progress .pbar-track {
+    flex: 1; height: 6px;
+    background: #0d0a04;
+    border: 1px solid #2a1a0a;
+    position: relative;
+    overflow: hidden;
+  }
+  .hud-b .hud-b-progress .pbar-track .pbar-fill {
+    height: 100%;
+    width: 62%;
+    background: repeating-linear-gradient(
+      90deg,
+      #d4a03c 0px, #d4a03c 4px,
+      #f5d98a 4px, #f5d98a 8px
+    );
+    transition: width 0.5s;
+  }
+  .hud-b .hud-b-progress .pbar-track .pbar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: rgba(255,255,255,0.12);
+  }
+  .hud-b .hud-b-progress .pbar-pct {
+    font-size: 8px;
+    color: var(--muted);
+  }
+  .hud-b .hud-b-progress .pbar-step {
+    font-size: 7px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     VARIANT C — "Pixel Compact" HUD (Minimal/Overlay style)
+     Floating overlay bar, ultra compact
+     ═══════════════════════════════════════════════════════════════ */
+  .hud-c {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: linear-gradient(180deg, rgba(26,18,6,0.95), rgba(13,10,4,0.95));
+    border: 1px solid #3a2a0a;
+    backdrop-filter: blur(2px);
+    font-size: 9px;
+    box-shadow: 2px 2px 0 #00000055;
+  }
+  .hud-c .c-live {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .hud-c .c-live .c-dot {
+    width: 6px; height: 6px;
+    background: #34d399;
+    animation: pulse-dot 1s ease-in-out infinite;
+  }
+  .hud-c .c-live .c-label {
+    color: #34d399;
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  .hud-c .c-sep {
+    width: 1px; height: 14px;
+    background: #2a1a0a;
+  }
+  .hud-c .c-step {
+    display: flex; align-items: center; gap: 4px;
+    padding: 1px 5px;
+    background: #2a1f0a;
+    border: 1px solid #5c4510;
+  }
+  .hud-c .c-step .c-step-name {
+    font-size: 8px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .hud-c .c-stat {
+    color: #8a7a4a;
+    font-size: 8px;
+  }
+  .hud-c .c-stat .c-stat-val { color: var(--muted); }
+  .hud-c .c-uptime {
+    color: #5c5010;
+    font-size: 8px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     Layout helpers
+     ═══════════════════════════════════════════════════════════════ */
+  .variants-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .comparison-notes {
+    margin-top: 24px;
+    padding: 16px;
+    background: #1a1206;
+    border: 2px solid #3a2a0a;
+  }
+  .comparison-notes h3 {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .comparison-notes ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .comparison-notes li {
+    font-size: 9px;
+    color: var(--muted);
+    padding: 4px 8px;
+    border-left: 2px solid var(--dim);
+  }
+  .comparison-notes li strong { color: var(--text); }
+  .comparison-notes li .tag {
+    display: inline-block;
+    padding: 0 4px;
+    font-size: 7px;
+    letter-spacing: 1px;
+    background: #2a1f0a;
+    border: 1px solid #5c4510;
+    margin-left: 6px;
+    color: var(--accent);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     Animated flow line (decorative)
+     ═══════════════════════════════════════════════════════════════ */
+  @keyframes flow-line {
+    0% { background-position: 0 0; }
+    100% { background-position: 20px 0; }
+  }
+  .flow-line {
+    background: repeating-linear-gradient(
+      90deg,
+      #5c4510 0px, #5c4510 6px,
+      transparent 6px, transparent 10px
+    );
+    background-size: 20px 100%;
+    animation: flow-line 0.8s linear infinite;
+  }
+
+  /* ── Current HUD reference ── */
+  .hud-current {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 12px;
+    background: #1c1814;
+    border: 1px solid #3a3020;
+    font-size: 11px;
+    color: #a09870;
+    opacity: 0.7;
+  }
+  .hud-current .strike { text-decoration: line-through; color: #5a5040; }
+</style>
+</head>
+<body>
+
+<div class="demo-section">
+  <h1>🏭 HUD Bar Redesign Concepts</h1>
+  <h2>Kairosoft Factory — 3 Layout Variants</h2>
+
+  <div class="variants-grid">
+
+    <!-- Reference: current HUD -->
+    <div>
+      <div class="variant-label">▸ CURRENT (for reference)</div>
+      <div class="hud-current">
+        <span>● <span class="strike">LIVE</span></span>
+        <span class="strike">|</span>
+        <span class="strike">Cycle: SCAN</span>
+        <span class="strike">|</span>
+        <span class="strike">👣 0/6</span>
+        <span class="strike">|</span>
+        <span class="strike">⚙ Cycle #0</span>
+        <span class="strike">|</span>
+        <span class="strike">⏱ 00:00:01</span>
+        <span>|</span>
+        <span>[📋 LOG]</span>
+      </div>
+    </div>
+
+    <!-- Variant A: Compact Console -->
+    <div>
+      <div class="variant-label">▸ VARIANT A — "Compact Console" <span style="color:var(--accent)">★ RECOMMENDED</span></div>
+      <div class="hud-a">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div class="live-dot"></div>
+          <span class="live-label">LIVE</span>
+        </div>
+        <div class="hud-sep"></div>
+        <div class="hud-step-badge">
+          <span class="step-icon">🔍</span>
+          <span class="step-name">SCAN</span>
+          <div class="step-progress-bar">
+            <div class="fill" style="width:62%"></div>
+          </div>
+        </div>
+        <div class="hud-sep"></div>
+        <div class="hud-stats">
+          <span><span class="stat-icon">👣</span><span class="stat-num">3/6</span></span>
+          <span><span class="stat-icon">⚙</span><span class="stat-num">#12</span></span>
+        </div>
+        <div class="hud-spacer"></div>
+        <div class="hud-uptime">⏱ 01:23:45</div>
+        <button class="hud-btn">📋 Log</button>
+        <button class="hud-btn" style="background:linear-gradient(180deg,#8b2500,#5c1800);border-color:#c83c00;">🔇</button>
+      </div>
+      <div style="margin-top:6px;font-size:7px;color:#5c5010;letter-spacing:0.5px;">
+        Horizontal progress bar per step · Compact icons · Reduced visual noise · 41% shorter than current
+      </div>
+    </div>
+
+    <!-- Variant B: Panel Dashboard -->
+    <div>
+      <div class="variant-label">▸ VARIANT B — "Panel Dashboard" (2-row info-rich)</div>
+      <div class="hud-b">
+        <div class="hud-b-row">
+          <div class="hud-b-left">
+            <div class="hud-b-live">
+              <div class="dot"></div>
+              <span class="label">LIVE</span>
+            </div>
+            <div class="hud-b-cycle">
+              <span class="lbl">CYCLE</span>
+              <span class="num"># 12</span>
+            </div>
+          </div>
+
+          <div class="pipeline-steps">
+            <div class="ps-item active">
+              <div class="ps-dot"></div>
+              <span class="ps-name">SCAN</span>
+            </div>
+            <span class="ps-arrow">▸</span>
+            <div class="ps-item">
+              <div class="ps-dot"></div>
+              <span class="ps-name">FORGE</span>
+            </div>
+            <span class="ps-arrow">▸</span>
+            <div class="ps-item">
+              <div class="ps-dot"></div>
+              <span class="ps-name">QC</span>
+            </div>
+            <span class="ps-arrow">▸</span>
+            <div class="ps-item">
+              <div class="ps-dot"></div>
+              <span class="ps-name">BUNDLE</span>
+            </div>
+            <span class="ps-arrow">▸</span>
+            <div class="ps-item">
+              <div class="ps-dot"></div>
+              <span class="ps-name">LIST</span>
+            </div>
+          </div>
+
+          <div class="hud-b-stats">
+            <span class="stat"><span class="stat-icon">👣</span><span class="stat-val">3/6</span></span>
+            <span class="stat"><span class="stat-icon">⚡</span><span class="stat-val">98%</span></span>
+          </div>
+
+          <div class="hud-b-actions">
+            <button>📋 Log</button>
+            <button>🔊</button>
+            <button style="border-color:#5c3010;color:#8b6940;">✕</button>
+          </div>
+        </div>
+
+        <div class="hud-b-progress">
+          <span class="pbar-label">Step</span>
+          <div class="pbar-track">
+            <div class="pbar-fill" style="width:62%"></div>
+          </div>
+          <span class="pbar-pct">62%</span>
+          <span class="pbar-step">FORGE next</span>
+          <span style="flex:1"></span>
+          <span style="font-size:7px;color:#5c5010;">⏱ 01:23:45</span>
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:7px;color:#5c5010;letter-spacing:0.5px;">
+        2-row layout · All pipeline steps visible · Step progress meter · Best for information-heavy use
+      </div>
+    </div>
+
+    <!-- Variant C: Pixel Compact (floating overlay) -->
+    <div>
+      <div class="variant-label">▸ VARIANT C — "Pixel Compact" (floating overlay, minimal)</div>
+      <div style="background:#0d0a04;padding:16px;border:1px solid #2a1a0a;">
+        <div class="hud-c">
+          <div class="c-live">
+            <div class="c-dot"></div>
+            <span class="c-label">LIVE</span>
+          </div>
+          <div class="c-sep"></div>
+          <div class="c-step">
+            <span style="font-size:8px;">🔍</span>
+            <span class="c-step-name">SCAN</span>
+          </div>
+          <div class="c-sep"></div>
+          <span class="c-stat"><span class="c-stat-val">3</span>/6</span>
+          <span class="c-stat">⚙<span class="c-stat-val"> #12</span></span>
+          <div class="c-sep"></div>
+          <div style="width:30px;height:3px;background:#1a1206;border:1px solid #2a1a0a;">
+            <div style="width:62%;height:100%;background:#d4a03c;"></div>
+          </div>
+          <div class="c-uptime">01:23:45</div>
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:7px;color:#5c5010;letter-spacing:0.5px;">
+        Floating · Transparent background · Tiny footprint · Great for overlay on dungeon floor
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Comparison Notes -->
+  <div class="comparison-notes">
+    <h3>📊 Design Decisions & Tradeoffs</h3>
+    <ul>
+      <li>
+        <strong>Variant A</strong> is the best balance — replaces text-heavy labels with pixel icons, adds the step progress bar inline, and keeps everything in a single compact row. <span class="tag">RECOMMENDED</span>
+      </li>
+      <li>
+        <strong>Variant B</strong> shows ALL 5 pipeline steps simultaneously (like a Kairosoft game status bar). The bottom progress meter adds game-like polish. Best for info-dense monitoring but takes 2x vertical space.
+      </li>
+      <li>
+        <strong>Variant C</strong> is a floating overlay HUD — semi-transparent, minimal footprint. Useful as an always-visible HUD overlaid on the dungeon floor. Less informative but more atmospheric.
+      </li>
+      <li>
+        <strong>Common improvements</strong>: Removed redundant labels (pipeline "Cycle:" prefix), consolidated stats into compact groups, added pixel-art progress bars, made buttons smaller and more game-like.
+      </li>
+      <li>
+        <strong>Quick win</strong>: Even just adding the step progress bar (Variant A's inline bar) to the current HUD is a 5-minute change that significantly improves perceived polish.
+      </li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  // Animate progress bars to show dynamic behavior
+  let p = 0;
+  setInterval(() => {
+    p = (p + 1) % 101;
+    document.querySelectorAll('.hud-a .fill, .hud-b .pbar-fill, .hud-c .fill').forEach(el => {
+      el.style.width = p + '%';
+    });
+    document.querySelector('.hud-b .pbar-pct').textContent = p + '%';
+  }, 120);
+</script>
+</body>
+</html>

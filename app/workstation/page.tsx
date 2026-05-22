@@ -938,7 +938,7 @@ export default function WorkstationPage() {
             }}>
               {soundEnabled ? <><Volume2 className="h-3 w-3 inline-block mr-1" />SFX</> : <><VolumeX className="h-3 w-3 inline-block mr-1" />MUTE</>}
             </button>
-            <button className="kairosoft-btn kairosoft-btn-danger" onClick={() => addLog("popo", "Factory shutting down for the day...", "warning")}>
+            <button className="kairosoft-btn kairosoft-btn-danger" onClick={() => addLog("popo", "Factory shutting down for the day...", "warn")}>
               <Moon className="h-3 w-3 inline-block mr-1" />CLOSE
             </button>
           </div>
