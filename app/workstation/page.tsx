@@ -1146,11 +1146,11 @@ export default function WorkstationPage() {
         </button>
 
         {/* Library button */}
-        <button onClick={() => setLibraryOpen(true)}
-          className="flex items-center gap-1 px-2 py-0.5 rounded border border-violet-700/30 hover:border-violet-500/50 text-violet-400 hover:text-violet-300 transition-colors text-[10px] bg-violet-950/20">
+        <a href="/library"
+          className="flex items-center gap-1 px-2 py-0.5 rounded border border-violet-700/30 hover:border-violet-500/50 text-violet-400 hover:text-violet-300 transition-colors text-[10px] bg-violet-950/20 no-underline">
           <BookOpen className="h-3 w-3" />
           LIBRARY
-        </button>
+        </a>
       </div>
 
       {/* ═══════ ACHIEVEMENT TOAST ═══════ */}
