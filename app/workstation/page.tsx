@@ -309,6 +309,22 @@ export default function WorkstationPage() {
   const [showLogModal, setShowLogModal] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [showForgeModal, setShowForgeModal] = useState(false)
+  
+  async function startForge() {
+    try {
+      const res = await fetch("/api/agents/task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: "auto" })
+      });
+      if (res.ok) {
+        addLog("popo", "Factory started via API", "info");
+      }
+    } catch(e) {
+      addLog("popo", "Failed to start factory", "err");
+    }
+  }
+  
 
   // Pipeline state
   const [currentPipelineStep, setCurrentPipelineStep] = useState(0)
@@ -472,247 +488,60 @@ export default function WorkstationPage() {
     // Pipeline scheduler
     let stepTimer = 0
 
-    schedulerRef.current = setInterval(() => {
-      const currentStepIdx = pipelineStepRef.current
-      const currentCycle = pipelineCycleRef.current
-      stepTimer += PIPELINE_TICK_MS
-
-      // Update step progress
-      setStepProgress(Math.min(1, stepTimer / PIPELINE_STEP_DURATION))
-
-      // Update walk movements
-      setAgents((prev) => updateWalk(prev))
-
-      if (stepTimer >= PIPELINE_STEP_DURATION) {
-        // Pipeline step complete
-        stepTimer = 0
-
-        setAgents((prev) => {
-          const next: Record<string, AgentState> = {}
-          for (const [id, st] of Object.entries(prev)) {
-            next[id] = { ...st }
-          }
-
-          const currentStep = PIPELINE_STEPS[currentStepIdx]
-          const nextStep = PIPELINE_STEPS[nextPipelineStep(currentStepIdx)]
-          const stepAgent = currentStep.agentId
-
-          // Current step agent → done briefly, then back to idle
-          if (next[stepAgent]) {
-            if (next[stepAgent].status === "working" || next[stepAgent].status === "idle") {
-              next[stepAgent] = {
-                ...next[stepAgent],
-                status: "done",
-                pulse: false,
-                message: `${currentStep.name} complete!`,
-                animMode: "idle",
+    
+    // Poll the Hermes API for real status
+    schedulerRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/api/agents/status');
+        const data = await res.json();
+        
+        if (data.success) {
+          setForgeRunning(data.isBusy);
+          
+          // Update agents based on real data
+          if (data.isBusy) {
+            setCurrentPipelineStep(1); // Show forging
+            setAgents(prev => {
+              const next = { ...prev };
+              if (next['forge']) {
+                next['forge'] = {
+                  ...next['forge'],
+                  status: 'working',
+                  message: 'Forging asset...',
+                  pulse: true
+                };
               }
-              // Add log
-              addLog(stepAgent, `${currentStep.name} complete!`, "ok")
-              // Play sound
-              if (soundEnabled) playStepComplete()
-            }
-          }
-
-          // Next step agent starts walking toward previous agent's position
-          if (next[nextStep.agentId] && next[stepAgent]) {
-            const prevAgentPos = {
-              x: Math.round(next[stepAgent].gridX),
-              y: Math.round(next[stepAgent].gridY),
-            }
-            const def = AGENTS.find(a => a.id === nextStep.agentId)
-            if (def) {
-              next[nextStep.agentId] = {
-                ...next[nextStep.agentId],
-                status: "walking",
-                message: `Heading to ${currentStep.agentId}...`,
-                animMode: "run",
-                walk: {
-                  fromX: def.homeX,
-                  fromY: def.homeY,
-                  targetX: prevAgentPos.x,
-                  targetY: prevAgentPos.y,
-                  walkProgress: 0,
-                },
-                facing: prevAgentPos.x > def.homeX ? "right" : "left",
+              return next;
+            });
+          } else {
+            setCurrentPipelineStep(0); // Show idle
+            setAgents(prev => {
+              const next = { ...prev };
+              if (next['forge'] && next['forge'].status === 'working') {
+                next['forge'] = {
+                  ...next['forge'],
+                  status: 'done',
+                  message: 'Pipeline complete!',
+                  pulse: false
+                };
               }
-            }
+              return next;
+            });
           }
-
-          return next
-        })
-
-        // Advance pipeline step
-        setCurrentPipelineStep((prev) => nextPipelineStep(prev))
-        setPipelineCycle((c) => {
-          const newCycle = c + 1
-          // Play cycle complete at the end of a full cycle (every 5 steps)
-          if (soundEnabled && newCycle % PIPELINE_STEPS.length === 0) {
-            playCycleComplete()
-          }
-          return newCycle
-        })
-      } else if (stepTimer === PIPELINE_TICK_MS) {
-        // Just started a new step
-        setAgents((prev) => {
-          const next: Record<string, AgentState> = {}
-          for (const [id, st] of Object.entries(prev)) {
-            next[id] = { ...st }
-          }
-
-          const currentStep = PIPELINE_STEPS[currentStepIdx]
-          const stepAgent = currentStep.agentId
-
-          // If this agent just arrived from walking and is at home, switch to working
-          const def = AGENTS.find(a => a.id === stepAgent)
-          if (def && next[stepAgent]) {
-            if (next[stepAgent].status !== "walking") {
-              next[stepAgent] = {
-                ...next[stepAgent],
-                status: "working" as AgentStatus,
-                pulse: true,
-                message: currentStep.label,
-                animMode: "idle",
-                gridX: def.homeX,
-                gridY: def.homeY,
-                walk: null,
-              }
-              addLog(stepAgent, currentStep.label, "info")
-            }
-          }
-
-          return next
-        })
-      } else if (stepTimer > PIPELINE_TICK_MS && stepTimer < PIPELINE_STEP_DURATION) {
-        // Mid-step: check for walking agents that arrived
-        setAgents((prev) => {
-          const next: Record<string, AgentState> = {}
-          let changed = false
-          for (const [id, st] of Object.entries(prev)) {
-            let n = { ...st }
-            // If walking agent arrived (walk was consumed, at target)
-            if (n.status === "walking" && !n.walk) {
-              // They've arrived - switch to working at their home
-              const def = AGENTS.find(a => a.id === id)
-              if (def) {
-                n = {
-                  ...n,
-                  status: "working" as AgentStatus,
-                  pulse: true,
-                  message: PIPELINE_STEPS.find(s => s.agentId === id)?.label ?? "Working...",
-                  animMode: "idle",
-                  gridX: def.homeX,
-                  gridY: def.homeY,
-                }
-                changed = true
-              }
-            }
-            next[id] = n
-          }
-          return changed ? next : prev
-        })
-      }
-
-      // ── Random buddy visits ──
-      if (Math.random() < 0.15) { // ~15% chance per tick
-        const allIds = AGENTS.map(a => a.id)
-        const idx = Math.floor(Math.random() * allIds.length)
-        const walkerId = allIds[idx]
-
-        setAgents((prev) => {
-          if (!prev[walkerId] || prev[walkerId].status !== "idle") return prev
-          const def = AGENTS.find(a => a.id === walkerId)
-          if (!def) return prev
-
-          // Pick a random buddy (different agent)
-          const buddies = AGENTS.filter(a => a.id !== walkerId)
-          const buddy = buddies[Math.floor(Math.random() * buddies.length)]
-
-          const next: Record<string, AgentState> = { ...prev }
-          next[walkerId] = {
-            ...next[walkerId],
-            status: "walking" as AgentStatus,
-            message: `Visiting ${buddy.label}...`,
-            animMode: "run",
-            walk: {
-              fromX: def.homeX,
-              fromY: def.homeY,
-              targetX: buddy.homeX,
-              targetY: buddy.homeY,
-              walkProgress: 0,
-            },
-            facing: buddy.homeX > def.homeX ? "right" : "left",
-          }
-          return next
-        })
-      }
-
-      // ── Popo checks on random agent ──
-      if (Math.random() < 0.12) {
-        setAgents((prev) => {
-          if (!prev["popo"] || prev["popo"].status !== "idle") return prev
-          const popoDef = AGENTS.find(a => a.id === "popo")
-          if (!popoDef) return prev
-
-          const targets = AGENTS.filter(a => a.id !== "popo" && prev[a.id]?.status === "working")
-          if (targets.length === 0) return prev
-          const target = targets[Math.floor(Math.random() * targets.length)]
-
-          const next: Record<string, AgentState> = { ...prev }
-          next["popo"] = {
-            ...next["popo"],
-            status: "walking" as AgentStatus,
-            message: `Checking on ${target.label}...`,
-            animMode: "run",
-            walk: {
-              fromX: popoDef.homeX,
-              fromY: popoDef.homeY,
-              targetX: target.homeX,
-              targetY: target.homeY,
-              walkProgress: 0,
-            },
-            facing: target.homeX > popoDef.homeX ? "right" : "left",
-          }
-          return next
-        })
-      }
-
-      // ── Meeting detection ──
-      setAgents((prev) => {
-        const next: Record<string, AgentState> = { ...prev }
-        // Check all pairs
-        for (let i = 0; i < AGENTS.length; i++) {
-          for (let j = i + 1; j < AGENTS.length; j++) {
-            const a = AGENTS[i]; const b = AGENTS[j]
-            const sa = next[a.id]; const sb = next[b.id]
-            if (!sa || !sb) continue
-            const ax = Math.round(sa.gridX); const ay = Math.round(sa.gridY)
-            const bx = Math.round(sb.gridX); const by = Math.round(sb.gridY)
-            const dist = Math.abs(ax - bx) + Math.abs(ay - by)
-            if (dist <= 1 && (sa.status === "walking" || sa.status === "working") && (sb.status === "walking" || sb.status === "working" || sb.status === "idle")) {
-              // Both agents are close — start meeting
-              next[a.id] = {
-                ...sa,
-                status: "meeting",
-                message: meetingLine(a.id, b.id),
-                animMode: "idle",
-                walk: null,
-                pulse: false,
-              }
-              next[b.id] = {
-                ...sb,
-                status: "meeting",
-                message: meetingLine(a.id, b.id),
-                animMode: "idle",
-                walk: null,
-                pulse: false,
-              }
+          
+          if (data.results && data.results.length > 0) {
+            // Update latest generated assets
+            const latest = data.results[data.results.length - 1];
+            if (latest.assets) {
+              setRecentAssets(latest.assets);
             }
           }
         }
-        return next
-      })
-    }, PIPELINE_TICK_MS)
+      } catch (err) {
+        console.error('Failed to poll status', err);
+      }
+    }, 5000)
+
 
     return () => {
       clearTimeout(loadTimer)
@@ -929,6 +758,9 @@ export default function WorkstationPage() {
             <span className="day-number">Day {pipelineCycle + 1}</span>
           </div>
           <div className="flex gap-2 pointer-events-auto">
+            <button className="kairosoft-btn" style={{background: 'linear-gradient(180deg, #d4a03c 0%, #8b6914 100%)', borderColor: '#f5d98a', textShadow: '1px 1px 0 #5c4510'}} onClick={() => startForge()}>
+              <Zap className="h-3 w-3 inline-block mr-1" />START
+            </button>
             <button className="kairosoft-btn" onClick={() => {
               if (soundEnabled) playLogNotification()
               setShowLogModal(true)
