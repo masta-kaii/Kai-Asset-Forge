@@ -301,6 +301,27 @@ export default function WorkstationPage() {
     setAssetsLoading(false)
   }, [])
 
+  // Fetch assets for Test Bench
+  const spinRef = useRef(0)
+  const logsEnd = useRef<HTMLDivElement>(null)
+  const logCounter = useRef(0)
+  const rafRef = useRef<number>(0)
+  const lastFrameTime = useRef(0)
+  const schedulerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pipelineStepRef = useRef(currentPipelineStep)
+  pipelineStepRef.current = currentPipelineStep
+  const pipelineCycleRef = useRef(pipelineCycle)
+  pipelineCycleRef.current = pipelineCycle
+  const pipelinePausedRef = useRef(pipelinePaused)
+  pipelinePausedRef.current = pipelinePaused
+
+  // ── Logging ──
+  const addLog = useCallback((agent: string, msg: string, type: LogEntry["type"] = "info") => {
+    const id = ++logCounter.current
+    const time = now().slice(0, 8)
+    setLogs((p) => [...p.slice(-80), { id, time, agent, msg, type }])
+  }, [])
+
   // 🎯 Decision Popup trigger — fires at end of each cycle
   const triggerDecisionPopup = useCallback((cycleNum: number) => {
     const choices = [
@@ -371,27 +392,6 @@ export default function WorkstationPage() {
     pollStats()
     const interval = setInterval(pollStats, 30000)
     return () => clearInterval(interval)
-  }, [])
-
-  // Fetch assets for Test Bench
-  const spinRef = useRef(0)
-  const logsEnd = useRef<HTMLDivElement>(null)
-  const logCounter = useRef(0)
-  const rafRef = useRef<number>(0)
-  const lastFrameTime = useRef(0)
-  const schedulerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pipelineStepRef = useRef(currentPipelineStep)
-  pipelineStepRef.current = currentPipelineStep
-  const pipelineCycleRef = useRef(pipelineCycle)
-  pipelineCycleRef.current = pipelineCycle
-  const pipelinePausedRef = useRef(pipelinePaused)
-  pipelinePausedRef.current = pipelinePaused
-
-  // ── Logging ──
-  const addLog = useCallback((agent: string, msg: string, type: LogEntry["type"] = "info") => {
-    const id = ++logCounter.current
-    const time = now().slice(0, 8)
-    setLogs((p) => [...p.slice(-80), { id, time, agent, msg, type }])
   }, [])
 
   // ── Uptime ──
