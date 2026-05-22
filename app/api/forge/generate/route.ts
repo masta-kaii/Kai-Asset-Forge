@@ -168,20 +168,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const rawCopyPath = path.join(OUTPUT_DIR, `${assetId}-raw.png`)
     await fs.copyFile(outputPath, rawCopyPath)
 
-    // 10b. Run pixel post-processor for clean pixel art quality
+    // 10b. Run pixel post-processor v2 for premium pixel art quality
     try {
-      const postProcessorPy = path.join(process.cwd(), "pixel-post-processor.py")
+      const postProcessorPy = path.join(process.cwd(), "scripts", "pixel-post-processor-v2.py")
       const cleanOutputPath = path.join(OUTPUT_DIR, `${assetId}-clean.png`)
-      execSync(
-        `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64 --no-outline`,
-        { timeout: 30000 }
+      const result = execSync(
+        `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64 --dither --score`,
+        { timeout: 30000, encoding: "utf-8" }
       )
+      // Extract quality score from JSON output (last line)
+      const lines = result.trim().split("\n")
+      const jsonLine = lines[lines.length - 1]
+      let qualityScore = 5
+      try {
+        const report = JSON.parse(jsonLine)
+        qualityScore = report.quality_score
+        console.log(`[forge/generate] Post-processor v2: ${report.colors_after} colors, quality ${qualityScore}/10 ⭐`)
+      } catch {}
       // Replace original with cleaned version
       await fs.rename(cleanOutputPath, outputPath)
-      console.log(`[forge/generate] Pixel post-processed: 32 colors, outlines, denoised`)
+      console.log(`[forge/generate] Pixel post-processed v2: quality ${qualityScore}/10`)
     } catch (postErr) {
       // Fall back to basic Jimp quantization
-      console.warn(`[forge/generate] Post-processor failed, using Jimp fallback:`, postErr)
+      console.warn(`[forge/generate] Post-processor v2 failed, using Jimp fallback:`, postErr)
       try {
         const sprite = await Jimp.read(outputPath)
         await sprite.quantize({ colors: 32, paletteQuantization: "wuquant", imageQuantization: "nearest" })
