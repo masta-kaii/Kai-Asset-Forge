@@ -11,13 +11,18 @@ import {
   AlertTriangle, Package, Sparkles, ScrollText,
   X, Monitor, MessageSquare, ChevronRight, Library, FileText, ListChecks,
   MapPin, Eye, Footprints, RefreshCw, Grid, Wallpaper,
-  Building2, Moon, Star,
+  Building2, Moon, Star, Volume2, VolumeX,
 } from "lucide-react"
 import { CuratorPanel } from "@/components/workstation/curator-panel"
 import { ScoutPanel } from "@/components/workstation/scout-panel"
 import { ListerPanel } from "@/components/workstation/lister-panel"
 import type { Asset } from "@/lib/types"
 import "./kairosoft-theme.css"
+import {
+  playPipelineStart, playStepComplete, playCycleComplete,
+  playAgentClick, playLogNotification, initAudio,
+  startAmbientDrone, stopAmbientDrone,
+} from "@/lib/factory-audio"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -302,6 +307,7 @@ export default function WorkstationPage() {
   const [loading, setLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [showLogModal, setShowLogModal] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(true)
   const [showForgeModal, setShowForgeModal] = useState(false)
 
   // Pipeline state
@@ -452,7 +458,13 @@ export default function WorkstationPage() {
   // ── Scheduler (autonomous pipeline + random walks) ──
   useEffect(() => {
     // Initial loading delay
-    const loadTimer = setTimeout(() => setLoading(false), 800)
+    const loadTimer = setTimeout(() => {
+      setLoading(false)
+      if (soundEnabled) {
+        playPipelineStart()
+        startAmbientDrone()
+      }
+    }, 800)
 
     // Fetch recent assets for Test Bench
     fetchAssets()
@@ -497,6 +509,8 @@ export default function WorkstationPage() {
               }
               // Add log
               addLog(stepAgent, `${currentStep.name} complete!`, "ok")
+              // Play sound
+              if (soundEnabled) playStepComplete()
             }
           }
 
@@ -530,7 +544,14 @@ export default function WorkstationPage() {
 
         // Advance pipeline step
         setCurrentPipelineStep((prev) => nextPipelineStep(prev))
-        setPipelineCycle((c) => c + 1)
+        setPipelineCycle((c) => {
+          const newCycle = c + 1
+          // Play cycle complete at the end of a full cycle (every 5 steps)
+          if (soundEnabled && newCycle % PIPELINE_STEPS.length === 0) {
+            playCycleComplete()
+          }
+          return newCycle
+        })
       } else if (stepTimer === PIPELINE_TICK_MS) {
         // Just started a new step
         setAgents((prev) => {
@@ -900,8 +921,22 @@ export default function WorkstationPage() {
             <span className="day-number">Day {pipelineCycle + 1}</span>
           </div>
           <div className="flex gap-2 pointer-events-auto">
-            <button className="kairosoft-btn" onClick={() => setShowLogModal(true)}>
+            <button className="kairosoft-btn" onClick={() => {
+              if (soundEnabled) playLogNotification()
+              setShowLogModal(true)
+            }}>
               <ScrollText className="h-3 w-3 inline-block mr-1" />LOG
+            </button>
+            <button className="kairosoft-btn" onClick={() => {
+              setSoundEnabled(!soundEnabled)
+              if (!soundEnabled) {
+                playPipelineStart()
+                startAmbientDrone()
+              } else {
+                stopAmbientDrone()
+              }
+            }}>
+              {soundEnabled ? <><Volume2 className="h-3 w-3 inline-block mr-1" />SFX</> : <><VolumeX className="h-3 w-3 inline-block mr-1" />MUTE</>}
             </button>
             <button className="kairosoft-btn kairosoft-btn-danger" onClick={() => addLog("popo", "Factory shutting down for the day...", "warning")}>
               <Moon className="h-3 w-3 inline-block mr-1" />CLOSE
@@ -929,7 +964,10 @@ export default function WorkstationPage() {
                   key={agent.id}
                   className="relative cursor-pointer group"
                   style={{ gridColumn: agent.homeX + 1, gridRow: agent.homeY + 1 }}
-                  onClick={() => setSelectedAgent(isSelected ? null : agent.id)}
+                  onClick={() => {
+                    if (soundEnabled) playAgentClick()
+                    setSelectedAgent(isSelected ? null : agent.id)
+                  }}
                   title={`${agent.label} — ${agent.role} (${st.status})`}
                 >
                   {/* Room container */}
