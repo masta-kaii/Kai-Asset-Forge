@@ -1,0 +1,31 @@
+{
+  "itchio": {
+    "enabled": false,
+    "username": "masta-kaii",
+    "api_key": "",
+    "game_url": "https://masta-kaii.itch.io",
+    "default_channel": "pixel-art-packs",
+    "butler_path": "butler",
+    "pricing": {
+      "small_pack": 3.99,
+      "tile_set": 8.99,
+      "animated_pack": 5.99
+    }
+  },
+  "gumroad": {
+    "enabled": false,
+    "access_token": "",
+    "default_format": "zip",
+    "pricing": {
+      "small_pack": 3.99,
+      "tile_set": 8.99,
+      "animated_pack": 5.99
+    }
+  },
+  "default_license": "CC0",
+  "default_tags": ["pixel-art", "game-assets", "sprites", "rpg-maker", "kairosoft"],
+  "description_templates": {
+    "small_pack": "A set of {count} hand-crafted pixel art sprites in the Kairosoft management sim style. Each sprite has been quality-checked against the 0x72 Dungeon Tileset standard with curated retro palettes.\n\n**Includes:**\n- {count} unique sprites (16×16)\n- Transparent PNG files\n- Game-ready pixel art\n- CC0 license — use in any project",
+    "tile_set": "A complete {theme} pixel art tileset for your RPG or simulation game. Built in the Kairosoft management sim style with quality-checked pixel art.\n\n**Includes:**\n- {count} tiles (16×16)\n- Seamless tile sheets\n- Game-ready format\n- CC0 license"
+  }
+}
