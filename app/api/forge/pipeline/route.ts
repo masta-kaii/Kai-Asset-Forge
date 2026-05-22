@@ -9,6 +9,7 @@ import { createAsset } from "@/lib/firebase/assets"
 import { createGeneration } from "@/lib/firebase/generations"
 import { uploadAssetBuffer } from "@/lib/firebase/storage"
 import type { AssetType, AssetStyle } from "@/lib/types"
+import { execSync } from "child_process"
 import { Jimp } from "jimp"
 
 export const dynamic = "force-dynamic"
@@ -24,11 +25,11 @@ const WORKFLOW_PATH = path.join(process.cwd(), "forge-workflow.json")
  */
 async function generateSprite(prompt: string, style?: string): Promise<string> {
   // 1. Read workflow template
-  const raw = await fs.readFile(path.join(process.cwd(), "forge-workflow-v3.json"), "utf-8")
+  const raw = await fs.readFile(path.join(process.cwd(), "forge-workflow-v6-dual-lora.json"), "utf-8")
   const workflow = JSON.parse(raw)
 
   // 2. Inject prompt
-  const pixelArtPrompt = `pixel art sprite of ${prompt}, 0x72 Dungeon Tileset style, bold pixel outlines, limited color palette, retro game pixel art, game-ready sprite, pure white background`
+  const pixelArtPrompt = `pixel art sprite of ${prompt}, cute chibi Kairosoft management sim style, 0x72 Dungeon Tileset quality, bold pixel outlines, limited retro color palette, warm saturated game pixel art, cute expressive character, game-ready sprite, pure white background`
   workflow["2"].inputs.text = style ? `${pixelArtPrompt}, ${style}` : pixelArtPrompt
   workflow["5"].inputs.seed = Math.floor(Math.random() * 2 ** 32)
 
@@ -81,13 +82,26 @@ async function generateSprite(prompt: string, style?: string): Promise<string> {
   await fs.mkdir(OUTPUT_DIR, { recursive: true })
   await fs.writeFile(outputPath, Buffer.from(await imgRes.arrayBuffer()))
 
-  // Color quantize to 32 colors for true pixel art
+  // Run pixel post-processor for clean pixel art quality
   try {
-    const sprite = await Jimp.read(outputPath)
-    await sprite.quantize({ colors: 32, paletteQuantization: "wuquant", imageQuantization: "nearest" })
-    await sprite.write(outputPath as `${string}.${string}`)
-  } catch {
-    // optional
+    const postProcessorPy = path.join(process.cwd(), "pixel-post-processor.py")
+    const cleanOutputPath = path.join(OUTPUT_DIR, `${path.basename(outputPath, ".png")}-clean.png`)
+    execSync(
+      `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64`,
+      { timeout: 30000 }
+    )
+    await fs.rename(cleanOutputPath, outputPath)
+    console.log(`[pipeline] Pixel post-processed: retro palette, outlines, denoised`)
+  } catch (postErr) {
+    // Fall back to basic Jimp quantization
+    console.warn(`[pipeline] Post-processor failed, using Jimp fallback:`, postErr)
+    try {
+      const sprite = await Jimp.read(outputPath)
+      await sprite.quantize({ colors: 32, paletteQuantization: "wuquant", imageQuantization: "nearest" })
+      await sprite.write(outputPath as `${string}.${string}`)
+    } catch {
+      // optional
+    }
   }
 
   return outputPath

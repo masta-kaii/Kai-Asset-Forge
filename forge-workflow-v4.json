@@ -59,21 +59,11 @@
       "vae": ["1", 2]
     }
   },
-  "7": {
-    "class_type": "ImageScale",
-    "inputs": {
-      "upscale_method": "nearest-exact",
-      "width": 64,
-      "height": 64,
-      "crop": "disabled",
-      "image": ["6", 0]
-    }
-  },
   "8": {
     "class_type": "SaveImage",
     "inputs": {
       "filename_prefix": "forge-pixel-art",
-      "images": ["7", 0]
+      "images": ["6", 0]
     }
   }
 }

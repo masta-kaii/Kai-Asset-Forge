@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import fs from "fs/promises"
 import path from "path"
 import crypto from "crypto"
+import { execSync } from "child_process"
 import { Jimp } from "jimp"
 
 // ComfyUI runs locally on :8188
@@ -34,8 +35,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       )
     }
 
-    // 2. Read the workflow template
-    const workflowPath = path.join(process.cwd(), "forge-workflow-v3.json")
+    // 2. Read the workflow template — v6 dual-LoRA (slider + dark fantasy pixel)
+    const workflowPath = path.join(process.cwd(), "forge-workflow-v6-dual-lora.json")
     let workflow: Record<string, any>
     try {
       const raw = await fs.readFile(workflowPath, "utf-8")
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // 3. Inject the user prompt into the CLIPTextEncode node (node "2")
-    const pixelArtPrompt = `pixel art sprite of ${prompt}, 0x72 Dungeon Tileset style, bold pixel outlines, limited color palette, retro game pixel art, fantasy pixel asset, game-ready sprite, 64x64 final size, pure white background`
+    const pixelArtPrompt = `pixel art sprite of ${prompt}, cute chibi Kairosoft management sim style, 0x72 Dungeon Tileset quality, bold pixel outlines, limited retro color palette, warm saturated game pixel art, cute expressive character, game-ready sprite, pure white background`
     if (style) {
       workflow["2"].inputs.text = `${pixelArtPrompt}, ${style}`
     } else {
@@ -163,15 +164,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     await fs.mkdir(OUTPUT_DIR, { recursive: true })
     await fs.writeFile(outputPath, imageBuffer)
 
-    // 10b. Color quantize to 32 colors for true pixel art feel
+    // Save a raw copy for debugging (before post-processing)
+    const rawCopyPath = path.join(OUTPUT_DIR, `${assetId}-raw.png`)
+    await fs.copyFile(outputPath, rawCopyPath)
+
+    // 10b. Run pixel post-processor for clean pixel art quality
     try {
-      const sprite = await Jimp.read(outputPath)
-      await sprite.quantize({ colors: 32, paletteQuantization: "wuquant", imageQuantization: "nearest" })
-      await sprite.write(outputPath as `${string}.${string}`)
-      console.log(`[forge/generate] Quantized to 32 colors`)
-    } catch (quantErr) {
-      // Quantization is optional — don't fail if jimp errors
-      console.warn(`[forge/generate] Color quantization skipped:`, quantErr)
+      const postProcessorPy = path.join(process.cwd(), "pixel-post-processor.py")
+      const cleanOutputPath = path.join(OUTPUT_DIR, `${assetId}-clean.png`)
+      execSync(
+        `python "${postProcessorPy}" "${outputPath}" "${cleanOutputPath}" --palette custom --size 64`,
+        { timeout: 30000 }
+      )
+      // Replace original with cleaned version
+      await fs.rename(cleanOutputPath, outputPath)
+      console.log(`[forge/generate] Pixel post-processed: 32 colors, outlines, denoised`)
+    } catch (postErr) {
+      // Fall back to basic Jimp quantization
+      console.warn(`[forge/generate] Post-processor failed, using Jimp fallback:`, postErr)
+      try {
+        const sprite = await Jimp.read(outputPath)
+        await sprite.quantize({ colors: 32, paletteQuantization: "wuquant", imageQuantization: "nearest" })
+        await sprite.write(outputPath as `${string}.${string}`)
+        console.log(`[forge/generate] Jimp fallback quantized to 32 colors`)
+      } catch (quantErr) {
+        console.warn(`[forge/generate] All quantization skipped:`, quantErr)
+      }
     }
 
     const assetUrl = `/generated-assets/${assetId}.png`

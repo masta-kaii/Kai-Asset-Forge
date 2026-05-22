@@ -1,0 +1,69 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    }
+  },
+  "9": {
+    "class_type": "LoraLoader",
+    "inputs": {
+      "lora_name": "dark_fantasy_pixel.safetensors",
+      "strength_model": 0.7,
+      "strength_clip": 0.7,
+      "model": ["1", 0],
+      "clip": ["1", 1]
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "pixel art sprite of TARGET_PROMPT, cute chibi Kairosoft management sim style, retro 16-bit video game asset, dark fantasy pixel art style, bold square pixel outlines, no anti-aliasing, crisp square pixels, flat colors only, warm saturated palette, game-ready sprite for RPG, single character centered on plain white background, clean pixel clusters, big chunky pixels, cute expressive face",
+      "clip": ["9", 1]
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "smooth shading, gradients, anti-aliasing, blur, soft edges, high detail, realistic, 8k, highly detailed, intricate, noisy, ugly, deformed, bad anatomy, disfigured, extra limbs, floating objects, high contrast, oversaturated, bloom, glow, lighting effects, atmospheric, cinematic, photorealistic, modern, abstract",
+      "clip": ["9", 1]
+    }
+  },
+  "4": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 640,
+      "height": 640,
+      "batch_size": 1
+    }
+  },
+  "5": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 42,
+      "steps": 25,
+      "cfg": 5.0,
+      "sampler_name": "dpmpp_sde",
+      "scheduler": "exponential",
+      "denoise": 1.0,
+      "model": ["9", 0],
+      "positive": ["2", 0],
+      "negative": ["3", 0],
+      "latent_image": ["4", 0]
+    }
+  },
+  "6": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["5", 0],
+      "vae": ["1", 2]
+    }
+  },
+  "8": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "forge-pixel-art",
+      "images": ["6", 0]
+    }
+  }
+}
