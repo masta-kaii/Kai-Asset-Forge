@@ -174,7 +174,7 @@ function now(): string { return new Date().toLocaleTimeString("en-US", { hour12:
 // ═══════════════════════════════════════════════════════════════════════════
 
 const statusVariants: Record<string, { cls: string; icon: typeof CheckCircle2 }> = {
-  idle:     { cls: "border-stone-600/30 bg-stone-800/30 text-stone-400", icon: Monitor },
+  idle:     { cls: "border-stone-600/30 bg-stone-800/30 text-gray-700", icon: Monitor },
   scanning: { cls: "border-blue-500/30 bg-blue-950/30 text-blue-400", icon: Activity },
   forging:  { cls: "border-amber-500/30 bg-amber-950/30 text-amber-400", icon: Zap },
   packaging:{ cls: "border-violet-500/30 bg-violet-950/30 text-violet-400", icon: Package },
@@ -232,7 +232,7 @@ function GameWindow({ title, icon, onClose, children, className }: {
             <span>{title}</span>
           </div>
           <button onClick={onClose}
-            className="p-1 rounded hover:bg-red-900/50 text-stone-400 hover:text-red-400 transition-colors">
+            className="p-1 rounded hover:bg-red-900/50 text-gray-700 hover:text-red-400 transition-colors">
             <X className="size-4" />
           </button>
         </div>
@@ -717,11 +717,11 @@ export default function WorkstationPage() {
 
         {/* Stats */}
         <div className="flex items-center gap-2.5">
-          <span className="flex items-center gap-1 text-stone-400 text-[10px]">
+          <span className="flex items-center gap-1 text-gray-700 text-[10px]">
             <Footprints className="h-3 w-3 text-stone-500" />
             <span className="font-mono tabular-nums">{workingAgents}/6</span>
           </span>
-          <span className="flex items-center gap-1 text-stone-400 text-[10px]">
+          <span className="flex items-center gap-1 text-gray-700 text-[10px]">
             <Cpu className="h-3 w-3 text-stone-500" />
             <span className="font-mono tabular-nums">Cycle #{pipelineCycle}</span>
           </span>
@@ -738,17 +738,17 @@ export default function WorkstationPage() {
 
         {/* Log button */}
         <button onClick={() => setShowLogModal(true)}
-          className="flex items-center gap-1 px-2 py-0.5 rounded border border-stone-700/50 hover:border-yellow-700/30 text-stone-400 hover:text-yellow-400 transition-colors text-[10px]">
+          className="flex items-center gap-1 px-2 py-0.5 rounded border border-stone-700/50 hover:border-yellow-700/30 text-gray-700 hover:text-yellow-400 transition-colors text-[10px]">
           <ScrollText className="h-3 w-3" />
           LOG
         </button>
       </div>
 
-      {/* ═══════ DUNGEON FLOOR — FULL SCREEN ═══════ */}
+      {/* ═══════ OFFICE FLOOR — FULL SCREEN ═══════ */}
       <div className="flex-1 relative overflow-hidden">
-        {/* Torchlit ambient glow */}
+        {/* Office ambient lighting */}
         <div className="pointer-events-none absolute inset-0 z-10" style={{
-          background: "radial-gradient(ellipse at 50% 50%, rgba(255,180,40,0.06) 0%, transparent 60%), radial-gradient(ellipse at 25% 25%, rgba(255,140,40,0.03) 0%, transparent 50%), radial-gradient(ellipse at 75% 75%, rgba(255,140,40,0.03) 0%, transparent 50%)",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%)",
         }} />
 
         {/* Kairosoft Day Counter + Factory Controls */}
@@ -785,7 +785,7 @@ export default function WorkstationPage() {
         </div>
 
         {/* Grid — 3x2 layout */}
-        <div className="absolute inset-0 p-2 sm:p-4">
+        <div className="absolute inset-0 p-2 sm:p-4 office-floor">
           <div className="grid gap-1 sm:gap-2 w-full h-full" style={{
             gridTemplateColumns: "repeat(3, 1fr)",
             gridTemplateRows: "repeat(3, 1fr)",
@@ -814,21 +814,15 @@ export default function WorkstationPage() {
                   <div className={`relative w-full h-full flex flex-col items-center justify-center border-2 transition-all duration-300 ${
                     isSelected ? "border-primary/60 ring-2 ring-primary/20" :
                     isPopo ? "border-yellow-500/60 bg-yellow-950/20 ring-1 ring-yellow-500/30" :
-                    isMeeting ? "border-violet-500/60 bg-violet-950/20 ring-1 ring-violet-500/30" :
-                    isPipelineStep ? "border-amber-500/50 bg-stone-900/40 ring-1 ring-amber-500/20" :
-                    isWorking ? "border-amber-600/30 bg-stone-900/40" :
-                    "border-stone-700/30 bg-stone-900/20 hover:border-stone-600/40"
+                    isMeeting ? "border-purple-400 bg-purple-50/80 office-wall" :
+                    isPipelineStep ? "border-yellow-400 bg-yellow-50/80 office-wall" :
+                    isWorking ? "border-blue-400 bg-blue-50/80 office-wall" :
+                    "border-gray-300 bg-white/50 hover:border-gray-400 office-wall"
                   }`}>
                     {/* Wall top border */}
                     <WallBorderTop />
 
-                    {/* Floor tile background */}
-                    <div className="absolute inset-0 opacity-40" style={{
-                      backgroundImage: `url(/sprites/tiles/floor_${agent.floorTile}.png)`,
-                      backgroundSize: "32px 32px",
-                      imageRendering: "pixelated",
-                      backgroundRepeat: "repeat",
-                    }} />
+                    {/* Removed individual dungeon tile backgrounds */}
 
                     {/* Wall decoration */}
                     {agent.wallDecor && (
@@ -864,7 +858,7 @@ export default function WorkstationPage() {
                             st.status === "walking" ? "text-blue-300" :
                             st.status === "done" ? "text-emerald-300" :
                             st.status === "working" ? "text-amber-300" :
-                            "text-stone-400"
+                            "text-gray-700"
                           }`}>{st.message}</p>
                           <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-stone-900/95 backdrop-blur border-r border-b ${
                             st.status === "meeting" ? "border-violet-500/40" :
@@ -877,12 +871,9 @@ export default function WorkstationPage() {
                       </div>
                     )}
 
-                    {/* Kairosoft building roof */}
-                    <div className="kairosoft-building absolute -top-1 left-1/2 -translate-x-1/2 z-4">
-                      <div className="roof" />
-                      <div className="building-body" style={{ width: 50 }}>
-                        <div className="sign">{agent.label}</div>
-                      </div>
+                    {/* Office desk label */}
+                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-gray-800 text-white font-mono text-[9px] rounded shadow-sm border border-gray-600">
+                      {agent.label}
                     </div>
 
                     {/* Agent sprite */}
@@ -1158,7 +1149,7 @@ export default function WorkstationPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-stone-700/30">
                 <Activity className="h-4 w-4 text-yellow-500" />
-                <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">Command Center · Factory Overview</span>
+                <span className="font-mono text-xs text-gray-700 uppercase tracking-wider">Command Center · Factory Overview</span>
               </div>
 
               {/* Quick stats */}
@@ -1218,7 +1209,7 @@ export default function WorkstationPage() {
                     return (
                       <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded bg-stone-800/40 border border-stone-700/20">
                         <div className={`h-1.5 w-1.5 rounded-full ${statusColors[st?.status ?? "idle"] ?? "bg-stone-700"} ${st?.pulse ? "animate-pulse" : ""}`} />
-                        <span className="font-mono text-[10px] text-stone-400 truncate">{a.label}</span>
+                        <span className="font-mono text-[10px] text-gray-700 truncate">{a.label}</span>
                       </div>
                     )
                   })}
@@ -1240,7 +1231,7 @@ export default function WorkstationPage() {
               <div className="flex items-center justify-between pb-2 border-b border-stone-700/30">
                 <div className="flex items-center gap-2">
                   <Eye className="h-4 w-4 text-violet-400" />
-                  <span className="font-mono text-xs text-stone-400 uppercase tracking-wider">
+                  <span className="font-mono text-xs text-gray-700 uppercase tracking-wider">
                     Test Bench · {recentAssets.length} Assets
                   </span>
                 </div>
@@ -1350,7 +1341,7 @@ export default function WorkstationPage() {
                   {selectedAsset.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {selectedAsset.tags.map((t, i) => (
-                        <span key={i} className="px-1.5 py-0.5 rounded bg-stone-800/60 text-stone-400 text-[9px] font-mono border border-stone-700/20">
+                        <span key={i} className="px-1.5 py-0.5 rounded bg-stone-800/60 text-gray-700 text-[9px] font-mono border border-stone-700/20">
                           {t}
                         </span>
                       ))}
@@ -1371,7 +1362,7 @@ export default function WorkstationPage() {
                           style={{ width: 48, height: 48, imageRendering: "pixelated" }}
                         />
                       </div>
-                      <p className="text-stone-400 text-[9px] font-mono truncate">{asset.name}</p>
+                      <p className="text-gray-700 text-[9px] font-mono truncate">{asset.name}</p>
                       <div className="flex items-center justify-between mt-1">
                         <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${
                           asset.qualityScore >= 6 ? "bg-emerald-900/30 text-emerald-400" :
@@ -1421,7 +1412,7 @@ export default function WorkstationPage() {
                     selectedAgentState.status === "walking" ? "border-blue-500/30 text-blue-400" :
                     selectedAgentState.status === "meeting" ? "border-violet-500/30 text-violet-400" :
                     selectedAgentState.status === "done" ? "border-emerald-500/30 text-emerald-400" :
-                    "border-stone-600/30 text-stone-400"
+                    "border-stone-600/30 text-gray-700"
                   }`}>
                     <div className={`h-1.5 w-1.5 rounded-full ${
                       selectedAgentState.status === "working" ? "bg-emerald-500" :
@@ -1475,7 +1466,7 @@ export default function WorkstationPage() {
                   l.type === "err" ? "text-red-400" :
                   l.type === "warn" ? "text-amber-400" :
                   l.type === "ok" ? "text-emerald-400" :
-                  "text-stone-400"
+                  "text-gray-700"
                 }>{l.msg}</span>
               </div>
             ))}
