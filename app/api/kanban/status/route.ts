@@ -86,26 +86,22 @@ export async function GET() {
 
     return NextResponse.json({
       agents,
-      pipeline: {
-        currentStep,
-        currentAgent: currentStep >= 0 ? pipelineOrder[currentStep] : null,
-        allDone,
-      },
-      board: {
-        totalTasks,
-        doneTotal,
-        blockedTotal,
-      },
+      pipeline: { currentStep, currentAgent: currentStep >= 0 ? pipelineOrder[currentStep] : null, allDone },
+      board: { totalTasks, doneTotal, blockedTotal },
     })
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: error.message,
-        agents: {},
-        pipeline: { currentStep: -1, currentAgent: null, allDone: false },
-        board: { totalTasks: 0, doneTotal: 0, blockedTotal: 0 },
+  } catch {
+    // Fallback: no Hermes CLI (Vercel production) — return empty
+    const empty = { activeCount: 0, readyCount: 0, doneCount: 0, blockedCount: 0 }
+    return NextResponse.json({
+      agents: {
+        scout: { profile: "scout", label: "Scout", ...empty },
+        forge: { profile: "forge", label: "Forge", ...empty },
+        curator: { profile: "curator", label: "Curator", ...empty },
+        packager: { profile: "packager", label: "Packager", ...empty },
+        lister: { profile: "lister", label: "Lister", ...empty },
       },
-      { status: 200 } // Don't fail — just return empty
-    )
+      pipeline: { currentStep: -1, currentAgent: null, allDone: false },
+      board: { totalTasks: 0, doneTotal: 0, blockedTotal: 0 },
+    })
   }
 }
