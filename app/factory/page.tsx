@@ -622,6 +622,19 @@ const QUICK = ["fantasy RPG warrior","sci-fi spaceship","magic health potion","d
 // ═══════════════════════════════════════════════════════════════
 export default function HermesOS() {
   const router = useRouter();
+
+  // ── AUTH GATE ──
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("kaf_auth");
+      if (!raw) { router.replace("/login"); return; }
+      const d = JSON.parse(raw);
+      if (!d.user || !d.ts || Date.now() - d.ts > 7 * 24 * 60 * 60 * 1000) {
+        router.replace("/login");
+      }
+    } catch { router.replace("/login"); }
+  }, []);
+
   const [agSt,  setAgSt]  = useState({popo:"idle",artist:"idle",qc:"idle",pkg:"idle"});
   const [agPr,  setAgPr]  = useState({popo:0,artist:0,qc:0,pkg:0});
   const [gLogs, setGLogs] = useState([]);

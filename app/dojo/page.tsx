@@ -43,20 +43,19 @@ export default function DojoPage() {
   const [trainFlash, setTrainFlash] = useState<string | null>(null);
 
   useEffect(() => {
-    const auth = localStorage.getItem("kaf_auth");
-    if (!auth) {
-      try {
-        const d = JSON.parse(auth || "{}");
-        if (d.user && d.ts && Date.now() - d.ts < 7 * 24 * 60 * 60 * 1000) {
-          // ok
-        } else {
-          router.replace("/login");
-          return;
-        }
-      } catch {
+    try {
+      const raw = localStorage.getItem("kaf_auth");
+      if (!raw) { router.replace("/login"); return; }
+      const d = JSON.parse(raw);
+      if (!d.user || !d.ts || Date.now() - d.ts > 7 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem("kaf_auth");
         router.replace("/login");
         return;
       }
+    } catch {
+      localStorage.removeItem("kaf_auth");
+      router.replace("/login");
+      return;
     }
     fetchAgents();
     const iv = setInterval(fetchAgents, 10000);
@@ -98,7 +97,10 @@ export default function DojoPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ agentId, xp, action }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        if (!data.agent) throw new Error("No agent data returned");
 
         setAgents((prev) => ({
           ...prev,
@@ -121,8 +123,9 @@ export default function DojoPage() {
           setTrainFlash(null);
           setTrainMsg("");
         }, 2500);
-      } catch {
-        setTrainMsg("> ERR: Training failed");
+      } catch (e: any) {
+        setTrainMsg(`> ERR: ${e.message || "Training failed"}`);
+        console.error("Training error:", e);
       }
       setTraining(false);
     },
