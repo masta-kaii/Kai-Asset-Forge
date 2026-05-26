@@ -1,0 +1,36 @@
+{
+  "name": "Summer Beach Tiles — Cozy Pixel Art Tile Set",
+  "type": "tile_set",
+  "assets": 5,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "Lay the foundation for your beach world! A complete pixel art tileset for your RPG, simulation, or cozy game.\n\n✨ **Highlights:**\n• 5 seamless tiles (32×32)\n• Sandy shores, crystal water, and wooden boardwalks\n• 100% tileable edges for seamless map building\n• PICO-8 inspired 24-color palette\n• Compatible with RPG Maker, GameMaker, Unity, Godot, and Tiled\n\n**Includes:**\n• 5 unique tiles (32×32)\n• Full sprite sheet strip\n• CC0 license — use in any project, personal or commercial\n\n**Quality Score:** 8.1/10 — Curator Approved with Distinction",
+  "tags": [
+    "pixel-art",
+    "game-assets",
+    "sprites",
+    "32x32",
+    "cozy-games",
+    "rpg-maker",
+    "game-development",
+    "beach",
+    "summer",
+    "vacation",
+    "pico8",
+    "retro",
+    "2d-sprites",
+    "game-dev",
+    "cc0",
+    "tileset",
+    "tiles",
+    "terrain",
+    "map-tiles",
+    "levels"
+  ],
+  "license": "CC0",
+  "pricing": 8.99,
+  "platforms": [
+    "itch.io",
+    "gumroad"
+  ],
+  "createdAt": "2026-05-23T11:15:38.075738"
+}

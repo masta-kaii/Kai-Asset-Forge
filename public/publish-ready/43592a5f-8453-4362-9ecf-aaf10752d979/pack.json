@@ -1,0 +1,23 @@
+{
+  "name": "Haunted Dungeon Decor — 39 Furniture & Props | Pixel Art Game Assets",
+  "type": "small_pack",
+  "assets": 39,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "**🪑 39 HAND-CRAFTED DUNGEON FURNITURE & PROP SPRITES — Fill Your Dungeon With Atmosphere! 🪑**\n\nFrom humble barrels and stools to regal thrones and magical portals — everything you need to make your dungeon feel alive. **All sprites CC0 licensed — use in commercial projects, no credit needed!**\n\n---\n\n**📦 WHAT'S INSIDE:**\n\n**🛏️ Furniture (11)**\nBed (with blanket), wooden bench, armchair, stools (tall & short), tables (small, long, round), ornate throne, bookshelf, wooden cabinet\n\n**🗝️ Props (12)**\nCandelabra (lit), hanging chain, cobweb cluster, glowing crystal, lantern (lit), cave mushrooms, wall torch (lit), torn tapestry, wooden sign post, ladder, stairs (up), stairs (down)\n\n**⚙️ Traps & Mechanics (6)**\nPressure plate, spike trap (retracted), spike trap (extended), lever (off), lever (on), magic portal, **MIMIC CHEST** 👀\n\n**🪣 Atmosphere & Storage (10)**\nBlacksmith anvil, wooden barrel, bones pile, wooden crate, crate stack (2-high), gravestone (weathered), wishing well, loose skull, skull pile, femur bones\n\n---\n\n**✅ ALL SPRITES:**\n- 39 unique sprites (16×16 pixels)\n- Transparent PNGs — ready for any engine\n- **CC0 LICENSE — commercial use, no credit required!**\n\n**🎨 STYLE:** 0x72 Dungeon Tileset inspired with Haunted Spectral palette\n**🏆 Curator Score: 8.3/10 — Approved with Distinction!**\n\n**💀 Perfect for:** RPGs, dungeon crawlers, adventure games, horror games, game jams, and filling empty rooms with believable dungeon clutter!",
+  "tags": [
+    "pixel-art", "game-assets", "sprites", "dungeon-props",
+    "rpg-maker", "furniture-sprites", "16x16", "tileset",
+    "fantasy-rpg", "game-dev", "indie-game", "pixel-art-furniture",
+    "dungeon-decor", "kairosoft", "game-art", "haunted",
+    "game-props", "rpg-props", "dungeon-furniture",
+    "pixel-art-props", "atmosphere-sprites", "mimic-chest",
+    "traps", "cc0", "fantasy-furniture", "dungeon-atmosphere",
+    "2d-props", "game-asset-pack", "retro-props"
+  ],
+  "license": "CC0",
+  "pricing": 3.99,
+  "marketplacePrice": 6.99,
+  "platforms": ["itch.io", "gumroad"],
+  "curatorScore": 8.3,
+  "createdAt": "2026-05-24T16:46:00.000Z"
+}

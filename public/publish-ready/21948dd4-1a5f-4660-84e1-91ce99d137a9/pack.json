@@ -1,0 +1,23 @@
+{
+  "name": "Haunted Dungeon UI Kit — 15 Interface Elements | Pixel Art Game UI",
+  "type": "small_pack",
+  "assets": 15,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "**🖥️ 15 DUNGEON-THEMED UI ELEMENTS — Complete Interface Kit for Your RPG! 🖥️**\n\nGive your game a cohesive, hand-crafted look with this complete pixel art UI kit. From buttons to progress bars — everything you need for menus, inventory, dialog boxes, and HUD. **All sprites CC0 licensed!**\n\n---\n\n**📦 WHAT'S INSIDE:**\n\n**🎮 Buttons (3)**\n- Normal state (dark stone)\n- Hover state (glowing green)\n- Pressed state (cracked stone)\n→ Ready for interactive UIs!\n\n**✅ Checkboxes (2)**\n- Unchecked (empty square)\n- Checked (filled with checkmark)\n\n**📦 Panels (2)**\n- Window frame with title bar (for dialogs)\n- Panel frame (for inventory & menus)\n\n**📊 Progress Bar (2)**\n- Background (empty track)\n- Fill segment (green for health/mana/XP)\n→ Stack multiple fills for layered bars!\n\n**🖱️ Cursor (1)**\n- Pointer hand icon\n\n**💎 Icons (5)**\n- Coin (gold) — currency display\n- Gem (blue) — premium currency\n- Heart (red) — health indicator\n- Scroll (parchment) — quest log\n- Star (gold) — rating/achievement\n\n---\n\n**✅ ALL SPRITES:**\n- 15 unique sprites (16×16 pixels)\n- Transparent PNGs — works with any engine\n- Matches 0x72 Dungeon Tileset aesthetic\n- **CC0 LICENSE — commercial use, no credit required!**\n\n**🎨 STYLE:** 0x72 Dungeon Tileset inspired — matches all packs in this collection!\n**🏆 Curator Score: 8.3/10 — Approved with Distinction!**\n\n**💀 Perfect for:** RPG menus, inventory screens, dialog boxes, HUD overlays, game jams, and any pixel art game needing a polished interface!",
+  "tags": [
+    "pixel-art", "game-assets", "sprites", "ui-elements",
+    "rpg-maker", "interface", "16x16", "game-ui",
+    "fantasy-rpg", "game-dev", "indie-game", "pixel-art-ui",
+    "buttons", "kairosoft", "hud-sprites", "haunted",
+    "ui-kit", "game-interface", "pixel-art-interface",
+    "hud-elements", "menu-sprites", "rpg-ui", "icon-set",
+    "cc0", "game-hud", "pixel-art-icons", "retro-ui",
+    "gui-sprites", "2d-ui", "game-uis"
+  ],
+  "license": "CC0",
+  "pricing": 3.99,
+  "marketplacePrice": 3.99,
+  "platforms": ["itch.io", "gumroad"],
+  "curatorScore": 8.3,
+  "createdAt": "2026-05-24T16:46:00.000Z"
+}

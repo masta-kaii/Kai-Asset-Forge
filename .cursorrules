@@ -1,0 +1,35 @@
+# Kai Asset Forge — AI Coding Rules
+
+You are inside Kai Asset Forge, Popo's autonomous pixel art factory.
+
+## Project
+- Root: C:\Users\khair\Kai-Asset-Forge
+- Pipeline: Scout → Forge → Curator → Packager → Lister
+- Gold standard: 0x72 Dungeon Tileset II v1.7
+
+## Pixel Art Quality
+- Generate sprites ONLY via: `python aseprite-forge.py --character <name>`
+- 16 character templates: dwarf, elf, wizard, orc, knight, angel, pumpkin, skeleton, goblin, imp, demon, ogre, zombie, lizard, chort, wogol
+- 30 dungeon tiles: `python aseprite-forge.py --tiles`
+- 24-color dungeon palette (hue-shifted, never grey shadows)
+- 1px external outline only
+- idle×4 + walk×4 + hit×1 per character
+- Verify: `ls forge-output/ && file forge-output/*/*.png`
+
+## Workflow
+1. Build → git add -A → git commit → git push (every step)
+2. Execute full plans without pausing
+3. Verify files on disk before reporting
+4. "now what?" = pick most critical action, execute now. No menus.
+
+## Agents (Hermes Profiles)
+- scout — Elf archer, market research
+- forge — Dwarf smith, sprite generation (aseprite-forge.py)
+- curator — Knight, quality inspection
+- packager — Goblin, bundle assembly
+- lister — Elf merchant, marketplace listings
+
+## Tools
+- Aseprite CLI: C:\Program Files (x86)\Steam\steamapps\common\Aseprite\Aseprite.exe
+- Dashboard: http://localhost:3004/factory (Hermes OS v5)
+- Hermes: hermes CLI with profiles

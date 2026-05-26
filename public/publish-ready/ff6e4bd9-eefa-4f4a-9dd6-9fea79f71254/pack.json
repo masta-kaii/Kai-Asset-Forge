@@ -1,0 +1,21 @@
+{
+  "name": "Tiles & Terrain — Dungeon Floor & Wall Pack",
+  "type": "tile_set",
+  "assets": 29,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "A complete Haunted Dungeon Tiles & Terrain pixel art tileset for your RPG or simulation game. Built in the Kairosoft management sim style with quality-checked pixel art.\n\n**Includes:**\n- 29 tiles (16×16)\n- Seamless tile sheets\n- Game-ready format\n- CC0 license",
+  "tags": [
+    "pixel-art",
+    "game-assets",
+    "sprites",
+    "rpg-maker",
+    "kairosoft"
+  ],
+  "license": "CC0",
+  "pricing": 8.99,
+  "platforms": [
+    "itch.io",
+    "gumroad"
+  ],
+  "createdAt": "2026-05-23T02:04:51.200Z"
+}

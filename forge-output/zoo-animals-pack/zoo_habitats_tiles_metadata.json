@@ -1,0 +1,153 @@
+{
+  "pack_name": "Zoo Habitats & Tiles Pack",
+  "pack_key": "zoo_habitats_tiles",
+  "description": "10 environment props and terrain tiles for building zoo habitats and enclosures.",
+  "total_sprites": 10,
+  "sprite_size": "32x32",
+  "standard": "0x72 Dungeon Tileset (adapted for theme pack)",
+  "curator_verdict": "ALL APPROVED",
+  "average_score": 6.8,
+  "tags": [
+    "environment",
+    "tiles",
+    "terrain",
+    "zoo",
+    "props",
+    "habitats"
+  ],
+  "categories": [
+    "Environment",
+    "Tile"
+  ],
+  "pricing_variants": {
+    "small": {
+      "sprite_count": 3,
+      "description": "Best for small projects",
+      "sprites_included": [
+        "entrance_gate",
+        "water_pool",
+        "zoo_fence"
+      ]
+    },
+    "medium": {
+      "sprite_count": 6,
+      "description": "Best for medium projects",
+      "sprites_included": [
+        "entrance_gate",
+        "water_pool",
+        "zoo_fence",
+        "zoo_rocks",
+        "zoo_sign",
+        "zoo_tree"
+      ]
+    },
+    "large": {
+      "sprite_count": 10,
+      "description": "Best for large projects",
+      "sprites_included": [
+        "entrance_gate",
+        "water_pool",
+        "zoo_fence",
+        "zoo_rocks",
+        "zoo_sign",
+        "zoo_tree",
+        "feeding_area",
+        "tile_dirt",
+        "tile_grass",
+        "tile_trail"
+      ]
+    }
+  },
+  "sprites": [
+    {
+      "name": "entrance_gate",
+      "description": "Zoo entrance archway",
+      "category": "Environment",
+      "score": 6.5,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "water_pool",
+      "description": "Blue water pool \u2605 Distinction",
+      "category": "Environment",
+      "score": 8.0,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_fence",
+      "description": "Wooden fence enclosure",
+      "category": "Environment",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_rocks",
+      "description": "Rock formation for habitats",
+      "category": "Environment",
+      "score": 6.5,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_sign",
+      "description": "Directional zoo sign",
+      "category": "Environment",
+      "score": 6.5,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_tree",
+      "description": "Large canopy tree",
+      "category": "Environment",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "feeding_area",
+      "description": "Animal feeding station",
+      "category": "Environment",
+      "score": 6.0,
+      "colors": 5,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tile_dirt",
+      "description": "Dirt ground tile",
+      "category": "Tile",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tile_grass",
+      "description": "Grassy ground tile",
+      "category": "Tile",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tile_trail",
+      "description": "Dirt trail tile",
+      "category": "Tile",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    }
+  ]
+}

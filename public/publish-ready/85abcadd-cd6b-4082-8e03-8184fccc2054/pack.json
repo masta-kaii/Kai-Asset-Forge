@@ -1,0 +1,23 @@
+{
+  "name": "Haunted Armory & Treasures — 26 Weapons, Armor & Magic Items | 16×16 Pixel Art",
+  "type": "small_pack",
+  "assets": 26,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "**⚔️ 26 METICULOUSLY CRAFTED LOOT SPRITES — Weapons, Armor, Magic & Rare Treasures! ⚔️**\n\nMake finding loot feel **rewarding**! This pack covers everything from humble daggers to legendary crowns and dragon eggs. Perfect for RPG inventory systems, shop menus, loot drops, and crafting tables. **All sprites CC0 licensed!**\n\n---\n\n**📦 WHAT'S INSIDE:**\n\n**⚔️ Weapons (8)**\nDagger, spear, mace, battle axe, longbow, wizard staff, flame sword (enchanted!), magic wand\n\n**🛡️ Armor & Gear (5)**\nIron helmet, steel gauntlets, armored boots, basic shield, quiver of arrows\n\n**🔮 Magic Items (7)**\nEnchanted amulet, mystic orb, magic ring, glowing crystal, ancient tome, phoenix feather, star charm\n\n**💎 Treasures & Valuables (6)**\nRoyal crown, jeweled crown, golden chalice, treasure pile (coins!), skull relic, dragon egg, rainbow potion\n\n---\n\n**✅ ALL SPRITES:**\n- 26 unique sprites (16×16 pixels)\n- Perfect size for inventory grids and equipment slots\n- Transparent PNGs — drag & drop into any engine\n- **CC0 LICENSE — commercial use, no credit required!**\n\n**🎨 STYLE:** 0x72 Dungeon Tileset inspired with consistent Haunted palette\n**🏆 Curator Score: 8.3/10 — Approved with Distinction!**\n\n**💀 Perfect for:** RPGs, roguelikes, shop UIs, crafting systems, loot tables, game jams, and any game with a rewarding loot economy!",
+  "tags": [
+    "pixel-art", "game-assets", "sprites", "weapons",
+    "rpg-maker", "magic-items", "16x16", "treasure-sprites",
+    "fantasy-rpg", "game-dev", "indie-game", "loot-sprites",
+    "armory", "kairosoft", "item-icons", "haunted",
+    "weapon-sprites", "rpg-items", "pixel-art-weapons",
+    "magic-artifacts", "treasure-icons", "inventory-sprites",
+    "game-loot", "cc0", "rpg-inventory", "crafting-sprites",
+    "equipment-icons", "pixel-art-items", "dungeon-loot"
+  ],
+  "license": "CC0",
+  "pricing": 3.99,
+  "marketplacePrice": 4.99,
+  "platforms": ["itch.io", "gumroad"],
+  "curatorScore": 8.3,
+  "createdAt": "2026-05-24T16:46:00.000Z"
+}

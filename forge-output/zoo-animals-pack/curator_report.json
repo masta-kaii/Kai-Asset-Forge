@@ -1,0 +1,401 @@
+{
+  "pack": "Pixel Zoo & Safari Pack",
+  "total_sprites": 30,
+  "approved": 22,
+  "rejected": 8,
+  "distinction": 0,
+  "standard_pass": 22,
+  "average_score": 6.37,
+  "sprites": [
+    {
+      "name": "bear",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Large brown bear with round ears",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 59.8,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "binoculars",
+      "score": 6.0,
+      "colors": 3,
+      "size": "32x32",
+      "description": "Viewing binoculars",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 88.3,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "compass",
+      "score": 6.4,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Navigational compass",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 80.5,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "crocodile",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Green reptile with long snout",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 61.6,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "elephant",
+      "score": 6.5,
+      "colors": 6,
+      "size": "32x32",
+      "description": "Gray giant with trunk and tusks",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 49.7,
+        "unique_colors_actual": 5
+      }
+    },
+    {
+      "name": "entrance_gate",
+      "score": 6.4,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Zoo entrance archway",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 70.7,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "feeding_area",
+      "score": 5.7,
+      "colors": 6,
+      "size": "32x32",
+      "description": "Animal feeding station",
+      "inspection": {
+        "palette_issues": 2,
+        "banding_ratio": 0.0,
+        "black_pct": 85.9,
+        "unique_colors_actual": 6
+      }
+    },
+    {
+      "name": "flamingo",
+      "score": 5.7,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Pink wading bird on one leg",
+      "inspection": {
+        "palette_issues": 2,
+        "banding_ratio": 0.0,
+        "black_pct": 82.6,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "giraffe",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Tall spotted mammal with long neck",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 67.9,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "hippo",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Massive gray river horse",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 53.4,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "lion",
+      "score": 7.0,
+      "colors": 5,
+      "size": "32x32",
+      "description": "King of the jungle with golden mane",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 58.4,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "monkey",
+      "score": 6.4,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Playful brown primate with long tail",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 60.5,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "peacock",
+      "score": 5.0,
+      "colors": 8,
+      "size": "32x32",
+      "description": "Blue bird with elaborate tail display",
+      "inspection": {
+        "palette_issues": 2,
+        "banding_ratio": 0.0,
+        "black_pct": 79.8,
+        "unique_colors_actual": 7
+      }
+    },
+    {
+      "name": "penguin",
+      "score": 7.0,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Black and white Antarctic bird",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 73.2,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "rhino",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Armored gray mammal with horn",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 59.4,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "safari_jeep",
+      "score": 6.5,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Green safari tour vehicle",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 64.1,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "safari_tent",
+      "score": 5.8,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Canvas camping tent",
+      "inspection": {
+        "palette_issues": 2,
+        "banding_ratio": 0.0,
+        "black_pct": 53.7,
+        "unique_colors_actual": 5
+      }
+    },
+    {
+      "name": "snake",
+      "score": 5.7,
+      "colors": 6,
+      "size": "32x32",
+      "description": "Green coiled serpent with forked tongue",
+      "inspection": {
+        "palette_issues": 2,
+        "banding_ratio": 0.0,
+        "black_pct": 67.6,
+        "unique_colors_actual": 5
+      }
+    },
+    {
+      "name": "tiger",
+      "score": 5.8,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Striped orange predator",
+      "inspection": {
+        "palette_issues": 2,
+        "banding_ratio": 0.0,
+        "black_pct": 66.1,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "tile_dirt",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "description": "Dirt ground tile",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 0.0,
+        "unique_colors_actual": 2
+      }
+    },
+    {
+      "name": "tile_grass",
+      "score": 6.3,
+      "colors": 2,
+      "size": "32x32",
+      "description": "Grassy ground tile",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 0.0,
+        "unique_colors_actual": 2
+      }
+    },
+    {
+      "name": "tile_trail",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "description": "Dirt trail tile",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 0.0,
+        "unique_colors_actual": 2
+      }
+    },
+    {
+      "name": "tropical_bird",
+      "score": 4.9,
+      "colors": 6,
+      "size": "32x32",
+      "description": "Colorful exotic bird",
+      "inspection": {
+        "palette_issues": 3,
+        "banding_ratio": 0.0,
+        "black_pct": 83.7,
+        "unique_colors_actual": 5
+      }
+    },
+    {
+      "name": "water_pool",
+      "score": 5.0,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Blue water pool for aquatic animals",
+      "inspection": {
+        "palette_issues": 2,
+        "banding_ratio": 0.0,
+        "black_pct": 57.0,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "zebra",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Black and white striped equine",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 72.3,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "zoo_fence",
+      "score": 6.3,
+      "colors": 5,
+      "size": "32x32",
+      "description": "Wooden fence enclosure",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 60.0,
+        "unique_colors_actual": 5
+      }
+    },
+    {
+      "name": "zoo_map",
+      "score": 6.4,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Zoo map with trails",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 34.4,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "zoo_rocks",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "description": "Rock formation for habitats",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 72.7,
+        "unique_colors_actual": 3
+      }
+    },
+    {
+      "name": "zoo_sign",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Directional zoo sign",
+      "inspection": {
+        "palette_issues": 0,
+        "banding_ratio": 0.0,
+        "black_pct": 67.2,
+        "unique_colors_actual": 4
+      }
+    },
+    {
+      "name": "zoo_tree",
+      "score": 6.3,
+      "colors": 4,
+      "size": "32x32",
+      "description": "Large canopy tree",
+      "inspection": {
+        "palette_issues": 1,
+        "banding_ratio": 0.0,
+        "black_pct": 53.5,
+        "unique_colors_actual": 4
+      }
+    }
+  ]
+}

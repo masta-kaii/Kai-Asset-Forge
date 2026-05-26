@@ -1,0 +1,23 @@
+{
+  "name": "Haunted Dungeon Tiles & Terrain — 30-Piece Tile Set | 16×16 Pixel Art",
+  "type": "tile_set",
+  "assets": 30,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "**🧱 30 METICULOUSLY CRAFTED HAUNTED DUNGEON TILES — Build Your Dungeon From The Ground Up! 🧱**\n\nThis comprehensive tile set spans floors, walls, corners, doors, and interactive props for a complete dungeon environment. **Every tile is CC0 licensed — use in commercial games, no credit needed!**\n\n---\n\n**📦 WHAT'S INSIDE:**\n\n**Floors (8)** — 8 variations including cracked stone, mossy stone, smooth flagstone, blood-stained, and rune-etched. Mix & match for natural-looking dungeon floors!\n\n**Walls (12)** — Brick wall segments (left/mid/right), 4 corner pieces (TL/TR/BL/BR), wall banner with haunted emblem, crumbling wall hole, wall torch, wall top with spikes\n\n**Doors (2)** — Heavy iron door (closed) + Creaking door (open) — perfect for dramatic reveals!\n\n**Interactive Props (4)** — Treasure chest (closed), treasure chest (open with loot), glowing key, magic potions (blue/green/red)\n\n**Special Features (4)** — Ornate stone columns, hanging wall chains, brazier with spectral flame\n\n---\n\n**✅ ALL SPRITES:**\n- 30 unique tiles (16×16 pixels)\n- Transparent PNGs — compatible with any game engine\n- Seamless tiling for infinite dungeon generation\n- **CC0 LICENSE — commercial use, no credit required!**\n\n**🎨 STYLE:** 0x72 Dungeon Tileset standard with Haunted Spectral palette (25 colors)\n**🏆 Curator Score: 8.3/10 — Approved with Distinction!**\n\n**💀 Perfect for:** Dungeon crawlers, roguelikes, procedural generation, RPG Maker, Godot, Unity, GameMaker, Tiled, and top-down adventure games. Seamless integration with all packs in this collection!",
+  "tags": [
+    "pixel-art", "game-assets", "tileset", "dungeon-tiles",
+    "16x16", "rpg-maker", "tilemap", "pixel-art-tiles",
+    "fantasy-rpg", "game-dev", "indie-game", "dungeon",
+    "kairosoft", "game-art", "haunted", "dungeon-tileset",
+    "pixel-art-tileset", "tiles", "terrain", "rpg-tiles",
+    "game-tiles", "retro-tileset", "rpg-maker-tiles",
+    "procedural-generation", "godot", "unity-assets",
+    "game-maker", "tiled-tileset", "cc0", "2d-tileset"
+  ],
+  "license": "CC0",
+  "pricing": 8.99,
+  "marketplacePrice": 8.99,
+  "platforms": ["itch.io", "gumroad"],
+  "curatorScore": 8.3,
+  "createdAt": "2026-05-24T16:46:00.000Z"
+}

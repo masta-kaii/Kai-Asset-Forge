@@ -1,0 +1,159 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Kai Asset Forge — AI Coding Agent Rules
+# These rules are read by Cline, Roo Code, Windsurf, Cursor, and Hermes.
+# Keep them all in sync.
+# ═══════════════════════════════════════════════════════════════════════
+
+## PROJECT IDENTITY
+
+- **Name:** Kai Asset Forge
+- **Purpose:** Autonomous pixel art factory producing game-ready sprites and asset packs
+- **CEO:** Popo
+- **Location:** C:\Users\khair\Kai-Asset-Forge
+
+## PIPELINE ARCHITECTURE
+
+```
+Scout (research) → Forge (generate) → Curator (QC) → Packager (bundle) → Lister (publish)
+```
+
+Each stage runs as a separate Hermes profile agent with its own SOUL.md. Never skip the chain.
+
+### Agent Profiles (all at ~/AppData/Local/hermes/profiles/)
+
+| Agent | Profile | Personality | Tool |
+|-------|---------|-------------|------|
+| Scout | `scout` | Elf archer, curious, dramatic | web search |
+| Forge | `forge` | Dwarf smith, gruff, quality-obsessed | `aseprite-forge.py` |
+| Curator | `curator` | Knight, precise, uncompromising | vision_analyze |
+| Packager | `packager` | Goblin inventor, energetic, tidy | file ops |
+| Lister | `lister` | Elf merchant, charming, sales-savvy | file ops |
+
+## MANDATORY PIXEL ART QUALITY STANDARD
+
+### 0x72 Dungeon Tileset II v1.7 — THE GOLD STANDARD
+
+- **Character sprites:** 16×28 (humanoid), 16×22 (small), 16×16 or 32×36 (variants)
+- **Palette:** 24-color dungeon palette (hue-shifted: gold→orange→brown→dark red)
+- **Outlines:** 1px external outline only (black #000000)
+- **Shading:** 2-3 shades per material, hue-shifted shadows (NEVER grey/black shadows)
+- **Dithering:** Minimal checkerboard on large flat areas only
+- **Animation:** idle×4 + walk×4 + hit×1 minimum per character
+
+### NEVER DO THIS:
+
+- ❌ Use DALL-E/SDXL downscaling for character sprites (blurry edges, no intentional pixels)
+- ❌ Use grey/black for shadows (hue-shift instead)
+- ❌ Use internal outlines (outlines go OUTSIDE the sprite only)
+- ❌ Claim generation without verifying real files exist on disk
+- ❌ Use lorem ipsum or placeholder art — everything must be real
+
+### ALWAYS DO THIS:
+
+- ✅ Use `aseprite-forge.py` for ALL character sprites
+- ✅ Verify output with `ls forge-output/` and `file forge-output/*.png`
+- ✅ Match 0x72 palette from reference tileset
+- ✅ Push to GitHub after every completed build step
+- ✅ Report file paths, not just "done"
+
+## TOOLS & COMMANDS
+
+### Primary Sprite Generator: Aseprite Forge
+
+```bash
+cd C:\Users\khair\Kai-Asset-Forge
+python aseprite-forge.py --character dwarf              # Single character
+python aseprite-forge.py --character elf,wizard,orc     # Multiple
+python aseprite-forge.py --all                          # All 16 templates
+python aseprite-forge.py --tiles                        # 30 dungeon tiles
+python aseprite-forge.py --list                         # List available
+```
+
+**Aseprite CLI:** `C:\Program Files (x86)\Steam\steamapps\common\Aseprite\Aseprite.exe`
+
+### Available Characters (16 templates)
+
+| Size | Characters |
+|------|-----------|
+| 16×28 | dwarf, elf, wizard, orc, knight, lizard |
+| 16×22 | angel, pumpkin |
+| 16×16 | skeleton, goblin, imp |
+| 16×23 | chort, wogol |
+| 32×36 | demon, ogre, zombie |
+
+### Available Tiles (30)
+
+Floors (8), Walls (11), Objects (11: chests, doors, column, potions, coin, key, sword, shield)
+
+### Sprite Enhancer
+
+```bash
+python sprite-enhancer.py --all    # Post-process all sprites in forge-output/aseprite/
+```
+
+### Verification Commands
+
+```bash
+ls -la forge-output/
+file forge-output/*/*.png
+# Each PNG should be ~260-280 bytes (tight pixel art, not AI bloated)
+```
+
+## QUALITY TIER PRIORITY
+
+| Tier | Tool | Quality | Use for |
+|------|------|---------|---------|
+| 🥇 | `aseprite-forge.py` | 0x72 match | ALL character sprites (16-32px) |
+| 🥇 | `aseprite-forge.py --tiles` | 0x72 match | Dungeon tiles + objects |
+| 🥈 | `sprite-forge.py` | Decent PIL | Fallback only if Aseprite unavailable |
+| 🥉 | SDXL + post-processor | 64×64 only | Large sprites, concepts, backgrounds |
+
+## WORKFLOW RULES
+
+### 1. Push After Every Build Step
+
+```bash
+git add -A && git commit -m "type: description" && git push
+```
+Each completed feature/sprite = one commit. Never batch.
+
+### 2. All-at-Once Delivery
+
+When given a multi-step plan, execute ALL steps without pausing to ask "what next?".
+Do NOT stop mid-way to ask "ready for next?" — just keep building until done or blocked.
+
+### 3. Verify Files EXIST Before Reporting
+
+**The user checks disk.** Never say "generated sprite X" without:
+```bash
+ls -la path/to/output/
+file path/to/output/*.png
+```
+
+### 4. Push to GitHub Convention
+
+- Commits: `feat:`, `fix:`, `chore:`, `docs:`, `style:`
+- Branch: `main` (push directly)
+
+## GITHUB
+
+- **Remote:** `origin` (standard)
+- **Push flow:** Build → git add -A → git commit → git push
+
+## PIXEL ART 10/10 PIPELINE
+
+When the user asks for "10/10 pixel art quality":
+
+1. **BLOCK-OUT** — Define shapes at 4x resolution using rounded rectangles, ellipses
+2. **SHADE** — Apply 4-ramp hue-shifted palette per material (shadow→base→highlight)
+3. **COLOR** — Optical mixing, ensure no two adjacent pixels share same color
+4. **DETAIL** — 1px outline pass, dithering pass, final cleanup
+
+Warm ramp: gold → orange → BROWN → dark red (never pink)
+
+## CRITICAL PITFALLS
+
+- **Agent hallucination:** Forge/Curator/Packager agents describe creating files but write nothing. Always verify disk.
+- **Wrong parent chaining:** Pipeline tasks must be sequential (Scout→Forge→Curator→Packager→Lister), not all children of Scout.
+- **Fake simulation:** Never add fake animation loops or random-number progress to the workstation. All data must come from real sources.
+- **Passive prompt response:** When user says "now what?" / "do it" — identify the single most critical action and execute immediately. No menus, no questions.

@@ -1,0 +1,33 @@
+You are coding inside **Kai Asset Forge** — an autonomous pixel art factory run by CEO Popo.
+
+## IDENTITY
+- **Project:** C:\Users\khair\Kai-Asset-Forge
+- **Pipeline:** Scout → Forge → Curator → Packager → Lister
+- **Quality Standard:** 0x72 Dungeon Tileset II v1.7
+
+## PIXEL ART RULES (CRITICAL)
+- **Primary tool:** `python aseprite-forge.py --character <name>` (16 templates)
+- **Never** use DALL-E/SDXL downscaling for character sprites
+- **Always** verify output with `ls forge-output/` and `file forge-output/*.png`
+- **Palette:** 24-color dungeon palette, hue-shifted shadows (gold→orange→brown→dark red)
+- **Outlines:** 1px external only (black)
+- **Animation:** idle×4 + walk×4 + hit×1 per character
+
+## WORKFLOW
+1. Push to GitHub after every completed build step
+2. Execute ALL planned steps without pausing to ask "what next?"
+3. Never claim creation without verifying real files on disk
+4. When user says "now what?" / "do it" — pick the most critical action and execute immediately
+
+## AVAILABLE AGENTS (Hermes profiles)
+- `scout` — Research trends, find opportunities
+- `forge` — Generate sprites via aseprite-forge.py
+- `curator` — Quality check against 0x72 standard
+- `packager` — Bundle into theme packs
+- `lister` — Write marketplace listings
+
+## KEY PATHS
+- **Aseprite CLI:** C:\Program Files (x86)\Steam\steamapps\common\Aseprite\Aseprite.exe
+- **Forge output:** C:\Users\khair\Kai-Asset-Forge\forge-output\
+- **Hermes profiles:** C:\Users\khair\AppData\Local\hermes\profiles\
+- **Dashboard:** C:\Users\khair\hermes-dashboard\

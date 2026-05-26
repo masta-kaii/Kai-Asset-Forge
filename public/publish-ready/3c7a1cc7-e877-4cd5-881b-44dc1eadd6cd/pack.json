@@ -1,0 +1,21 @@
+{
+  "name": "UI Essentials — Dark Dungeon Interface Pack",
+  "type": "small_pack",
+  "assets": 16,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "A set of 16 hand-crafted pixel art sprites in the Kairosoft management sim style. Each sprite has been quality-checked against the 0x72 Dungeon Tileset standard with curated retro palettes.\n\n**Includes:**\n- 16 unique sprites (16×16)\n- Transparent PNG files\n- Game-ready pixel art\n- CC0 license — use in any project",
+  "tags": [
+    "pixel-art",
+    "game-assets",
+    "sprites",
+    "rpg-maker",
+    "kairosoft"
+  ],
+  "license": "CC0",
+  "pricing": 3.99,
+  "platforms": [
+    "itch.io",
+    "gumroad"
+  ],
+  "createdAt": "2026-05-23T02:04:30.399Z"
+}

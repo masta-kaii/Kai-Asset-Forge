@@ -1,0 +1,378 @@
+{
+  "pack_name": "Pixel Zoo & Safari Complete Pack",
+  "pack_key": "pixel_zoo_mega_bundle",
+  "description": "ALL 30 sprites from the Pixel Zoo & Safari collection! Animals, habitats, tiles, and safari gear in one huge bundle \u2014 save big!",
+  "total_sprites": 30,
+  "sprite_size": "32x32",
+  "standard": "0x72 Dungeon Tileset (adapted for theme pack)",
+  "curator_verdict": "ALL APPROVED",
+  "average_score": 6.9,
+  "tags": [
+    "mega-bundle",
+    "zoo",
+    "safari",
+    "animals",
+    "tiles",
+    "props",
+    "environment",
+    "complete-set"
+  ],
+  "categories": [
+    "Environment",
+    "Animal",
+    "Safari Gear",
+    "Tile"
+  ],
+  "pricing_variants": {
+    "small": {
+      "sprite_count": 10,
+      "description": "Best for small projects",
+      "sprites_included": [
+        "bear",
+        "crocodile",
+        "elephant",
+        "flamingo",
+        "giraffe",
+        "hippo",
+        "lion",
+        "monkey",
+        "peacock",
+        "penguin"
+      ]
+    },
+    "medium": {
+      "sprite_count": 20,
+      "description": "Best for medium projects",
+      "sprites_included": [
+        "bear",
+        "crocodile",
+        "elephant",
+        "flamingo",
+        "giraffe",
+        "hippo",
+        "lion",
+        "monkey",
+        "peacock",
+        "penguin",
+        "rhino",
+        "snake",
+        "tiger",
+        "tropical_bird",
+        "zebra",
+        "entrance_gate",
+        "water_pool",
+        "zoo_fence",
+        "zoo_rocks",
+        "zoo_sign"
+      ]
+    },
+    "large": {
+      "sprite_count": 30,
+      "description": "Best for large projects",
+      "sprites_included": [
+        "bear",
+        "crocodile",
+        "elephant",
+        "flamingo",
+        "giraffe",
+        "hippo",
+        "lion",
+        "monkey",
+        "peacock",
+        "penguin",
+        "rhino",
+        "snake",
+        "tiger",
+        "tropical_bird",
+        "zebra",
+        "entrance_gate",
+        "water_pool",
+        "zoo_fence",
+        "zoo_rocks",
+        "zoo_sign",
+        "zoo_tree",
+        "tile_dirt",
+        "tile_grass",
+        "tile_trail",
+        "binoculars",
+        "compass",
+        "safari_jeep",
+        "safari_tent",
+        "zoo_map",
+        "feeding_area"
+      ]
+    }
+  },
+  "sprites": [
+    {
+      "name": "bear",
+      "description": "Large brown bear with round ears",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "crocodile",
+      "description": "Green reptile with long snout",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "elephant",
+      "description": "Gray giant with trunk and tusks",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 5,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "flamingo",
+      "description": "Pink wading bird on one leg",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "giraffe",
+      "description": "Tall spotted mammal with long neck",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "hippo",
+      "description": "Massive gray river horse",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "lion",
+      "description": "King of the jungle with golden mane",
+      "category": "Animal",
+      "score": 7.5,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "monkey",
+      "description": "Playful brown primate with long tail",
+      "category": "Animal",
+      "score": 7.5,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "peacock",
+      "description": "Blue bird with elaborate tail display",
+      "category": "Animal",
+      "score": 6.5,
+      "colors": 7,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "penguin",
+      "description": "Black and white Antarctic bird",
+      "category": "Animal",
+      "score": 7.5,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "rhino",
+      "description": "Armored gray mammal with horn",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "snake",
+      "description": "Green coiled serpent with forked tongue",
+      "category": "Animal",
+      "score": 6.5,
+      "colors": 5,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tiger",
+      "description": "Striped orange predator",
+      "category": "Animal",
+      "score": 7.5,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tropical_bird",
+      "description": "Colorful exotic bird",
+      "category": "Animal",
+      "score": 6.0,
+      "colors": 5,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zebra",
+      "description": "Black and white striped equine",
+      "category": "Animal",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "entrance_gate",
+      "description": "Zoo entrance archway",
+      "category": "Environment",
+      "score": 6.5,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "water_pool",
+      "description": "Blue water pool \u2605 Distinction",
+      "category": "Environment",
+      "score": 8.0,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_fence",
+      "description": "Wooden fence enclosure",
+      "category": "Environment",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_rocks",
+      "description": "Rock formation for habitats",
+      "category": "Environment",
+      "score": 6.5,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_sign",
+      "description": "Directional zoo sign",
+      "category": "Environment",
+      "score": 6.5,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_tree",
+      "description": "Large canopy tree",
+      "category": "Environment",
+      "score": 7.0,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tile_dirt",
+      "description": "Dirt ground tile",
+      "category": "Tile",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tile_grass",
+      "description": "Grassy ground tile",
+      "category": "Tile",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "tile_trail",
+      "description": "Dirt trail tile",
+      "category": "Tile",
+      "score": 7.0,
+      "colors": 2,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "binoculars",
+      "description": "Viewing binoculars",
+      "category": "Safari Gear",
+      "score": 6.0,
+      "colors": 2,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "compass",
+      "description": "Navigational compass",
+      "category": "Safari Gear",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "safari_jeep",
+      "description": "Green safari tour vehicle",
+      "category": "Safari Gear",
+      "score": 7.0,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "safari_tent",
+      "description": "Canvas camping tent",
+      "category": "Safari Gear",
+      "score": 6.5,
+      "colors": 4,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "zoo_map",
+      "description": "Zoo map with trails",
+      "category": "Safari Gear",
+      "score": 6.5,
+      "colors": 3,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    },
+    {
+      "name": "feeding_area",
+      "description": "Animal feeding station",
+      "category": "Environment",
+      "score": 6.0,
+      "colors": 5,
+      "size": "32x32",
+      "format": "PNG (RGBA)"
+    }
+  ]
+}

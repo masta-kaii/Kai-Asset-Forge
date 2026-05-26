@@ -1,0 +1,92 @@
+{
+  "character": "angel",
+  "scheme": "angel",
+  "palette": "pico8",
+  "pixel_size": "16x22",
+  "frames": [
+    {
+      "type": "idle",
+      "frame": 0,
+      "file": "angel_angel_idle_f0.png",
+      "size": "16x22",
+      "bytes": 248
+    },
+    {
+      "type": "idle",
+      "frame": 1,
+      "file": "angel_angel_idle_f1.png",
+      "size": "16x22",
+      "bytes": 245
+    },
+    {
+      "type": "idle",
+      "frame": 2,
+      "file": "angel_angel_idle_f2.png",
+      "size": "16x22",
+      "bytes": 248
+    },
+    {
+      "type": "idle",
+      "frame": 3,
+      "file": "angel_angel_idle_f3.png",
+      "size": "16x22",
+      "bytes": 245
+    },
+    {
+      "type": "walk",
+      "frame": 0,
+      "file": "angel_angel_walk_f0.png",
+      "size": "16x22",
+      "bytes": 248
+    },
+    {
+      "type": "walk",
+      "frame": 1,
+      "file": "angel_angel_walk_f1.png",
+      "size": "16x22",
+      "bytes": 262
+    },
+    {
+      "type": "walk",
+      "frame": 2,
+      "file": "angel_angel_walk_f2.png",
+      "size": "16x22",
+      "bytes": 248
+    },
+    {
+      "type": "walk",
+      "frame": 3,
+      "file": "angel_angel_walk_f3.png",
+      "size": "16x22",
+      "bytes": 246
+    },
+    {
+      "type": "hit",
+      "frame": 0,
+      "file": "angel_angel_hit_f0.png",
+      "size": "16x22",
+      "bytes": 249
+    }
+  ],
+  "frame_count": 9,
+  "animations": {
+    "idle": 4,
+    "walk": 4,
+    "hit": 1
+  },
+  "sheet_file": "angel_angel_spritesheet.png",
+  "files": [
+    "angel_angel_idle_f0.png",
+    "angel_angel_idle_f1.png",
+    "angel_angel_idle_f2.png",
+    "angel_angel_idle_f3.png",
+    "angel_angel_walk_f0.png",
+    "angel_angel_walk_f1.png",
+    "angel_angel_walk_f2.png",
+    "angel_angel_walk_f3.png",
+    "angel_angel_hit_f0.png",
+    "angel_angel_spritesheet.png"
+  ],
+  "generated_at": "2026-05-22T05:18:56Z",
+  "engine": "sprite-forge-v2-shape-based"
+}

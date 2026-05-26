@@ -1,0 +1,24 @@
+{
+  "name": "Haunted Heroes — 16 Animated Dungeon Characters | 16×16 Pixel Art Sprites",
+  "type": "animated_pack",
+  "assets": 120,
+  "characters": 16,
+  "spriteSheet": "preview/spritesheet.png",
+  "description": "**🔥 16 FULLY ANIMATED HAUNTED HEROES — Walk, Idle & Hit Animations Included! 🔥**\n\nBring your dungeon to life with 16 unique pixel art characters! Each hero comes with walk cycles, idle animations, and hit poses — **120 total animation frames** ready to drop into your game engine.\n\n---\n\n**🎮 THE ROSTER:**\n| Character | Rating | Character | Rating |\n|-----------|--------|-----------|--------|\n| ⚔️ Knight | ★8.9/10 | 👻 Skelet | ★8.2/10 |\n| 👹 Demon | ★8.7/10 | 🐉 Chort | ★8.1/10 |\n| 💀 Zombie | ★8.6/10 | 🧌 Wogol | ★8.1/10 |\n| 😇 Angel | ★8.5/10 | ⛏️ Dwarf | ★8.0/10 |\n| 🟢 Orc | ★8.4/10 | 🧝 Goblin | ★7.9/10 |\n| 💀 Skeleton | ★8.3/10 | 👿 Imp | ★7.8/10 |\n| 🦎 Lizard | ★8.3/10 | 🎃 Pumpkin Knight | ★7.8/10 |\n| 👺 Ogre | ★8.2/10 | 🧙 Elf, Wizard + more! | — |\n\n**✨ ANIMATION FRAMES PER CHARACTER:**\n- Walk cycle: 4 frames\n- Idle animation: 4 frames\n- Hit/Death pose: 1 frame\n- **= 9 frames × 16 characters + bonus = 120 frames total!**\n\n---\n\n**✅ INCLUDES:**\n- 16 unique character sprites (16×16 pixels)\n- Walk, idle, and hit animation frames\n- Master composite spritesheet for quick preview\n- Individual transparent PNGs per character\n- **CC0 LICENSE — Use in any project, commercial or personal, no credit required!**\n\n**🎨 STYLE:** 0x72 Dungeon Tileset inspired with Haunted Spectral palette (25 colors)\n**🏆 Curator Score: 8.3/10 — Approved with Distinction!**\n\n**💀 Perfect for:** Dungeon crawlers, tactical RPGs, roguelikes, horror games, game jams (Pixel Forge Jam!), and any project needing animated monster sprites.",
+  "tags": [
+    "pixel-art", "game-assets", "animated-sprites", "character-sprites",
+    "16x16", "rpg-maker", "dungeon-crawler", "pixel-art-characters",
+    "monster-sprites", "fantasy-rpg", "game-dev", "indie-game",
+    "kairosoft", "haunted", "character-animation", "walk-cycle",
+    "game-characters", "spritesheet", "game-asset-pack", "retro-rpg",
+    "pixel-art-monsters", "rpg-sprites", "tactical-rpg", "roguelike",
+    "horror-game", "game-jam", "cc0", "top-down-rpg", "2d-sprites",
+    "pixel-character-pack"
+  ],
+  "license": "CC0",
+  "pricing": 5.99,
+  "marketplacePrice": 7.99,
+  "platforms": ["itch.io", "gumroad"],
+  "curatorScore": 8.3,
+  "createdAt": "2026-05-24T16:46:00.000Z"
+}

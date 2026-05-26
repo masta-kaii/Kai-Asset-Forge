@@ -1,0 +1,92 @@
+{
+  "character": "wizard",
+  "scheme": "wizard",
+  "palette": "pico8",
+  "pixel_size": "16x28",
+  "frames": [
+    {
+      "type": "idle",
+      "frame": 0,
+      "file": "wizard_wizard_idle_f0.png",
+      "size": "16x28",
+      "bytes": 274
+    },
+    {
+      "type": "idle",
+      "frame": 1,
+      "file": "wizard_wizard_idle_f1.png",
+      "size": "16x28",
+      "bytes": 270
+    },
+    {
+      "type": "idle",
+      "frame": 2,
+      "file": "wizard_wizard_idle_f2.png",
+      "size": "16x28",
+      "bytes": 274
+    },
+    {
+      "type": "idle",
+      "frame": 3,
+      "file": "wizard_wizard_idle_f3.png",
+      "size": "16x28",
+      "bytes": 270
+    },
+    {
+      "type": "walk",
+      "frame": 0,
+      "file": "wizard_wizard_walk_f0.png",
+      "size": "16x28",
+      "bytes": 274
+    },
+    {
+      "type": "walk",
+      "frame": 1,
+      "file": "wizard_wizard_walk_f1.png",
+      "size": "16x28",
+      "bytes": 292
+    },
+    {
+      "type": "walk",
+      "frame": 2,
+      "file": "wizard_wizard_walk_f2.png",
+      "size": "16x28",
+      "bytes": 274
+    },
+    {
+      "type": "walk",
+      "frame": 3,
+      "file": "wizard_wizard_walk_f3.png",
+      "size": "16x28",
+      "bytes": 280
+    },
+    {
+      "type": "hit",
+      "frame": 0,
+      "file": "wizard_wizard_hit_f0.png",
+      "size": "16x28",
+      "bytes": 264
+    }
+  ],
+  "frame_count": 9,
+  "animations": {
+    "idle": 4,
+    "walk": 4,
+    "hit": 1
+  },
+  "sheet_file": "wizard_wizard_spritesheet.png",
+  "files": [
+    "wizard_wizard_idle_f0.png",
+    "wizard_wizard_idle_f1.png",
+    "wizard_wizard_idle_f2.png",
+    "wizard_wizard_idle_f3.png",
+    "wizard_wizard_walk_f0.png",
+    "wizard_wizard_walk_f1.png",
+    "wizard_wizard_walk_f2.png",
+    "wizard_wizard_walk_f3.png",
+    "wizard_wizard_hit_f0.png",
+    "wizard_wizard_spritesheet.png"
+  ],
+  "generated_at": "2026-05-22T05:18:47Z",
+  "engine": "sprite-forge-v2-shape-based"
+}

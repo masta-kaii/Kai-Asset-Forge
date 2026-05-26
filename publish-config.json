@@ -22,6 +22,11 @@
       "animated_pack": 5.99
     }
   },
+  "pricing": {
+    "small_pack": 3.99,
+    "tile_set": 8.99,
+    "animated_pack": 5.99
+  },
   "default_license": "CC0",
   "default_tags": ["pixel-art", "game-assets", "sprites", "rpg-maker", "kairosoft"],
   "description_templates": {
