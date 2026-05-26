@@ -1,5 +1,9 @@
 import { execSync } from 'child_process'
 import { NextResponse } from 'next/server'
+import { readFile, writeFile } from 'fs/promises'
+import { join } from 'path'
+
+const STATS_PATH = join(process.cwd(), 'data', 'agent-stats.json')
 
 function hermes(args: string): string {
   try {
@@ -12,6 +16,44 @@ function hermes(args: string): string {
 function extractTaskId(output: string): string | null {
   const match = output.match(/(t_[a-zA-Z0-9]+)/)
   return match ? match[1] : null
+}
+
+function xpForLevel(level: number): number {
+  return Math.floor(100 * Math.pow(1.5, level - 1))
+}
+
+async function feedAgentXP(agentId: string, xp: number, action: string) {
+  try {
+    const raw = await readFile(STATS_PATH, 'utf-8')
+    const stats = JSON.parse(raw)
+    const agent = stats[agentId]
+    if (!agent) return null
+
+    agent.totalXP = (agent.totalXP || 0) + xp
+    const required = xpForLevel(agent.level)
+    let leveledUp = false
+    
+    if (agent.totalXP >= required) {
+      agent.level = agent.level + 1
+      agent.xpToNext = xpForLevel(agent.level + 1)
+      agent.xp = agent.totalXP - required
+      leveledUp = true
+    } else {
+      agent.xpToNext = required
+      agent.xp = agent.totalXP
+    }
+
+    agent.trainingHistory = agent.trainingHistory || []
+    agent.trainingHistory.unshift({ action, xp, ts: new Date().toISOString() })
+    if (agent.trainingHistory.length > 20) {
+      agent.trainingHistory = agent.trainingHistory.slice(0, 20)
+    }
+
+    await writeFile(STATS_PATH, JSON.stringify(stats, null, 2), 'utf-8')
+    return { agent: stats[agentId], leveledUp }
+  } catch {
+    return null
+  }
 }
 
 export async function POST(request: Request) {
@@ -54,11 +96,40 @@ export async function POST(request: Request) {
     const listerId = extractTaskId(listerOut)
     if (!listerId) throw new Error('Failed to create Lister task')
 
+    // ── FEED AGENT XP from production ──
+    const xpResults: any[] = []
+    
+    // Popo gets XP for orchestrating
+    const popoResult = await feedAgentXP('popo', 20, `Pipeline orchestration: ${theme}`)
+    if (popoResult) xpResults.push({ agent: 'popo', ...popoResult })
+    
+    // Artist gets XP for generating
+    const artistResult = await feedAgentXP('artist', 25, `Asset generation: ${theme}`)
+    if (artistResult) xpResults.push({ agent: 'artist', ...artistResult })
+    
+    // QC gets XP for reviewing
+    const qcResult = await feedAgentXP('qc', 15, `Quality review: ${theme}`)
+    if (qcResult) xpResults.push({ agent: 'qc', ...qcResult })
+    
+    // Pkg gets XP for packaging
+    const pkgResult = await feedAgentXP('pkg', 10, `Asset packaging: ${theme}`)
+    if (pkgResult) xpResults.push({ agent: 'pkg', ...pkgResult })
+
+    const levelUps = xpResults.filter((r: any) => r.leveledUp).map((r: any) => r.agent.agent?.name || r.agent)
+
     return NextResponse.json({
       success: true,
       pipeline: [scoutId, forgeId, curatorId, packagerId, listerId],
       theme,
       message: `✦ PIPELINE ACTIVE: ${theme.toUpperCase()} PACK IN PRODUCTION`,
+      agentXP: xpResults.map((r: any) => ({
+        agent: r.agent?.agent?.id || r.agent,
+        name: r.agent?.agent?.name,
+        xp: r.agent?.agent?.xp,
+        level: r.agent?.agent?.level,
+        leveledUp: r.leveledUp,
+      })),
+      levelUps: levelUps.length > 0 ? levelUps : undefined,
     })
   } catch (e: any) {
     return NextResponse.json({

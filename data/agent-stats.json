@@ -1,0 +1,94 @@
+{
+  "popo": {
+    "id": "popo",
+    "name": "POPO COMMAND",
+    "role": "Director · Orchestrator",
+    "level": 3,
+    "xp": 247,
+    "xpToNext": 400,
+    "totalXP": 247,
+    "color": "#f5a623",
+    "bgA": "#1e1508",
+    "motto": "I orchestrate the chaos.",
+    "skills": {
+      "orchestration": { "name": "Orchestration", "level": 4, "icon": "⚙", "desc": "Coordinate multi-agent workflows" },
+      "strategy": { "name": "Strategy", "level": 3, "icon": "♟", "desc": "Plan optimal production routes" },
+      "vision": { "name": "Vision", "level": 3, "icon": "👁", "desc": "Define art direction & quality targets" },
+      "delegation": { "name": "Delegation", "level": 2, "icon": "↗", "desc": "Efficiently assign tasks to agents" }
+    },
+    "trainingHistory": [
+      { "action": "Pipeline orchestration", "xp": 40, "ts": "2026-05-25T10:00:00Z" },
+      { "action": "Quality review pass", "xp": 25, "ts": "2026-05-25T14:30:00Z" },
+      { "action": "Production run #3", "xp": 60, "ts": "2026-05-26T09:00:00Z" }
+    ]
+  },
+  "artist": {
+    "id": "artist",
+    "name": "PIXEL STUDIO",
+    "role": "Asset Generation Lab",
+    "level": 2,
+    "xp": 180,
+    "xpToNext": 250,
+    "totalXP": 180,
+    "color": "#60a5fa",
+    "bgA": "#061220",
+    "motto": "Every pixel has a purpose.",
+    "skills": {
+      "pixelart": { "name": "Pixel Art", "level": 3, "icon": "🖼", "desc": "Sprite & tileset craftsmanship" },
+      "color": { "name": "Color Theory", "level": 2, "icon": "🎨", "desc": "Palette harmony & optical mixing" },
+      "composition": { "name": "Composition", "level": 2, "icon": "📐", "desc": "Layout, proportion & silhouette" },
+      "speed": { "name": "Speed", "level": 1, "icon": "⚡", "desc": "Fast iteration & rapid prototyping" }
+    },
+    "trainingHistory": [
+      { "action": "Sprite sheet generation", "xp": 35, "ts": "2026-05-25T11:00:00Z" },
+      { "action": "Palette refinement", "xp": 20, "ts": "2026-05-25T15:00:00Z" },
+      { "action": "Production run #3", "xp": 50, "ts": "2026-05-26T09:00:00Z" }
+    ]
+  },
+  "qc": {
+    "id": "qc",
+    "name": "QC CHAMBER",
+    "role": "Quality Control",
+    "level": 2,
+    "xp": 140,
+    "xpToNext": 250,
+    "totalXP": 140,
+    "color": "#c084fc",
+    "bgA": "#0f0620",
+    "motto": "Nothing ships broken.",
+    "skills": {
+      "inspection": { "name": "Inspection", "level": 3, "icon": "🔍", "desc": "Detect flaws & inconsistencies" },
+      "consistency": { "name": "Consistency", "level": 2, "icon": "📏", "desc": "Maintain style across all assets" },
+      "accuracy": { "name": "Accuracy", "level": 2, "icon": "🎯", "desc": "Precision in validation checks" },
+      "standards": { "name": "Standards", "level": 1, "icon": "📋", "desc": "Enforce pipeline quality gates" }
+    },
+    "trainingHistory": [
+      { "action": "Sprite inspection round", "xp": 30, "ts": "2026-05-25T12:00:00Z" },
+      { "action": "Style guide enforcement", "xp": 15, "ts": "2026-05-25T16:00:00Z" },
+      { "action": "Production run #3", "xp": 45, "ts": "2026-05-26T09:00:00Z" }
+    ]
+  },
+  "pkg": {
+    "id": "pkg",
+    "name": "PACKAGING BAY",
+    "role": "Export Pipeline",
+    "level": 1,
+    "xp": 90,
+    "xpToNext": 150,
+    "totalXP": 90,
+    "color": "#4ade80",
+    "bgA": "#051810",
+    "motto": "Ready for deployment.",
+    "skills": {
+      "export": { "name": "Export", "level": 2, "icon": "📦", "desc": "Multi-format asset export" },
+      "optimization": { "name": "Optimization", "level": 1, "icon": "⚡", "desc": "File size & performance tuning" },
+      "metadata": { "name": "Metadata", "level": 1, "icon": "🏷", "desc": "Tagging & cataloging assets" },
+      "delivery": { "name": "Delivery", "level": 1, "icon": "🚀", "desc": "Publish-ready packaging" }
+    },
+    "trainingHistory": [
+      { "action": "Asset packaging batch", "xp": 25, "ts": "2026-05-25T13:00:00Z" },
+      { "action": "Format optimization", "xp": 15, "ts": "2026-05-25T17:00:00Z" },
+      { "action": "Production run #3", "xp": 30, "ts": "2026-05-26T09:00:00Z" }
+    ]
+  }
+}

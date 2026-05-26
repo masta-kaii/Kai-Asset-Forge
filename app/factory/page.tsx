@@ -3,6 +3,7 @@
 // @ts-nocheck
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 const API   = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
@@ -620,6 +621,7 @@ const QUICK = ["fantasy RPG warrior","sci-fi spaceship","magic health potion","d
 //  ROOT APP
 // ═══════════════════════════════════════════════════════════════
 export default function HermesOS() {
+  const router = useRouter();
   const [agSt,  setAgSt]  = useState({popo:"idle",artist:"idle",qc:"idle",pkg:"idle"});
   const [agPr,  setAgPr]  = useState({popo:0,artist:0,qc:0,pkg:0});
   const [gLogs, setGLogs] = useState([]);
@@ -950,7 +952,7 @@ export default function HermesOS() {
         display:"flex",justifyContent:"space-between",
         color:"#475569",fontSize:11,background:"#191d28",
         fontFamily:"'VT323',monospace",flexShrink:0}}>
-        <span>HERMES OS v5 · PIXEL FACTORY · {isLive ? "⚡ KANBAN LIVE" : "📡 DEMO MODE"} · Kai Asset Forge</span>
+        <span>HERMES OS v5 · PIXEL FACTORY · {isLive ? "⚡ KANBAN LIVE" : "📡 DEMO MODE"} · <span onClick={()=>router.push('/dojo')} style={{color:'#c084fc',cursor:'pointer',letterSpacing:1}} onMouseEnter={(e)=>e.currentTarget.style.color='#f5a623'} onMouseLeave={(e)=>e.currentTarget.style.color='#c084fc'}>🏯 DOJO</span></span>
         <span>✦ POPO ONLINE · {prodCnt} PRODUCTIONS COMPLETE</span>
       </div>
     </div>
