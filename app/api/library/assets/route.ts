@@ -1,192 +1,89 @@
-import { NextResponse } from "next/server"
-import { readdir, stat } from "fs/promises"
-import { join } from "path"
+import { NextResponse } from "next/server";
+import { readdir, stat } from "fs/promises";
+import { join, relative } from "path";
+import { existsSync } from "fs";
 
-const CATEGORY_KEYWORDS: Record<string, string> = {
-  creative: "Creative",
-  furniture: "Furniture",
-  props: "Props",
-  ui: "UI",
-  weapons: "Weapons",
-  angel: "Angel",
-  knight: "Knight",
-  amulet: "Amulet",
-  anvil: "Anvil",
-  apple: "Apple",
-  armor: "Armor",
-  arrow: "Arrow",
-  axe: "Axe",
-  bag: "Bag",
-  banner: "Banner",
-  barrel: "Barrel",
-  barrel2: "Barrel",
-  bed: "Bed",
-  book: "Book",
-  boot: "Boot",
-  bottle: "Bottle",
-  bow: "Bow",
-  box: "Box",
-  bread: "Bread",
-  broom: "Broom",
-  bucket: "Bucket",
-  bush: "Bush",
-  candle: "Candle",
-  carpet: "Carpet",
-  carrot: "Carrot",
-  chair: "Chair",
-  chest: "Chest",
-  chicken: "Chicken",
-  coin: "Coin",
-  cow: "Cow",
-  crate: "Crate",
-  crossbow: "Crossbow",
-  crown: "Crown",
-  crystal: "Crystal",
-  dagger: "Dagger",
-  door: "Door",
-  dragon: "Dragon",
-  duck: "Duck",
-  egg: "Egg",
-  fence: "Fence",
-  fish: "Fish",
-  flag: "Flag",
-  flower: "Flower",
-  gem: "Gem",
-  ghost: "Ghost",
-  goblet: "Goblet",
-  golem: "Golem",
-  grass: "Grass",
-  hammer: "Hammer",
-  hat: "Hat",
-  heart: "Heart",
-  helmet: "Helmet",
-  herb: "Herb",
-  horse: "Horse",
-  house: "House",
-  key: "Key",
-  lamp: "Lamp",
-  lantern: "Lantern",
-  log: "Log",
-  map: "Map",
-  monster: "Monster",
-  mushroom: "Mushroom",
-  orb: "Orb",
-  pickaxe: "Pickaxe",
-  pillar: "Pillar",
-  plant: "Plant",
-  plate: "Plate",
-  potion: "Potion",
-  ring: "Ring",
-  rock: "Rock",
-  rod: "Rod",
-  scroll: "Scroll",
-  shield: "Shield",
-  shirt: "Shirt",
-  shoes: "Shoes",
-  skull: "Skull",
-  slime: "Slime",
-  spear: "Spear",
-  staff: "Staff",
-  statue: "Statue",
-  stone: "Stone",
-  sword: "Sword",
-  table: "Table",
-  tomb: "Tomb",
-  torch: "Torch",
-  tree: "Tree",
-  wand: "Wand",
-  water: "Water",
-  well: "Well",
-  wheat: "Wheat",
-  window: "Window",
-  zombie: "Zombie",
-  crab: "Crab",
-  summer: "Summer",
-  beach: "Beach",
-  sunny: "Sunny",
-  tropical: "Tropical",
-  pineapple: "Pineapple",
-  watermelon: "Watermelon",
-}
+const FORGE_DIR = join(process.cwd(), "forge-output");
 
-function guessCategory(filename: string): string {
-  const base = filename.replace(/\.png$/i, "").toLowerCase()
-  
-  // Preview files
-  if (base.startsWith("_")) {
-    const cat = base.replace(/^_/, "").replace(/_preview$/, "")
-    return CATEGORY_KEYWORDS[cat] ?? cat.charAt(0).toUpperCase() + cat.slice(1)
-  }
-
-  // Check known keywords
-  for (const [kw, label] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (base.includes(kw)) return label
-  }
-
-  // Sprite sheet frames
-  if (/\w+_f\d+$/.test(base) || base.endsWith("_spritesheet")) {
-    const parts = base.split("_")
-    const name = parts[0]
-    return CATEGORY_KEYWORDS[name] ?? name.charAt(0).toUpperCase() + name.slice(1)
-  }
-
-  // UUID-based files
-  if (/^[0-9a-f]{8}-/.test(base)) return "Forge"
-
-  return "General"
-}
-
-function formatName(filename: string): string {
-  let base = filename.replace(/\.png$/i, "")
-  if (base.startsWith("_")) {
-    base = base.replace(/^_/, "")
-  }
-  return base
-    .replace(/_/g, " ")
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .replace(/\sF\d+$/i, "") // strip frame numbers
-    .replace(/\sSpritesheet$/i, "")
-}
-
-function isNoun(filename: string): boolean {
-  const base = filename.replace(/\.png$/i, "").toLowerCase()
-  // Skip UUID files (no real name)
-  if (/^[0-9a-f]{8}-/.test(base)) return false
-  return true
-}
-
-export async function GET() {
-  const dir = join(process.cwd(), "public", "generated-assets")
-  let files: string[] = []
+async function scanDir(dir: string, category: string): Promise<any[]> {
+  const entries: any[] = [];
   try {
-    files = await readdir(dir)
-  } catch {
-    return NextResponse.json({ assets: [], error: "Directory not found" })
-  }
-
-  const assets = await Promise.all(
-    files
-      .filter((f) => f.endsWith(".png") && isNoun(f))
-      .map(async (f) => {
-        const s = await stat(join(dir, f)).catch(() => ({ size: 0 }))
-        return {
-          id: f.replace(".png", ""),
-          name: formatName(f),
-          filename: f,
-          category: guessCategory(f),
+    const files = await readdir(dir, { withFileTypes: true });
+    for (const f of files) {
+      const fullPath = join(dir, f.name);
+      if (f.isDirectory()) {
+        // Recurse with category = folder name
+        const sub = await scanDir(fullPath, f.name);
+        entries.push(...sub);
+      } else if (f.name.endsWith(".png")) {
+        const s = await stat(fullPath).catch(() => ({ size: 0 }));
+        const rel = relative(FORGE_DIR, fullPath).replace(/\\/g, "/");
+        entries.push({
+          id: rel.replace(/\.png$/i, "").replace(/\//g, "-"),
+          name: f.name.replace(/\.png$/i, "").replace(/_/g, " ").replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          filename: f.name,
+          category,
           size: s.size,
-          path: "/generated-assets/" + f,
-        }
-      })
-  )
+          path: `/api/library/image?file=${encodeURIComponent(rel)}`,
+          relPath: rel,
+        });
+      }
+    }
+  } catch {}
+  return entries;
+}
 
-  // Sort: named items first, then by category
-  assets.sort((a, b) => {
-    if (a.category === "Forge" && b.category !== "Forge") return 1
-    if (b.category === "Forge" && a.category !== "Forge") return -1
-    return a.category.localeCompare(b.category) || a.name.localeCompare(b.name)
-  })
+export async function GET(req: Request) {
+  try {
+    if (!existsSync(FORGE_DIR)) {
+      return NextResponse.json({ assets: [], error: "forge-output not found" });
+    }
 
-  return NextResponse.json({ assets })
+    const { searchParams } = new URL(req.url);
+    const catFilter = searchParams.get("category");
+    const search = searchParams.get("search")?.toLowerCase();
+
+    let allAssets: any[] = [];
+
+    const topFiles = await readdir(FORGE_DIR, { withFileTypes: true });
+    for (const f of topFiles) {
+      const fullPath = join(FORGE_DIR, f.name);
+      if (f.isDirectory()) {
+        if (catFilter && catFilter !== "all" && f.name !== catFilter) continue;
+        const sub = await scanDir(fullPath, f.name);
+        allAssets.push(...sub);
+      } else if (f.name.endsWith(".png")) {
+        if (catFilter && catFilter !== "all" && catFilter !== "root") continue;
+        const s = await stat(fullPath).catch(() => ({ size: 0 }));
+        allAssets.push({
+          id: f.name.replace(/\.png$/i, ""),
+          name: f.name.replace(/\.png$/i, "").replace(/_/g, " ").replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          filename: f.name,
+          category: "root",
+          size: s.size,
+          path: `/api/library/image?file=${encodeURIComponent(f.name)}`,
+          relPath: f.name,
+        });
+      }
+    }
+
+    // Filter by search
+    if (search) {
+      allAssets = allAssets.filter(
+        (a) =>
+          a.name.toLowerCase().includes(search) ||
+          a.category.toLowerCase().includes(search)
+      );
+    }
+
+    // Sort by category then name
+    allAssets.sort((a, b) => {
+      if (a.category !== b.category) return a.category.localeCompare(b.category);
+      return a.name.localeCompare(b.name);
+    });
+
+    return NextResponse.json({ assets: allAssets, total: allAssets.length });
+  } catch (e: any) {
+    return NextResponse.json({ assets: [], error: e.message }, { status: 500 });
+  }
 }
