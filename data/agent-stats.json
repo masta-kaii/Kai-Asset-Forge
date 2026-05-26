@@ -4,9 +4,9 @@
     "name": "POPO COMMAND",
     "role": "Director · Orchestrator",
     "level": 4,
-    "xp": 42,
-    "xpToNext": 506,
-    "totalXP": 267,
+    "xp": 277,
+    "xpToNext": 337,
+    "totalXP": 277,
     "color": "#f5a623",
     "bgA": "#1e1508",
     "motto": "I orchestrate the chaos.",
@@ -37,6 +37,11 @@
       }
     },
     "trainingHistory": [
+      {
+        "action": "Test after fix",
+        "xp": 10,
+        "ts": "2026-05-26T19:21:19.932Z"
+      },
       {
         "action": "Test training",
         "xp": 20,
