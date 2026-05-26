@@ -1,0 +1,69 @@
+import { execSync } from 'child_process'
+import { NextResponse } from 'next/server'
+
+function hermes(args: string): string {
+  try {
+    return execSync(`hermes ${args} 2>&1`, { encoding: 'utf-8', timeout: 30000 })
+  } catch (e: any) {
+    return e.stdout || e.stderr || e.message
+  }
+}
+
+function extractTaskId(output: string): string | null {
+  const match = output.match(/(t_[a-zA-Z0-9]+)/)
+  return match ? match[1] : null
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json().catch(() => ({}))
+    const theme = body.theme || 'dungeon'
+
+    // Step 1: Create Scout task
+    const scoutOut = hermes(
+      `kanban create "Scout: Research ${theme} pixel art trends" --assignee scout --body "Research trending ${theme}-themed pixel art. Find asset gaps. Output list of sprite descriptions."`
+    )
+    const scoutId = extractTaskId(scoutOut)
+    if (!scoutId) throw new Error('Failed to create Scout task')
+
+    // Step 2: Create Forge task (parent = Scout)
+    const forgeOut = hermes(
+      `kanban create "Forge: Generate ${theme} pixel art sprites" --assignee forge --parent ${scoutId} --body "Generate sprites using aseprite-forge.py. Pass to Curator."`
+    )
+    const forgeId = extractTaskId(forgeOut)
+    if (!forgeId) throw new Error('Failed to create Forge task')
+
+    // Step 3: Create Curator task (parent = Forge)
+    const curatorOut = hermes(
+      `kanban create "Curator: Quality check ${theme} sprites" --assignee curator --parent ${forgeId} --body "Check against 0x72 standard. Score 1-10. Pass approved to Packager."`
+    )
+    const curatorId = extractTaskId(curatorOut)
+    if (!curatorId) throw new Error('Failed to create Curator task')
+
+    // Step 4: Create Packager task (parent = Curator)
+    const packagerOut = hermes(
+      `kanban create "Packager: Bundle ${theme} assets" --assignee packager --parent ${curatorId} --body "Bundle approved assets. Create sprite sheets and previews. Pass to Lister."`
+    )
+    const packagerId = extractTaskId(packagerOut)
+    if (!packagerId) throw new Error('Failed to create Packager task')
+
+    // Step 5: Create Lister task (parent = Packager)
+    const listerOut = hermes(
+      `kanban create "Lister: Marketplace listing for ${theme} pack" --assignee lister --parent ${packagerId} --body "Write SEO titles, descriptions, pricing. Draft for Popo approval."`
+    )
+    const listerId = extractTaskId(listerOut)
+    if (!listerId) throw new Error('Failed to create Lister task')
+
+    return NextResponse.json({
+      success: true,
+      pipeline: [scoutId, forgeId, curatorId, packagerId, listerId],
+      theme,
+      message: `✦ PIPELINE ACTIVE: ${theme.toUpperCase()} PACK IN PRODUCTION`,
+    })
+  } catch (e: any) {
+    return NextResponse.json({
+      success: false,
+      error: e.message || 'Pipeline creation failed',
+    })
+  }
+}
