@@ -870,6 +870,7 @@ export default function HermesOS() {
   const [asset,   setAsset]   = useState(null);
   const [qcRep,   setQcRep]   = useState(null);
   const [dlReady, setDlReady] = useState(false);
+  const [webPreview, setWebPreview] = useState<string|null>(null);
   const [running, setRunning] = useState(false);
   const [selRoom, setSelRoom] = useState(null);
   const [prompt,  setPrompt]  = useState("a fantasy RPG warrior character");
@@ -989,7 +990,7 @@ export default function HermesOS() {
     setAgPr({popo:0,scout:0,artist:0,webgen:0,qc:0,pkg:0});
     setTasks({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
     setRLogs({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
-    setAsset(null);setQcRep(null);setDlReady(false);
+    setAsset(null);setQcRep(null);setDlReady(false);setWebPreview(null);
   },[]);
 
   // ── Real Kanban Pipeline Execution ──
@@ -1073,7 +1074,8 @@ export default function HermesOS() {
       if (webData.success) {
         updTask("webgen","Generate Web Page",{status:"done",progress:100});
         setSt("webgen","idle",100);
-        log(`✓ Web page generated: ${webData.asset.name}.html`,"success","WEBGEN");
+        setWebPreview(webData.asset.previewUrl);
+        log(`✓ Web page ready: ${webData.asset.name}`,"success","WEBGEN");
       } else {
         log("Web generation skipped: " + (webData.error || "unknown"),"warn","WEBGEN");
         setSt("webgen","idle",100);
@@ -1296,6 +1298,19 @@ export default function HermesOS() {
 
           {/* Bottom strip */}
           <div style={{flexShrink:0,padding:"0 10px 10px",display:"flex",flexDirection:"column",gap:6}}>
+            {/* Web Preview */}
+            {webPreview && (
+              <div style={{background:"#12151d",border:"1px solid #22d3ee55",overflow:"hidden",position:"relative"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 12px",background:"#0f1218",borderBottom:"1px solid #252938"}}>
+                  <span style={{color:"#22d3ee",fontSize:12,fontFamily:"'VT323',monospace",letterSpacing:1}}>🌐 WEB PREVIEW</span>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>window.open(webPreview,'_blank')} style={{background:"rgba(34,211,238,0.1)",border:"1px solid #22d3ee44",color:"#22d3ee",padding:"2px 8px",fontFamily:"'VT323',monospace",fontSize:11,cursor:"pointer",letterSpacing:1}}>↗ OPEN</button>
+                    <button onClick={()=>setWebPreview(null)} style={{background:"none",border:"1px solid #252938",color:"#94a3b8",padding:"2px 8px",fontFamily:"'VT323',monospace",fontSize:11,cursor:"pointer"}}>✕</button>
+                  </div>
+                </div>
+                <iframe src={webPreview} style={{width:"100%",height:400,border:"none",background:"#fff"}} title="Web Preview" sandbox="allow-scripts"/>
+              </div>
+            )}
             {asset && (
               <div style={{background:"#12151d",border:"1px solid #252938",padding:"8px 12px",
                 display:"flex",gap:12,alignItems:"center",fontFamily:"'VT323',monospace",flexWrap:"wrap"}}>
