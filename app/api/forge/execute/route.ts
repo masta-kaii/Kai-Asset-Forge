@@ -1,9 +1,30 @@
 import { execSync } from 'child_process'
 import { NextResponse } from 'next/server'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, writeFile, appendFile } from 'fs/promises'
 import { join } from 'path'
+import { existsSync } from 'fs'
 
 const STATS_PATH = join(process.cwd(), 'data', 'agent-stats.json')
+
+// Resolve Obsidian vault path
+function getVaultPath(): string | null {
+  const home = process.env.HOME || process.env.USERPROFILE || ''
+  const candidates = [
+    join(home, 'Documents', 'Kai-Forge-Vault'),
+    join(home, 'Documents', 'Obsidian Vault'),
+  ]
+  for (const p of candidates) {
+    if (existsSync(p)) return p
+  }
+  return null
+}
+
+async function logToVault(note: string, content: string) {
+  const vault = getVaultPath()
+  if (!vault) return
+  const path = join(vault, note)
+  await appendFile(path, content, 'utf-8').catch(() => {})
+}
 
 function hermes(args: string): string {
   try {
@@ -111,6 +132,22 @@ export async function POST(request: Request) {
     await feed('pkg', 10, `Asset packaging: ${theme}`)
 
     const levelUps = xpResults.filter((r: any) => r.leveledUp).map((r: any) => r.agent?.agent?.name || r.agent)
+
+    // ── LOG TO OBSIDIAN VAULT ──
+    const batchNum = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    logToVault('Batch History.md', `
+## BATCH #${batchNum} — ${theme.toUpperCase()}
+- **Date:** ${today}
+- **Theme:** ${theme}
+- **Status:** 🔄 IN PROGRESS
+- **Agents:** SCOUT → PIXEL STUDIO + WEB GENERATOR → QC CHAMBER → PACKAGING BAY
+- **Tasks Created:** 5 (Scout: \`${scoutId}\` → Pixel: \`${artistId}\` + Web: \`${webgenId}\` → QC: \`${qcId}\` → PKG: \`${pkgId}\`)
+- **XP Awarded:** POPO +20, SCOUT +25, PIXEL +25, WEB +25, QC +15, PKG +10
+${levelUps.length > 0 ? `- **⚡ LEVEL UP:** ${levelUps.join(', ')}` : ''}
+---
+`)
+    logToVault('POPO COMMAND.md', `\n## Pipeline Run — ${theme} — ${today}\n- Created 5 Kanban tasks\n- Batch #${batchNum}\n${levelUps.length > 0 ? `- Level ups: ${levelUps.join(', ')}` : ''}\n`)
 
     return NextResponse.json({
       success: true,
