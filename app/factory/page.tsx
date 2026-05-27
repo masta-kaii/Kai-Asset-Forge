@@ -1223,7 +1223,7 @@ export default function HermesOS() {
   const selCfg = selRoom ? AGENT_CFG[selRoom] : null;
 
   return (
-    <div style={{height:"100vh",background:"#0d0f14",color:"#e2e8f0",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+    <div className="factory-root" style={{height:"100vh",background:"#0d0f14",color:"#e2e8f0",overflow:"hidden",display:"flex",flexDirection:"column"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -1233,10 +1233,22 @@ export default function HermesOS() {
         @keyframes glowPulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
         @keyframes slideIn{from{transform:translateX(20px);opacity:0;}to{transform:translateX(0);opacity:1;}}
         button{cursor:pointer;} button:hover{opacity:0.82;}
+        @media (max-width: 768px) {
+          .factory-root { overflow: auto !important; height: auto !important; min-height: 100vh !important; }
+          .factory-header { flex-direction: column !important; padding: 8px 12px !important; gap: 6px !important; }
+          .factory-agents { gap: 3px !important; overflow-x: auto !important; flex-wrap: nowrap !important; padding: 4px 0 !important; }
+          .factory-agents > div { padding: 2px 6px !important; font-size: 10px !important; }
+          .factory-command { flex-direction: column !important; padding: 6px 10px !important; gap: 6px !important; }
+          .factory-command input { width: 100% !important; min-width: unset !important; font-size: 13px !important; }
+          .factory-main { flex-direction: column !important; }
+          .factory-map-area { padding: 4px !important; overflow: auto !important; }
+          .factory-sidebar { position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; max-width: 400px !important; z-index: 50 !important; }
+          .factory-footer { flex-direction: column !important; gap: 4px !important; text-align: center !important; font-size: 9px !important; }
+        }
       `}</style>
 
       {/* TOP BAR */}
-      <div style={{borderBottom:"1px solid #252938",padding:"7px 16px",
+      <div className="factory-header" style={{borderBottom:"1px solid #252938",padding:"7px 16px",
         display:"flex",alignItems:"center",justifyContent:"space-between",
         background:"linear-gradient(90deg,#191d28,#12151d)",
         flexShrink:0,fontFamily:"'VT323',monospace",gap:10}}>
@@ -1299,7 +1311,7 @@ export default function HermesOS() {
       </div>
 
       {/* COMMAND BAR */}
-      <div style={{padding:"7px 14px",borderBottom:"1px solid #252938",background:"#12151d",
+      <div className="factory-command" style={{padding:"7px 14px",borderBottom:"1px solid #252938",background:"#12151d",
         flexShrink:0,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",fontFamily:"'VT323',monospace"}}>
         <span style={{color:"#f5a623",fontSize:13,whiteSpace:"nowrap"}}>✦ POPO:</span>
         <input value={prompt} onChange={e=>setPrompt(e.target.value)}
@@ -1338,9 +1350,9 @@ export default function HermesOS() {
       </div>
 
       {/* MAIN */}
-      <div style={{flex:1,display:"flex",overflow:"hidden",minHeight:0}}>
+      <div className="factory-main" style={{flex:1,display:"flex",overflow:"hidden",minHeight:0}}>
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-          <div style={{flex:1,overflow:"auto",padding:10,display:"flex",
+          <div className="factory-map-area" style={{flex:1,overflow:"auto",padding:10,display:"flex",
             justifyContent:"center",alignItems:"flex-start",background:"#0a0b10"}}>
             <FacilityMap agentStatus={agSt} selRoom={selRoom} onRoomClick={setSelRoom} activeFlow={flow} onSpriteClick={setPersonaAgent}/>
           </div>
@@ -1402,7 +1414,7 @@ export default function HermesOS() {
           onSave={savePersona} onClose={()=>setPersonaAgent(null)}/>
       )}
 
-      <div style={{borderTop:"1px solid #252938",padding:"4px 16px",
+      <div className="factory-footer" style={{borderTop:"1px solid #252938",padding:"4px 16px",
         display:"flex",justifyContent:"space-between",
         color:"#475569",fontSize:11,background:"#191d28",
         fontFamily:"'VT323',monospace",flexShrink:0}}>

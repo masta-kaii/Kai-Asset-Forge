@@ -11,9 +11,16 @@ export const metadata: Metadata = {
   description: "Hermes OS v5 · Autonomous pixel art production pipeline",
 }
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${vt323.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${vt323.variable} h-full antialiased`} style={{WebkitTextSizeAdjust:"100%"}}>
       <body className="min-h-full">{children}</body>
     </html>
   )

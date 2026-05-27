@@ -161,10 +161,10 @@ export default function DojoPage() {
       )}
 
       {/* ── MAIN: Two columns (Agents + Training Panel) ── */}
-      <div style={{display:"flex",gap:0,minHeight:"calc(100vh - 140px)"}}>
+      <div style={{display:"flex",flexDirection:"row",gap:0,minHeight:"calc(100vh - 140px)",flexWrap:"wrap"}}>
         {/* Left: Agent cards */}
-        <div style={{flex:1,padding:24,overflow:"auto",maxHeight:"calc(100vh - 140px)"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(360px, 1fr))",gap:16}}>
+        <div style={{flex:"1 1 360px",minWidth:0,padding:24,overflow:"auto",maxHeight:"calc(100vh - 140px)"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(280px, 1fr))",gap:16}}>
             {agentList.map(agent=>{
               const xpPct=Math.min(100,(agent.xp/agent.xpToNext)*100);
               const isSel=selected===agent.id;
@@ -211,7 +211,7 @@ export default function DojoPage() {
         </div>
 
         {/* Right: Training Panel */}
-        <div style={{width:420,background:"#12151d",borderLeft:"1px solid #1e293b",padding:20,overflow:"auto",maxHeight:"calc(100vh - 140px)",flexShrink:0}}>
+        <div className="dojo-training-panel" style={{flex:"0 0 420px",width:420,background:"#12151d",borderLeft:"1px solid #1e293b",padding:20,overflow:"auto",maxHeight:"calc(100vh - 140px)"}}>
           <h2 style={{fontSize:20,color:"#f5a623",letterSpacing:2,marginBottom:16,textShadow:"0 0 10px rgba(245,166,35,0.3)"}}>⚔ TRAINING PANEL</h2>
 
           {/* Agent tabs */}
@@ -309,6 +309,10 @@ export default function DojoPage() {
         @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
         @keyframes xpFlash{0%{transform:scale(1);}50%{transform:scale(1.02);}100%{transform:scale(1);}}
         @keyframes slideDown{from{transform:translateY(-10px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+        @media (max-width: 768px) {
+          .dojo-training-panel { width: 100% !important; flex: 1 1 100% !important; border-left: none !important; border-top: 1px solid #1e293b !important; }
+          .dojo-agent-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
     </div>
   );

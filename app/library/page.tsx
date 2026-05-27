@@ -288,7 +288,14 @@ export default function LibraryPage() {
         </div>
       )}
 
-      <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
+      <style>{`
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+        @media (max-width: 640px) {
+          .library-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+          .library-header h1 { font-size: 20px !important; }
+          .library-controls { flex-direction: column !important; }
+        }
+      `}</style>
     </div>
   );
 }
