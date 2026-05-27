@@ -11,7 +11,12 @@ function hermes(args: string): string {
 
 // Agent ID mapping: Kanban assignee → factory agent ID
 const ASSIGNEE_MAP: Record<string, string> = {
+  popo: 'popo',
   scout: 'scout',
+  artist: 'artist',
+  webgen: 'webgen',
+  qc: 'qc',
+  pkg: 'pkg',
   forge: 'artist',
   curator: 'qc',
   packager: 'pkg',
