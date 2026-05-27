@@ -94,6 +94,16 @@
 - **Grid alignment**: Characters centered in 16×16 / 32×32 / 48×48 cells
 - **Color palette**: Earth tones + character accent colors, no neon
 
+### 64×64 Premium Sprite Standards (NEW)
+- **Detail threshold**: 64×64 sprites must show 4× the detail of 16×16
+- **Color ramp**: 6-12 colors expected (not 3-6 like small sprites)
+- **Outline**: 1-2px outline acceptable at 64×64 (vs 1px only for 16×16)
+- **Shading**: 5-6 step gradient expected (vs 3-4 for small sprites)
+- **Silhouette**: Must be readable at 75% and 50% downscale
+- **Anti-aliasing**: ALLOWED on internal edges at 64×64 (but NOT on outer silhouette)
+- **Animation frames**: 6+ frames for idle, 8+ for walk (smoother at larger size)
+- **Reference benchmark**: Compare against RPG Maker MV 48×48 sheets (closest match)
+
 ### Pixel Art Top Down Basic QC Benchmarks
 - **Ground tiles**: Seamless tiling verified by 2×2 tile test grid
 - **Props**: Dark outline around objects, 1px shadow offset (bottom-right)

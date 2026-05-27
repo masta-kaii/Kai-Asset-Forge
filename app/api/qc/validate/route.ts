@@ -10,22 +10,28 @@ const REF_PATHS = {
 }
 
 // Auto-fail check: detects common AI downscaling artifacts
-function detectAutoFails(asset: any): string[] {
+function detectAutoFails(asset: any, size: number): string[] {
   const fails: string[] = []
   const pixels = asset.pixels
   
   if (!pixels || !Array.isArray(pixels)) return fails
 
-  // Check 1: Mixed perspectives (side-view vs top-down cues)
-  // Check 2: Anti-aliased edges (semi-transparent pixels at edges)
-  // Check 3: Color banding (sudden color jumps)
-  // Check 4: Missing outlines on sprites
-  // Check 5: Pillow shading pattern
+  // Valid grid sizes
+  const validSizes = [16, 32, 48, 64]
+  if (!validSizes.includes(size)) {
+    fails.push(`Grid size mismatch: ${size}x${size} (expected 16/32/48/64)`)
+    return fails
+  }
 
-  // For now, basic checks
-  const size = pixels.length
-  if (size < 8 || size > 64) {
-    fails.push(`Grid size mismatch: ${size}x${size} (expected 16-48)`)
+  // 64×64 specific rules
+  if (size === 64) {
+    // 64×64 allows more colors
+    return fails // skip small-sprite restrictions
+  }
+
+  // Small sprite checks (16-48)
+  if (size < 16 || size > 64) {
+    fails.push(`Grid size out of range: ${size}x${size}`)
   }
 
   return fails
@@ -48,7 +54,7 @@ export async function POST(req: Request) {
     const { asset, type, size } = await req.json()
 
     const pixels = asset.pixels
-    const autoFails = detectAutoFails(asset)
+    const autoFails = detectAutoFails(asset, size || 16)
     
     // Run checks
     const paletteCheck = pixels ? analyzePalette(pixels) : { pass: true, note: "No pixel data", colorCount: 0 }

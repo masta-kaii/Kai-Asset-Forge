@@ -875,6 +875,7 @@ export default function HermesOS() {
   const [selRoom, setSelRoom] = useState(null);
   const [prompt,  setPrompt]  = useState("a fantasy RPG warrior character");
   const [prodCnt, setProdCnt] = useState(0);
+  const [spriteSize, setSpriteSize] = useState(16); // 16 | 32 | 48 | 64
   const [flow,    setFlow]    = useState("");
   const [clock,      setClock]      = useState(new Date());
   const [isLive,     setIsLive]     = useState(false);
@@ -1096,7 +1097,7 @@ export default function HermesOS() {
           body: JSON.stringify({
             asset: genData.asset,
             type: userPrompt,
-            size: 16,
+            size: spriteSize,
           }),
         });
         qcResult = await qcRes.json();
@@ -1305,7 +1306,19 @@ export default function HermesOS() {
           onKeyDown={e=>e.key==="Enter"&&!running&&run(prompt)}
           style={{flex:1,minWidth:180,background:"#050709",border:"1px solid #252938",
             color:"#e2e8f0",padding:"6px 11px",fontFamily:"'VT323',monospace",fontSize:15,outline:"none"}}/>
-        <button onClick={()=>run(prompt)} disabled={running} style={{
+            {/* Sprite Size Selector */}
+            <div style={{display:"flex",gap:2,background:"#0d1018",border:"1px solid #252938",padding:2}}>
+            {[16,32,48,64].map(sz=>(
+              <button key={sz} onClick={()=>setSpriteSize(sz)} style={{
+                background:spriteSize===sz?"rgba(245,166,35,0.15)":"transparent",
+                border:spriteSize===sz?"1px solid #f5a62355":"1px solid transparent",
+                color:spriteSize===sz?"#f5a623":"#475569",
+                padding:"3px 8px",fontFamily:"'VT323',monospace",fontSize:12,
+                cursor:"pointer",letterSpacing:1
+              }}>{sz}×{sz}</button>
+            ))}
+            </div>
+            <button onClick={()=>run(prompt)} disabled={running} style={{
           background:running?"#191d28":"rgba(245,166,35,0.1)",
           border:`1px solid ${running?"#252938":"#f5a623"}`,
           color:running?"#475569":"#f5a623",
