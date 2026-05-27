@@ -106,18 +106,6 @@ export async function POST(request: Request) {
     const qcId = verifierMatch[1]
     const pkgId = synthMatch[1]
 
-    log("✦ SWARM DEPLOYED — agents discussing freely","success","POPO")
-    log("Pixel Artist assigned: " + artistId,"info","POPO")
-    log("Web Generator assigned: " + webgenId,"info","POPO")
-    log("QC Verifier assigned: " + qcId,"info","POPO")
-    log("Packager assigned: " + pkgId,"info","POPO")
-
-    // The swarm mode lets agents:
-    // - Work in PARALLEL (not rigid sequential pipeline)
-    // - Comment on each other's tasks (free discussion)
-    // - QC can ask Pixel Artist to revise (not just pass/fail)
-    // - Packager sees everything and synthesizes
-
     // ── FEED AGENT XP ──
     const xpResults: any[] = []
     const feed = async (id: string, xp: number, action: string) => {
