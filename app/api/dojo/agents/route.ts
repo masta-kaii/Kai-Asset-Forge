@@ -3,8 +3,8 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 
-const STATS_PATH = join(process.cwd(), "data", "agent-stats.json");
-const STATS_DIR = join(process.cwd(), "data");
+const STATS_PATH = join(process.env.VERCEL ? '/tmp' : join(process.cwd(), 'data'), 'agent-stats.json');
+const STATS_DIR = process.env.VERCEL ? '/tmp' : join(process.cwd(), 'data');
 
 async function ensureDir() {
   if (!existsSync(STATS_DIR)) {
