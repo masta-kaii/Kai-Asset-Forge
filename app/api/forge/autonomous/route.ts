@@ -167,8 +167,8 @@ function parsePixels(sprite: any): PixelGrid | null {
   // Parse pixel data from sprite (supports flat arrays and 2D)
   if (sprite.pixels.length === w * h) {
     for (let y = 0; y < h; y++) {
-      data.push(sprite.pixels.slice(y * w, (y + 1) * w).map((p: any) => 
-        typeof p === 'number' ? p : (p.index ?? p.color ?? -1)
+      data.push(sprite.pixels.slice(y * w, (y + 1) * w).map((pixel: any) => 
+        typeof pixel === 'number' ? pixel : (pixel.index ?? pixel.color ?? -1)
       ));
     }
   } else if (Array.isArray(sprite.pixels[0])) {
