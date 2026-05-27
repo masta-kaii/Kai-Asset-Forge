@@ -1,7 +1,8 @@
 // @ts-nocheck
 /**
- * AUTONOMOUS PIPELINE + POPO'S QC ENGINE v3.0
- * Scout → Forge → QC (pixel-level) → Pack → List
+ * AUTONOMOUS PIPELINE + POPO'S QC ENGINE v4.0 — CLOSED-LOOP QUALITY
+ * Scout → Forge → QC → {PASS: Pack→List | FAIL: REWORK→Forge→QC (max 3)}
+ * QC failures feed back to Pixel Artist & Web Generator for rework.
  * No Hermes required. All stages run on Vercel.
  */
 import { NextResponse } from "next/server";
@@ -16,16 +17,7 @@ export const runtime = "nodejs";
 const STATS_PATH = "/tmp/agent-stats.json";
 const OUTPUT_DIR = "/tmp/forge-output";
 const PIPELINE_LOG = "/tmp/pipeline-log.json";
-
-// ═══════════════════════ DEFAULT AGENT STATS ═══════════════════════
-const DEFAULT_AGENTS: Record<string, any> = {
-  artist: { id: "artist", name: "PIXEL STUDIO", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
-    skills: { pixelart: { level: 1, name: "Pixel Art" }, color: { level: 1, name: "Color Theory" }, composition: { level: 1, name: "Composition" }, speed: { level: 1, name: "Speed" } } },
-  webgen: { id: "webgen", name: "WEB GENERATOR", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
-    skills: { frontend: { level: 1, name: "Frontend" }, design: { level: 1, name: "Design" }, responsive: { level: 1, name: "Responsive" }, perf: { level: 1, name: "Performance" } } },
-  popo: { id: "popo", name: "POPO COMMAND", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
-    skills: { orchestration: { level: 1, name: "Orchestration" }, strategy: { level: 1, name: "Strategy" }, vision: { level: 1, name: "Vision" }, delegation: { level: 1, name: "Delegation" } } },
-};
+const MAX_REWORKS = 3;
 
 // ═══════════════════════ 0x72 FORGE PALETTE ═══════════════════════
 const FORGE_PALETTE: Record<number, [number,number,number]> = {
@@ -57,35 +49,68 @@ function scoutStage(theme: string, stats: any) {
   return { stage:"SCOUT", status:"complete", brief };
 }
 
-// ═══════════════════════ STAGE 2: FORGE ═══════════════════════
-function forgeStage(brief: any, stats: any) {
+// ═══════════════════════ STAGE 2: FORGE (with rework support) ═══════════════════════
+function forgeStage(brief: any, stats: any, reworkFeedback?: any) {
   const a = stats.artist||stats.artist_default;
   const w = stats.webgen||stats.webgen_default;
-  const pSkills = { pixelart:a?.skills?.pixelart?.level||1, color:a?.skills?.color?.level||1, composition:a?.skills?.composition?.level||1, speed:a?.skills?.speed?.level||1 };
-  const wSkills = { frontend:w?.skills?.frontend?.level||1, design:w?.skills?.design?.level||1, responsive:w?.skills?.responsive?.level||1, perf:w?.skills?.perf?.level||1 };
+
+  // If reworking, boost skills based on QC feedback
+  let pSkills = { pixelart:a?.skills?.pixelart?.level||1, color:a?.skills?.color?.level||1, composition:a?.skills?.composition?.level||1, speed:a?.skills?.speed?.level||1 };
+  let wSkills = { frontend:w?.skills?.frontend?.level||1, design:w?.skills?.design?.level||1, responsive:w?.skills?.responsive?.level||1, perf:w?.skills?.perf?.level||1 };
+
+  if (reworkFeedback) {
+    // REWORK MODE: apply QC feedback by temporarily boosting relevant skills
+    const spriteIssues = reworkFeedback.spriteFeedback || [];
+    const pageIssues = reworkFeedback.pageFeedback || [];
+
+    if (spriteIssues.length > 0) {
+      // Boost pixel skills based on what QC flagged
+      if (spriteIssues.some((i:string) => i.includes("missing outline") || i.includes("AUTO-FAIL")))
+        pSkills = { ...pSkills, pixelart: Math.min(pSkills.pixelart+2, 5), composition: Math.min(pSkills.composition+1, 5) };
+      if (spriteIssues.some((i:string) => i.includes("PINK") || i.includes("palette") || i.includes("color")))
+        pSkills = { ...pSkills, color: Math.min(pSkills.color+3, 5) };
+      if (spriteIssues.some((i:string) => i.includes("blob") || i.includes("silhouette") || i.includes("scattered")))
+        pSkills = { ...pSkills, composition: Math.min(pSkills.composition+2, 5) };
+    }
+
+    if (pageIssues.length > 0) {
+      wSkills = { ...wSkills, design: Math.min(wSkills.design+2, 5), frontend: Math.min(wSkills.frontend+1, 5) };
+    }
+  }
+
   const sprites: any[] = [];
   const tmpls = TEMPLATES.filter((t:any)=>t.difficulty<=pSkills.pixelart+Math.floor(pSkills.color/2));
-  const count = Math.min(brief.spriteCount, tmpls.length);
+  const count = Math.max(1, Math.min(brief.spriteCount, tmpls.length));
+
   for (let i=0;i<count;i++) {
     const t = tmpls[i]||tmpls[0];
     const s = generateWithSkills(pSkills,t.name);
-    // Store pixel data so QC can do real pixel-level validation
-    sprites.push({
-      name: t.name, qualityTier: s.qualityTier, colorsUsed: s.colorsUsed, size: `${s.width}×${s.height}`,
-      width: s.width, height: s.height, pixels: s.pixels,
-    });
+    sprites.push({ name:t.name, qualityTier:s.qualityTier, colorsUsed:s.colorsUsed, size:`${s.width}×${s.height}` });
   }
+
   const page = generatePage(wSkills,"landing");
   ensureDir(OUTPUT_DIR);
-  const bid = Date.now().toString(36);
+  const bid = reworkFeedback?.batchId || Date.now().toString(36);
   const bd = path.join(OUTPUT_DIR,bid);
   ensureDir(bd);
-  fs.writeFileSync(path.join(bd,"assets.json"),JSON.stringify({ brief, sprites:sprites.map((s:any)=>({name:s.name,qualityTier:s.qualityTier,colorsUsed:s.colorsUsed,size:s.size})), pageTier:page.tier, pageFeatures:page.features },null,2));
+
+  fs.writeFileSync(path.join(bd,"assets.json"),JSON.stringify({
+    brief, sprites:sprites.map((s:any)=>({name:s.name,qualityTier:s.qualityTier,colorsUsed:s.colorsUsed,size:s.size})),
+    pageTier:page.tier, pageFeatures:page.features,
+    reworkCount: (reworkFeedback?.reworkCount||0)+1,
+  },null,2));
   fs.writeFileSync(path.join(bd,"page.html"),page.html);
+
   const log = loadLog();
-  log.forge = { bid, count:sprites.length, top:sprites[0]?.qualityTier||"Basic", pageTier:page.tier, ts:new Date().toISOString() };
+  log.forge = { bid, count:sprites.length, top:sprites[0]?.qualityTier||"Basic", pageTier:page.tier, rework:!!reworkFeedback, ts:new Date().toISOString() };
   saveLog(log);
-  return { stage:"FORGE", status:"complete", batchId:bid, spritesGenerated:sprites.length, topQuality:sprites[0]?.qualityTier||"Basic", pageTier:page.tier, pageFeatures:page.features.length };
+
+  return {
+    stage:"FORGE", status:"complete", batchId:bid, spritesGenerated:sprites.length,
+    topQuality:sprites[0]?.qualityTier||"Basic", pageTier:page.tier, pageFeatures:page.features.length,
+    reworked: !!reworkFeedback,
+    boostedSkills: reworkFeedback ? { pixel:pSkills, web:wSkills } : undefined,
+  };
 }
 
 // ═══════════════════════ QC ENGINE v3.0 ═══════════════════════
@@ -114,8 +139,7 @@ function qcOutline(g:PixelGrid):{score:number;issues:string[]} {
     const hasBlack=nbrs.some(([nx,ny])=>!(nx<0||nx>=w||ny<0||ny>=h)&&data[ny][nx]===0);
     if (!hasBlack) { penalty++; if (penalty<=3) issues.push(`Missing outline at (${x},${y})`); }
   }
-  const maxP=w*h*0.3;
-  return {score:Math.max(0,20-Math.floor((penalty/maxP)*20)),issues};
+  return {score:Math.max(0,20-Math.floor((penalty/(w*h*0.3))*20)),issues};
 }
 
 function qcPalette(g:PixelGrid):{score:number;issues:string[];colorsFound:Set<number>;nonForge:number} {
@@ -179,28 +203,46 @@ function validateSprite(sprite:any):any {
   return {name:sprite.name,score:total,pass:af.length===0&&total>=55,autoFails:af,issues:allIssues.slice(0,8)};
 }
 
-// ═══════════════════════ STAGE 3: QC ═══════════════════════
+// ═══════════════════════ STAGE 3: QC (returns structured feedback for rework) ═══════════════════════
 function qcStage(batchId:string,stats:any) {
   const bd=path.join(OUTPUT_DIR,batchId);
   const af=path.join(bd,"assets.json");
   if (!fs.existsSync(af)) return {stage:"QC",status:"error",error:"No assets found"};
   const assets=JSON.parse(fs.readFileSync(af,"utf-8"));
   const results:any[]=[]; let total=0,pCount=0;
-  for (const s of assets.sprites) { const r=validateSprite(s); results.push(r); total+=r.score; if(r.pass)pCount++; }
+  let spriteFeedback:string[]=[];
+  for (const s of assets.sprites) {
+    const r=validateSprite(s);
+    results.push(r); total+=r.score;
+    if(r.pass) pCount++;
+    else spriteFeedback=[...spriteFeedback,...r.issues];
+  }
   const pTiers:Record<string,number>={Basic:30,Standard:55,Professional:75,Enterprise:95};
   const pScore=pTiers[assets.pageTier]||50; const pPass=pScore>=50;
-  results.push({name:"landing-page",score:pScore,pass:pPass,autoFails:[],issues:[]});
+  const pageFeedback:string[]=pPass?[]:[`Page tier ${assets.pageTier} — need higher tier (current: ${pScore}/100)`];
+  results.push({name:"landing-page",score:pScore,pass:pPass,autoFails:[],issues:pageFeedback});
   if(pPass)pCount++;
-  // Check auto-fails (MUST come before overallPass computation)
+
   let hasAF=false; const allAF:string[]=[];
   for (const r of results) { if(r.autoFails?.length>0){hasAF=true;allAF.push(`${r.name}:${r.autoFails.join(",")}`);} }
+
   const avgScore=assets.sprites.length>0?Math.round(total/assets.sprites.length):pScore;
   const overallPass=hasAF?false:pCount>=Math.ceil(results.length*0.6);
+
   const report={results,avgScore,overallPass,autoFails:allAF,ts:new Date().toISOString(),validator:"Popo's QC Engine v3.0"};
   fs.writeFileSync(path.join(bd,"qc-report.json"),JSON.stringify(report,null,2));
-  return {stage:"QC",status:overallPass?"APPROVED":"NEEDS WORK",checks:results.length,passed:pCount,avgScore,autoFails:allAF,
+
+  return {
+    stage:"QC", status:overallPass?"APPROVED":"NEEDS WORK",
+    checks:results.length, passed:pCount, avgScore, autoFails:allAF,
     details:results.map((r:any)=>`${r.name}:${r.pass?'✓':'✕'} ${r.score}/100${r.autoFails?.length?' [AF:'+r.autoFails.join(',')+']':''}`),
-    feedback:results.flatMap((r:any)=>r.issues||[]).slice(0,10)};
+    feedback:results.flatMap((r:any)=>r.issues||[]).slice(0,10),
+    // Structured feedback for rework loop
+    reworkNeeded: !overallPass,
+    spriteFeedback: spriteFeedback.slice(0,5),
+    pageFeedback,
+    failedSprites: results.filter((r:any)=>!r.pass&&r.name!=="landing-page").map((r:any)=>r.name),
+  };
 }
 
 // ═══════════════════════ STAGE 4: PACK ═══════════════════════
@@ -230,44 +272,90 @@ function listStage(batchId:string,stats:any) {
 function ensureDir(d:string){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});}
 function loadLog():any{try{if(fs.existsSync(PIPELINE_LOG))return JSON.parse(fs.readFileSync(PIPELINE_LOG,"utf-8"));}catch{}return{};}
 function saveLog(l:any){ensureDir("/tmp");fs.writeFileSync(PIPELINE_LOG,JSON.stringify(l,null,2));}
-function loadStats(): any {
-  try {
-    if (fs.existsSync(STATS_PATH)) {
-      const data = JSON.parse(fs.readFileSync(STATS_PATH, "utf-8"));
-      // Merge defaults for any missing agents (cold start recovery)
-      let changed = false;
-      for (const [id, agent] of Object.entries(DEFAULT_AGENTS)) {
-        if (!data[id]) { data[id] = { ...agent }; changed = true; }
-      }
-      if (changed) fs.writeFileSync(STATS_PATH, JSON.stringify(data, null, 2));
-      return data;
-    }
-  } catch {}
-  // Seed with defaults on first run / cold start
-  const defaults = JSON.parse(JSON.stringify(DEFAULT_AGENTS));
-  try { fs.writeFileSync(STATS_PATH, JSON.stringify(defaults, null, 2)); } catch {}
-  return defaults;
-}
+function loadStats():any{try{if(fs.existsSync(STATS_PATH))return JSON.parse(fs.readFileSync(STATS_PATH,"utf-8"));}catch{}return{};}
 
-// ═══════════════════════ MAIN ═══════════════════════
+// ═══════════════════════ MAIN — WITH REWORK LOOP ═══════════════════════
 export async function POST(request:Request) {
   try {
     const {theme}=await request.json().catch(()=>({}));
     const stats=loadStats();
+
+    // STAGE 1: SCOUT
     const scout=scoutStage(theme,stats);
-    const forge=forgeStage(scout.brief,stats);
-    const qc=qcStage(forge.batchId,stats);
-    const pack=packStage(forge.batchId,stats);
-    const list=listStage(forge.batchId,stats);
-    // XP
-    if(stats.artist){stats.artist.totalXP=(stats.artist.totalXP||0)+25;stats.artist.xp=(stats.artist.xp||0)+25;}
-    if(stats.webgen){stats.webgen.totalXP=(stats.webgen.totalXP||0)+20;stats.webgen.xp=(stats.webgen.xp||0)+20;}
-    if(stats.popo){stats.popo.totalXP=(stats.popo.totalXP||0)+30;stats.popo.xp=(stats.popo.xp||0)+30;}
+    const pipeline:any[]=[scout];
+    let batchId="";
+    let finalQc:any=null;
+    let reworks=0;
+
+    // STAGE 2+3: FORGE → QC → REWORK LOOP (up to MAX_REWORKS)
+    let forge=forgeStage(scout.brief,stats);
+    pipeline.push(forge);
+    batchId=forge.batchId;
+
+    let qc=qcStage(batchId,stats);
+    pipeline.push(qc);
+
+    while (qc.reworkNeeded && reworks < MAX_REWORKS) {
+      reworks++;
+      // Train agents based on what QC flagged
+      if (stats.artist && qc.spriteFeedback?.length > 0) {
+        stats.artist.totalXP=(stats.artist.totalXP||0)+15;
+        stats.artist.xp=(stats.artist.xp||0)+15;
+        // Boost skills permanently from rework training
+        if (stats.artist.skills) {
+          if (qc.spriteFeedback.some((i:string)=>i.includes("outline")||i.includes("blob")))
+            stats.artist.skills.pixelart = { level: Math.min((stats.artist.skills.pixelart?.level||1)+1, 5) };
+          if (qc.spriteFeedback.some((i:string)=>i.includes("PINK")||i.includes("color")||i.includes("palette")))
+            stats.artist.skills.color = { level: Math.min((stats.artist.skills.color?.level||1)+1, 5) };
+        }
+      }
+      if (stats.webgen && qc.pageFeedback?.length > 0) {
+        stats.webgen.totalXP=(stats.webgen.totalXP||0)+10;
+        stats.webgen.xp=(stats.webgen.xp||0)+10;
+        if (stats.webgen.skills) {
+          stats.webgen.skills.design = { level: Math.min((stats.webgen.skills.design?.level||1)+1, 5) };
+        }
+      }
+
+      // REWORK: re-forge with QC feedback + boosted skills
+      forge = forgeStage(scout.brief, stats, {
+        batchId,
+        reworkCount: reworks,
+        spriteFeedback: qc.spriteFeedback,
+        pageFeedback: qc.pageFeedback,
+      });
+      pipeline.push(forge);
+
+      qc = qcStage(batchId, stats);
+      pipeline.push(qc);
+
+      if (!qc.reworkNeeded) break;
+    }
+
+    finalQc = qc;
     try{fs.writeFileSync(STATS_PATH,JSON.stringify(stats,null,2));}catch{}
+
+    // STAGE 4: PACK (only if QC passed or max reworks exhausted)
+    const pack = packStage(batchId, stats);
+    pipeline.push(pack);
+
+    // STAGE 5: LIST
+    const list = listStage(batchId, stats);
+    pipeline.push(list);
+
     return NextResponse.json({
-      success:true,autonomous:true,batchId:forge.batchId,theme:scout.brief.theme,
-      pipeline:[scout,forge,qc,pack,list],
-      summary:{sprites:forge.spritesGenerated,topQuality:forge.topQuality,pageTier:forge.pageTier,qcPassed:qc.passed,qcTotal:qc.checks,qcStatus:qc.status,price:list.listing?.price||0},
+      success:true, autonomous:true, batchId, theme:scout.brief.theme,
+      pipeline,
+      reworks,
+      summary:{
+        sprites:forge.spritesGenerated, topQuality:forge.topQuality,
+        pageTier:forge.pageTier,
+        qcPassed:finalQc.passed, qcTotal:finalQc.checks,
+        qcStatus:finalQc.status, qcScore:finalQc.avgScore,
+        reworks,
+        autoFails:finalQc.autoFails,
+        price:list.listing?.price||0,
+      },
       output:`/api/forge/autonomous?batch=${forge.batchId}`,
     });
   } catch(e:any) {
