@@ -1058,6 +1058,27 @@ export default function HermesOS() {
         throw new Error(genData.error || "Generation failed");
       }
 
+      // Web Generator — runs in parallel with Pixel Studio
+      setSt("webgen","working",30); setSelRoom("webgen");
+      addTask("webgen",{name:"Generate Web Page",status:"running",desc:userPrompt,progress:20});
+      log("Generating web landing page...","info","WEBGEN");
+
+      const webRes = await fetch('/api/forge/generate-web', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: userPrompt, feature: 'landing-page' })
+      });
+      const webData = await webRes.json();
+
+      if (webData.success) {
+        updTask("webgen","Generate Web Page",{status:"done",progress:100});
+        setSt("webgen","idle",100);
+        log(`✓ Web page generated: ${webData.asset.name}.html`,"success","WEBGEN");
+      } else {
+        log("Web generation skipped: " + (webData.error || "unknown"),"warn","WEBGEN");
+        setSt("webgen","idle",100);
+      }
+
       // QC
       setSt("qc","reviewing",20); setSelRoom("qc");
       addTask("qc",{name:"Validate Asset",status:"reviewing",progress:30});
