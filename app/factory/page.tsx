@@ -1010,11 +1010,11 @@ export default function HermesOS() {
       const data = await res.json();
 
       if (data.success) {
-        log("✦ REAL PIPELINE DEPLOYED","success","POPO");
+        log("✦ SWARM DEPLOYED — agents collaborating freely","success","POPO");
         log("Theme: " + data.theme,"info","POPO");
-        log("Tasks: " + (data.pipeline?.length || 0) + " created","info","POPO");
-        log("Monitoring Kanban board...","system","POPO");
-        setFlow(data.message || "✦ PIPELINE ACTIVE");
+        log("Workers: " + (data.swarm?.workers?.length || 0) + " in parallel","info","POPO");
+        log("Agents can discuss freely via task comments","system","POPO");
+        setFlow(data.message || "🐝 SWARM ACTIVE");
         setIsLive(true);
         setTimeout(() => {
           setRunning(false);
