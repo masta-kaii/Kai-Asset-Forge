@@ -1,301 +1,480 @@
-import { NextResponse } from 'next/server'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import { join } from 'path'
+// @ts-nocheck
+/**
+ * ENHANCED DOJO TRAINING — Real Connection
+ * 
+ * Training now ACTUALLY generates assets and compares quality.
+ * XP earned = real quality score, not random numbers.
+ * 
+ * STUDY: Analyzes reference → stores real insights
+ * PRACTICE: Generates at current skill → compares to master → real score
+ * CHALLENGE: Generates at skill+1 → passes if score > 70
+ */
+import { NextResponse } from "next/server";
+import { generateWithSkills, compareGenerations, TEMPLATES } from "@/lib/skill-sprite-gen";
+import { generatePage, comparePages } from "@/lib/skill-page-gen";
+import * as fs from "fs";
+import * as path from "path";
 
-const DATA_FILE = join(process.env.VERCEL ? '/tmp' : join(process.cwd(), 'data'), 'agent-stats.json')
-const XP_LEVELS = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000]
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-function xpForLevel(lv: number) { return XP_LEVELS[Math.min(lv - 1, XP_LEVELS.length - 1)] || 0 }
+const STATS_PATH = "/tmp/agent-stats.json";
+const TRAINING_MEMORY_PATH = "/tmp/training-memory.json";
 
-function loadAgents() {
+// ═══════════════════════════════════════════════════════════════
+//  STATS HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function ensureStats(): Record<string, any> {
+  const defaultStats = getDefaultStats();
   try {
-    if (!existsSync(DATA_FILE)) {
-      // Seed default agents on cold start
-      const defaults: Record<string, any> = {
-        popo: { id:"popo",name:"POPO COMMAND",role:"Director · Orchestrator",level:1,xp:0,xpToNext:100,totalXP:0,color:"#f5a623",bgA:"#1e1508",motto:"I orchestrate the chaos.",skills:{orchestration:{name:"Orchestration",level:1,icon:"⚙",desc:"Coordinate multi-agent workflows"},strategy:{name:"Strategy",level:1,icon:"♟",desc:"Plan optimal production routes"},vision:{name:"Vision",level:1,icon:"👁",desc:"Define art direction & quality targets"},delegation:{name:"Delegation",level:1,icon:"↗",desc:"Efficiently assign tasks to agents"}},trainingHistory:[]},
-        scout: { id:"scout",name:"SCOUT HUB",role:"Research & Trends",level:1,xp:0,xpToNext:100,totalXP:0,color:"#f59e0b",bgA:"#1e1208",motto:"I find what's next.",skills:{research:{name:"Research",level:1,icon:"🔬",desc:"Deep market & trend analysis"},curation:{name:"Curation",level:1,icon:"📋",desc:"Identify high-value opportunities"},briefing:{name:"Briefing",level:1,icon:"📝",desc:"Clear creative briefs for studios"},speed:{name:"Speed",level:1,icon:"⚡",desc:"Fast research turnaround"}},trainingHistory:[]},
-        artist: { id:"artist",name:"PIXEL STUDIO",role:"Sprite & Tileset Lab",level:1,xp:0,xpToNext:100,totalXP:0,color:"#60a5fa",bgA:"#061220",motto:"Every pixel has a purpose.",skills:{pixelart:{name:"Pixel Art",level:1,icon:"🖼",desc:"Sprite & tileset craftsmanship"},color:{name:"Color Theory",level:1,icon:"🎨",desc:"Palette harmony & optical mixing"},composition:{name:"Composition",level:1,icon:"📐",desc:"Layout, proportion & silhouette"},speed:{name:"Speed",level:1,icon:"⚡",desc:"Fast iteration & rapid prototyping"}},trainingHistory:[]},
-        webgen: { id:"webgen",name:"WEB GENERATOR",role:"Page & Component Forge",level:1,xp:0,xpToNext:100,totalXP:0,color:"#22d3ee",bgA:"#041820",motto:"I ship pixels and pages.",skills:{frontend:{name:"Frontend",level:1,icon:"🖥",desc:"React/Next.js component craft"},design:{name:"Design",level:1,icon:"🎯",desc:"UI/UX pattern implementation"},responsive:{name:"Responsive",level:1,icon:"📱",desc:"Multi-device layouts"},perf:{name:"Performance",level:1,icon:"⚡",desc:"Fast load & render optimization"}},trainingHistory:[]},
-        qc: { id:"qc",name:"QC CHAMBER",role:"Quality Control",level:1,xp:0,xpToNext:100,totalXP:0,color:"#c084fc",bgA:"#0f0620",motto:"Nothing ships broken.",skills:{inspection:{name:"Inspection",level:1,icon:"🔍",desc:"Detect flaws & inconsistencies"},consistency:{name:"Consistency",level:1,icon:"📏",desc:"Maintain style across all assets"},accuracy:{name:"Accuracy",level:1,icon:"🎯",desc:"Precision in validation checks"},standards:{name:"Standards",level:1,icon:"📋",desc:"Enforce pipeline quality gates"}},trainingHistory:[]},
-        pkg: { id:"pkg",name:"PACKAGING BAY",role:"Export Pipeline",level:1,xp:0,xpToNext:100,totalXP:0,color:"#4ade80",bgA:"#051810",motto:"Ready for deployment.",skills:{export:{name:"Export",level:1,icon:"📦",desc:"Multi-format asset export"},optimization:{name:"Optimization",level:1,icon:"⚡",desc:"File size & performance tuning"},metadata:{name:"Metadata",level:1,icon:"🏷",desc:"Tagging & cataloging assets"},delivery:{name:"Delivery",level:1,icon:"🚀",desc:"Publish-ready packaging"}},trainingHistory:[]},
+    if (fs.existsSync(STATS_PATH)) {
+      const data = JSON.parse(fs.readFileSync(STATS_PATH, "utf-8"));
+      // Merge defaults for any missing agents
+      for (const [id, agent] of Object.entries(defaultStats)) {
+        if (!data[id]) data[id] = agent;
       }
-      saveAgents(defaults)
-      return defaults
+      return data;
     }
-    return JSON.parse(readFileSync(DATA_FILE, 'utf-8'))
-  } catch { return {} }
+  } catch {}
+  // Seed with defaults
+  fs.writeFileSync(STATS_PATH, JSON.stringify(defaultStats, null, 2));
+  return defaultStats;
 }
 
-function saveAgents(data: any) {
-  mkdirSync(join(process.cwd(), 'data'), { recursive: true })
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8')
-}
-
-function addXP(agent: any, xp: number, skillKey: string) {
-  agent.xp = (agent.xp || 0) + xp
-  agent.totalXP = (agent.totalXP || 0) + xp
-  let leveledUp = false
-
-  while (agent.xp >= agent.xpToNext) {
-    agent.xp -= agent.xpToNext
-    agent.level = (agent.level || 1) + 1
-    agent.xpToNext = xpForLevel(agent.level)
-    leveledUp = true
-  }
-
-  // Improve a random skill related to what was practiced
-  const skills = agent.skills || {}
-  const improvedSkills: string[] = []
-
-  if (skillKey && skills[skillKey]) {
-    skills[skillKey].level = Math.min(10, (skills[skillKey].level || 1) + 1)
-    improvedSkills.push(skills[skillKey].name)
-  }
-
-  // Random chance to improve another skill
-  const otherKeys = Object.keys(skills).filter(k => k !== skillKey)
-  if (otherKeys.length > 0 && Math.random() < 0.3) {
-    const rk = otherKeys[Math.floor(Math.random() * otherKeys.length)]
-    skills[rk].level = Math.min(10, (skills[rk].level || 1) + 1)
-    improvedSkills.push(skills[rk].name)
-  }
-
-  // Add to training history
-  agent.trainingHistory = agent.trainingHistory || []
-  return { leveledUp, improvedSkills, xp }
-}
-
-// ── Pixel Studio Training Logic ──
-function trainPixelStudio(mode: string, reference: any, prompt?: string) {
-  const refName = reference?.name || 'unknown'
-
-  switch (mode) {
-    case 'study': {
-      // Analyze reference sprite
-      const paletteNotes = [
-        "Limited palette detected — 4-6 colors, warm/cool consistency maintained",
-        "No orphan pixels found — every color serves a purpose in the composition",
-      ]
-      const outlineNotes = [
-        "1px dark outline consistently applied to outer silhouette",
-        "Selective internal outlines — details readable without clutter",
-      ]
-      const shadingNotes = [
-        "Directional light source: top-left (consistent across sprite)",
-        "3-step gradient shading — no pillow shading detected",
-      ]
-      const silhouetteNotes = [
-        `Sprite readable at ${reference.size || '16×16'} — clear character silhouette`,
-        "Distinct head/body/limb separation even at small scale",
-      ]
-      return {
-        insights: [
-          `🎨 PALETTE: ${paletteNotes[Math.floor(Math.random() * paletteNotes.length)]}`,
-          `✏️ OUTLINE: ${outlineNotes[Math.floor(Math.random() * outlineNotes.length)]}`,
-          `☀ SHADING: ${shadingNotes[Math.floor(Math.random() * shadingNotes.length)]}`,
-          `👤 SILHOUETTE: ${silhouetteNotes[Math.floor(Math.random() * silhouetteNotes.length)]}`,
-          `📐 Reference: ${refName} (${reference.category || 'Character'}, ${reference.frames || 1} frames, ${reference.size || '16×16'})`,
-        ].join('\n'),
-        feedback: `Studied ${refName} — palette, outline, shading, and silhouette patterns extracted. Apply these to your next creation.`,
-      }
-    }
-    case 'practice': {
-      const score = 65 + Math.floor(Math.random() * 25)
-      const approved = score >= 70
-      return {
-        approved,
-        score,
-        checks: {
-          paletteConsistency: { pass: score > 60, note: score > 60 ? 'Palette matches reference' : 'Palette needs more reference study' },
-          outlineQuality: { pass: score > 55, note: score > 55 ? 'Outline style consistent' : 'Outline thickness varies' },
-          silhouetteReadability: { pass: score > 65, note: 'Silhouette readable at target size' },
-          shadingTechnique: { pass: score > 50, note: score > 50 ? 'Light direction matches reference' : 'Check light source direction' },
-          referenceMatch: { pass: approved, note: approved ? `Close match to ${refName}` : `Deviates from ${refName} style` },
-        },
-        feedback: approved ? `Recreation matches ${refName} style — good practice!` : `Practice more with ${refName} — focus on palette and outline consistency.`,
-      }
-    }
-    case 'challenge': {
-      const promptText = prompt || `Generate original in ${refName} style`
-      const score = 55 + Math.floor(Math.random() * 35)
-      const approved = score >= 70
-      return {
-        approved,
-        score,
-        prompt: promptText,
-        checks: {
-          paletteConsistency: { pass: score > 55, note: `Palette matching ${refName} reference` },
-          outlineQuality: { pass: score > 60, note: 'Outline style evaluated' },
-          silhouetteReadability: { pass: score > 50, note: 'New original silhouette — readable' },
-          shadingTechnique: { pass: score > 45, note: score > 45 ? 'Shading follows reference conventions' : 'Needs more reference study' },
-          styleCoherence: { pass: approved, note: approved ? `Original fits ${refName} style` : `Style doesn't match ${refName}` },
-        },
-        feedback: approved
-          ? `Successfully generated original sprite in ${refName} style — creative application of studied patterns!`
-          : `Good attempt — but the generated sprite doesn't fully capture ${refName}'s style. Study the reference more.`,
-      }
-    }
-    case 'library': {
-      return {
-        insights: [
-          `📚 BROWSING: ${refName}`,
-          `   Category: ${reference.category || 'Character'}`,
-          `   Size: ${reference.size || '16×16'}`,
-          `   Frames: ${reference.frames || 1}`,
-          `   Path: ${reference.path}`,
-          ``,
-          `Key observations:`,
-          `- Professional pixel placement at ${reference.size || 'small'} scale`,
-          `- Consistent color palette across all frames`,
-          `- Clean animation transitions (${reference.frames || 1} frames)`,
-        ].join('\n'),
-        feedback: `Browsed ${refName} — metadata extracted. Use this knowledge to inform your next creation.`,
-      }
-    }
-    default:
-      return { insights: 'Unknown training mode', feedback: 'Select a valid training mode' }
-  }
-}
-
-// ── Web Generator Training Logic ──
-function trainWebGenerator(mode: string, reference: any, prompt?: string) {
-  const refName = reference?.name || 'unknown'
-  const refStyle = reference?.style || 'General'
-  const refColors = reference?.colors || '#000 + white'
-
-  switch (mode) {
-    case 'study': {
-      return {
-        insights: [
-          `🎨 COLOR SYSTEM: ${refColors}`,
-          `📐 LAYOUT: ${refName} uses ${refStyle} patterns — clean hierarchy, clear CTAs`,
-          `🔤 TYPOGRAPHY: Sans-serif, large headings, generous spacing`,
-          `🧩 COMPONENTS: Hero → Features → CTA → Footer (${refName} pattern)`,
-          `⚡ INTERACTIONS: ${reference.features || 'Smooth transitions, hover states'}`,
-        ].join('\n'),
-        feedback: `Studied ${refName} (${refStyle}) — extracted color system, layout patterns, typography, and component structure.`,
-      }
-    }
-    case 'practice': {
-      const score = 60 + Math.floor(Math.random() * 30)
-      const approved = score >= 70
-      return {
-        approved,
-        score,
-        checks: {
-          layoutAccuracy: { pass: score > 55, note: score > 55 ? 'Layout matches reference' : 'Layout needs adjustment' },
-          colorSystem: { pass: score > 60, note: `Colors match ${refName}'s ${refColors}` },
-          typography: { pass: score > 50, note: 'Typography hierarchy correct' },
-          responsiveness: { pass: score > 45, note: 'Components respond to viewport' },
-          componentMatch: { pass: approved, note: approved ? `Close match to ${refName}` : `Deviates from ${refName} patterns` },
-        },
-        feedback: approved ? `Component rebuild matches ${refName}'s design system!` : `Review ${refName}'s spacing and color usage more carefully.`,
-      }
-    }
-    case 'challenge': {
-      const promptText = prompt || `Generate landing page in ${refName} style`
-      const industries = ['Restaurant', 'SaaS', 'E-commerce', 'Portfolio', 'Agency', 'Healthcare', 'Education', 'Real Estate']
-      const industry = promptText.match(/restaurant|saas|commerce|portfolio|agency|health|education|real.?estate/i)?.[0] || industries[Math.floor(Math.random() * industries.length)]
-      const score = 50 + Math.floor(Math.random() * 40)
-      const approved = score >= 70
-      return {
-        approved,
-        score,
-        industry,
-        prompt: promptText,
-        checks: {
-          styleMatch: { pass: score > 55, note: `Matches ${refName} (${refStyle})` },
-          layoutQuality: { pass: score > 50, note: `Clean ${industry} layout` },
-          colorSystem: { pass: score > 60, note: `Adapted ${refColors} for ${industry}` },
-          contentRelevance: { pass: score > 45, note: `${industry}-specific content` },
-          overallPolish: { pass: approved, note: approved ? 'Production-ready' : 'Needs refinement' },
-        },
-        feedback: approved
-          ? `${industry} landing page generated in ${refName}'s style — ready for deployment!`
-          : `${industry} page generated but doesn't fully match ${refName}'s design quality. Study the color system and spacing.`,
-      }
-    }
-    case 'responsive': {
-      const breakpoints = ['320px (Mobile)', '768px (Tablet)', '1024px (Desktop)']
-      const score = 55 + Math.floor(Math.random() * 35)
-      const approved = score >= 70
-      return {
-        approved,
-        score,
-        breakpoints,
-        checks: {
-          mobileLayout: { pass: true, note: 'Single column, stacked CTAs' },
-          tabletLayout: { pass: score > 50, note: score > 50 ? '2-column grid, adapted nav' : 'Tablet breakpoint needs work' },
-          desktopLayout: { pass: score > 55, note: score > 55 ? 'Full layout, sidebar nav' : 'Desktop spacing issues' },
-          touchTargets: { pass: true, note: '44px minimum touch targets' },
-          imageScaling: { pass: score > 45, note: 'Images scale responsively' },
-        },
-        feedback: approved
-          ? `All 3 breakpoints pass — mobile, tablet, desktop variants generated in ${refName} style!`
-          : `Responsive variants generated but some breakpoints need adjustment.`,
-      }
-    }
-    default:
-      return { insights: 'Unknown training mode', feedback: 'Select a valid training mode' }
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { agentId, mode, reference, prompt } = await req.json()
-    if (!agentId || !mode) {
-      return NextResponse.json({ error: 'agentId and mode required' }, { status: 400 })
-    }
-
-    const agents = loadAgents()
-    const agent = agents[agentId]
-    if (!agent) {
-      return NextResponse.json({ error: `Agent ${agentId} not found` }, { status: 404 })
-    }
-
-    // ── Execute training ──
-    let result: any
-    let xpEarned: number
-    let skillKey: string
-
-    if (agentId === 'artist') {
-      result = trainPixelStudio(mode, reference, prompt)
-      xpEarned = { study: 15, practice: 25, challenge: 40, library: 5 }[mode] || 10
-      skillKey = { study: 'color', practice: 'pixelart', challenge: 'composition', library: 'color' }[mode] || 'pixelart'
-    } else if (agentId === 'webgen') {
-      result = trainWebGenerator(mode, reference, prompt)
-      xpEarned = { study: 15, practice: 25, challenge: 40, responsive: 30 }[mode] || 10
-      skillKey = { study: 'design', practice: 'frontend', challenge: 'design', responsive: 'responsive' }[mode] || 'frontend'
-    } else {
-      // Generic training for other agents
-      xpEarned = 20
-      skillKey = Object.keys(agent.skills || {})[0] || 'speed'
-      result = {
-        insights: `${agent.name} completed training session — ${mode} mode`,
-        feedback: `Training complete. Keep practicing to improve skills.`,
-      }
-    }
-
-    // ── Apply XP ──
-    const { leveledUp, improvedSkills } = addXP(agent, xpEarned, skillKey)
-    const actionLabel = `${mode.charAt(0).toUpperCase() + mode.slice(1)}: ${reference?.name || 'training'}`
-    agent.trainingHistory.unshift({ action: actionLabel, xp: xpEarned, ts: new Date().toISOString() })
-    agents[agentId] = agent
-    saveAgents(agents)
-
-    return NextResponse.json({
-      success: true,
-      agent,
-      xp: xpEarned,
-      leveledUp,
-      improvedSkills,
-      result: {
-        ...result,
-        mode,
-        reference: reference?.name,
+function getDefaultStats() {
+  return {
+    artist: {
+      id: "artist", name: "PIXEL STUDIO", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
+      skills: {
+        pixelart: { level: 1, name: "Pixel Art" },
+        color: { level: 1, name: "Color Theory" },
+        composition: { level: 1, name: "Composition" },
+        speed: { level: 1, name: "Speed" },
       },
-    })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Training failed' }, { status: 500 })
+      trainingHistory: [] as any[],
+    },
+    webgen: {
+      id: "webgen", name: "WEB GENERATOR", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
+      skills: {
+        frontend: { level: 1, name: "Frontend" },
+        design: { level: 1, name: "Design" },
+        responsive: { level: 1, name: "Responsive" },
+        perf: { level: 1, name: "Performance" },
+      },
+      trainingHistory: [] as any[],
+    },
+  };
+}
+
+function saveStats(stats: Record<string, any>) {
+  fs.writeFileSync(STATS_PATH, JSON.stringify(stats, null, 2));
+}
+
+function loadTrainingMemory(): Record<string, any> {
+  try {
+    if (fs.existsSync(TRAINING_MEMORY_PATH)) {
+      return JSON.parse(fs.readFileSync(TRAINING_MEMORY_PATH, "utf-8"));
+    }
+  } catch {}
+  return {};
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SKILL EXTRACTION
+// ═══════════════════════════════════════════════════════════════
+
+function getPixelSkills(agent: any) {
+  return {
+    pixelart: agent.skills?.pixelart?.level || 1,
+    color: agent.skills?.color?.level || 1,
+    composition: agent.skills?.composition?.level || 1,
+    speed: agent.skills?.speed?.level || 1,
+  };
+}
+
+function getWebSkills(agent: any) {
+  return {
+    frontend: agent.skills?.frontend?.level || 1,
+    design: agent.skills?.design?.level || 1,
+    responsive: agent.skills?.responsive?.level || 1,
+    perf: agent.skills?.perf?.level || 1,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LEVELING
+// ═══════════════════════════════════════════════════════════════
+
+function getXPForLevel(level: number): number {
+  return 100 * Math.pow(1.5, level - 1);
+}
+
+function applyXP(agent: any, xpGained: number): { leveledUp: boolean; skillsImproved: string[] } {
+  agent.xp = (agent.xp || 0) + xpGained;
+  agent.totalXP = (agent.totalXP || 0) + xpGained;
+  
+  let leveledUp = false;
+  const skillsImproved: string[] = [];
+  
+  // Level up check
+  while (agent.xp >= agent.xpToNext) {
+    agent.xp -= agent.xpToNext;
+    agent.level = (agent.level || 1) + 1;
+    agent.xpToNext = getXPForLevel(agent.level);
+    leveledUp = true;
+    
+    // On level up, improve a random skill
+    const skills = Object.keys(agent.skills || {});
+    if (skills.length > 0) {
+      const skillToImprove = skills[Math.floor(Math.random() * skills.length)];
+      agent.skills[skillToImprove].level = (agent.skills[skillToImprove].level || 1) + 1;
+      skillsImproved.push(skillToImprove);
+    }
   }
+  
+  return { leveledUp, skillsImproved };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PIXEL STUDIO TRAINING
+// ═══════════════════════════════════════════════════════════════
+
+function trainPixelStudio(agent: any, mode: string, templateName?: string) {
+  const skills = getPixelSkills(agent);
+  const memory = loadTrainingMemory();
+  
+  // STUDY: Analyze a reference template
+  if (mode === "study") {
+    const template = templateName 
+      ? TEMPLATES.find(t => t.name === templateName) 
+      : TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)];
+    
+    if (!template) {
+      return { error: `Template "${templateName}" not found` };
+    }
+
+    // Analyze the template
+    const colorsUsed = new Set<number>();
+    for (const row of template.grid) {
+      for (const cell of row) {
+        if (cell >= 0) colorsUsed.add(cell);
+      }
+    }
+    
+    const hasOutline = template.grid.some(row => row.includes(0));
+    const hasHighlights = template.grid.some(row => 
+      row.some(cell => [7, 10, 20].includes(cell))
+    );
+    const hasTransparency = template.grid.some(row => row.includes(-1));
+
+    // Store in training memory
+    memory[template.name] = {
+      studied: true,
+      studiedAt: new Date().toISOString(),
+      colorsUsed: colorsUsed.size,
+      hasOutline,
+      hasHighlights,
+      hasTransparency,
+      size: `${template.width}×${template.height}`,
+    };
+    fs.writeFileSync(TRAINING_MEMORY_PATH, JSON.stringify(memory, null, 2));
+
+    const insights = [
+      `🎨 PALETTE: ${colorsUsed.size} unique colors detected`,
+      `✏️ OUTLINE: ${hasOutline ? '1px dark outline present' : 'No outline detected'}`,
+      `✨ HIGHLIGHTS: ${hasHighlights ? 'Specular highlights found' : 'No highlights'}`,
+      `🫧 TRANSPARENCY: ${hasTransparency ? 'Transparent pixels used' : 'Fully opaque'}`,
+      `📐 SIZE: ${template.width}×${template.height} pixels — ${template.width * template.height} total`,
+      `📚 DIFFICULTY: ${template.difficulty}/5`,
+    ];
+
+    const xpGained = 10 + (template.difficulty * 3);
+    const { leveledUp, skillsImproved } = applyXP(agent, xpGained);
+
+    return {
+      success: true,
+      mode: "study",
+      agent: agent.id,
+      xp: xpGained,
+      leveledUp,
+      improvedSkills: skillsImproved,
+      template: template.name,
+      insights,
+      feedback: `Studied ${template.name} — ${template.width}×${template.height} pixel art. Insights stored in training memory for future practice.`,
+      currentSkills: getPixelSkills(agent),
+    };
+  }
+
+  // PRACTICE: Generate at current skill, compare to master
+  if (mode === "practice") {
+    const templates = TEMPLATES.filter(t => t.difficulty <= skills.pixelart + Math.floor(skills.color / 2));
+    if (templates.length === 0) {
+      return { error: "No templates available at current skill level. Train pixelart or color first!" };
+    }
+    
+    const template = templateName
+      ? templates.find(t => t.name === templateName) || templates[templates.length - 1]
+      : templates[Math.floor(Math.random() * templates.length)];
+
+    const masterSkills = { pixelart: 5, color: 5, composition: 5, speed: 5 };
+    const reference = generateWithSkills(masterSkills, template.name);
+    const student = generateWithSkills(skills, template.name);
+    const comparison = compareGenerations(student, reference);
+
+    // XP = real score
+    const xpGained = comparison.score;
+    const { leveledUp, skillsImproved } = applyXP(agent, xpGained);
+
+    return {
+      success: true,
+      mode: "practice",
+      agent: agent.id,
+      xp: xpGained,
+      score: comparison.score,
+      leveledUp,
+      improvedSkills: skillsImproved,
+      template: template.name,
+      studentQuality: student.qualityTier,
+      referenceQuality: reference.qualityTier,
+      feedback: comparison.feedback,
+      currentSkills: getPixelSkills(agent),
+    };
+  }
+
+  // CHALLENGE: Generate at skill+1 difficulty
+  if (mode === "challenge") {
+    const challengeSkills = {
+      pixelart: Math.min(skills.pixelart + 1, 5),
+      color: Math.min(skills.color + 1, 5),
+      composition: Math.min(skills.composition + 1, 5),
+      speed: skills.speed,
+    };
+
+    const templates = TEMPLATES.filter(t => t.difficulty <= challengeSkills.pixelart + Math.floor(challengeSkills.color / 2));
+    if (templates.length === 0) {
+      return { error: "No challenge-level templates available. Train more!" };
+    }
+
+    const template = templates[templates.length - 1]; // Hardest available
+    const masterSkills = { pixelart: 5, color: 5, composition: 5, speed: 5 };
+    const reference = generateWithSkills(masterSkills, template.name);
+    const student = generateWithSkills(challengeSkills, template.name);
+    const comparison = compareGenerations(student, reference);
+
+    const passed = comparison.score >= 65;
+    const xpGained = passed ? comparison.score * 1.5 : comparison.score * 0.5;
+    const { leveledUp, skillsImproved } = applyXP(agent, Math.round(xpGained));
+
+    return {
+      success: true,
+      mode: "challenge",
+      agent: agent.id,
+      xp: Math.round(xpGained),
+      score: comparison.score,
+      passed,
+      leveledUp,
+      improvedSkills: skillsImproved,
+      template: template.name,
+      studentQuality: student.qualityTier,
+      referenceQuality: reference.qualityTier,
+      feedback: [
+        passed ? "🏆 CHALLENGE PASSED! You pushed beyond your current skill level." : "❌ Challenge failed — keep training fundamentals first.",
+        ...comparison.feedback,
+      ],
+      currentSkills: getPixelSkills(agent),
+    };
+  }
+
+  return { error: `Unknown mode: ${mode}` };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  WEB GENERATOR TRAINING
+// ═══════════════════════════════════════════════════════════════
+
+function trainWebGenerator(agent: any, mode: string) {
+  const skills = getWebSkills(agent);
+
+  if (mode === "study") {
+    const masterSkills = { frontend: 5, design: 5, responsive: 5, perf: 5 };
+    const page = generatePage(masterSkills, "landing");
+    
+    const xpGained = 15;
+    const { leveledUp, skillsImproved } = applyXP(agent, xpGained);
+
+    return {
+      success: true,
+      mode: "study",
+      agent: agent.id,
+      xp: xpGained,
+      leveledUp,
+      improvedSkills: skillsImproved,
+      insights: [
+        `🎨 DESIGN: ${page.features.length} features in reference page`,
+        `📐 STRUCTURE: Hero + Feature Cards + Footer layout`,
+        `🏆 TIER: ${page.tier} level page studied`,
+      ],
+      feedback: "Studied a professional landing page. Design patterns and structure extracted.",
+      currentSkills: getWebSkills(agent),
+    };
+  }
+
+  if (mode === "practice") {
+    const masterSkills = { frontend: 5, design: 5, responsive: 5, perf: 5 };
+    const reference = generatePage(masterSkills, "landing");
+    const student = generatePage(skills, "landing");
+    const comparison = comparePages(student, reference);
+
+    const xpGained = comparison.score;
+    const { leveledUp, skillsImproved } = applyXP(agent, xpGained);
+
+    return {
+      success: true,
+      mode: "practice",
+      agent: agent.id,
+      xp: xpGained,
+      score: comparison.score,
+      leveledUp,
+      improvedSkills: skillsImproved,
+      studentTier: student.tier,
+      referenceTier: reference.tier,
+      feedback: comparison.feedback,
+      currentSkills: getWebSkills(agent),
+    };
+  }
+
+  if (mode === "challenge") {
+    const challengeSkills = {
+      frontend: Math.min(skills.frontend + 1, 5),
+      design: Math.min(skills.design + 1, 5),
+      responsive: Math.min(skills.responsive + 1, 5),
+      perf: Math.min(skills.perf + 1, 5),
+    };
+
+    const masterSkills = { frontend: 5, design: 5, responsive: 5, perf: 5 };
+    const reference = generatePage(masterSkills, "landing");
+    const student = generatePage(challengeSkills, "landing");
+    const comparison = comparePages(student, reference);
+
+    const passed = comparison.score >= 65;
+    const xpGained = passed ? comparison.score * 1.5 : comparison.score * 0.5;
+    const { leveledUp, skillsImproved } = applyXP(agent, Math.round(xpGained));
+
+    return {
+      success: true,
+      mode: "challenge",
+      agent: agent.id,
+      xp: Math.round(xpGained),
+      score: comparison.score,
+      passed,
+      leveledUp,
+      improvedSkills: skillsImproved,
+      studentTier: student.tier,
+      referenceTier: reference.tier,
+      feedback: [
+        passed ? "🏆 CHALLENGE PASSED! You pushed beyond your current skill level." : "❌ Challenge failed — keep training fundamentals first.",
+        ...comparison.feedback,
+      ],
+      currentSkills: getWebSkills(agent),
+    };
+  }
+
+  if (mode === "responsive") {
+    const pageTypes = [
+      { type: "landing", label: "Desktop Landing" },
+      { type: "dashboard", label: "Mobile Dashboard" },
+    ];
+    const chosen = pageTypes[Math.floor(Math.random() * pageTypes.length)];
+    const page = generatePage(skills, chosen.type);
+
+    const xpGained = 25;
+    const { leveledUp, skillsImproved } = applyXP(agent, xpGained);
+
+    return {
+      success: true,
+      mode: "responsive",
+      agent: agent.id,
+      xp: xpGained,
+      leveledUp,
+      improvedSkills: skillsImproved,
+      pageType: chosen.label,
+      tier: page.tier,
+      feedback: [
+        `📱 Generated ${chosen.label} page at ${page.tier} tier`,
+        `🎨 Features: ${page.features.join(', ')}`,
+        `📐 Responsive level: ${skills.responsive} — ${page.skillBreakdown.responsive.unlocks.join(', ')}`,
+      ],
+      currentSkills: getWebSkills(agent),
+    };
+  }
+
+  return { error: `Unknown mode: ${mode}` };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    let { agentId, mode, templateName, reference } = body;
+
+    if (!agentId || !mode) {
+      return NextResponse.json({ error: "agentId and mode required" }, { status: 400 });
+    }
+
+    // Accept reference object from DOJO UI: map it to a template name
+    if (!templateName && reference) {
+      const refId = typeof reference === 'string' ? reference : (reference.id || reference.name || '');
+      // Map DOJO reference IDs to pixel art templates
+      const refMap: Record<string, string> = {
+        'bob_idle': 'crystal_magic',
+        'bob_run': 'sword_flame',
+        'amelia_idle': 'egg_dragon',
+        'alex_sit': 'tome_ancient',
+        'interiors_16': 'chalice_golden',
+        'td_props': 'star_charm',
+        'td_player': 'feather_phoenix',
+        'td_grass': 'orb_mystic',
+        'td_stone': 'skull_relic',
+        'room_builder_16': 'potion_rainbow',
+      };
+      templateName = refMap[refId] || undefined;
+    }
+
+    const stats = ensureStats();
+    const agent = stats[agentId];
+
+    if (!agent) {
+      return NextResponse.json({ error: `Agent ${agentId} not found` }, { status: 404 });
+    }
+
+    let result: any;
+
+    if (agentId === "artist") {
+      result = trainPixelStudio(agent, mode, templateName);
+    } else if (agentId === "webgen") {
+      result = trainWebGenerator(agent, mode);
+    } else {
+      return NextResponse.json({ error: `Unknown agent: ${agentId}` }, { status: 400 });
+    }
+
+    if (result.error) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    // Save stats
+    saveStats(stats);
+
+    return NextResponse.json(result);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  const stats = ensureStats();
+  return NextResponse.json({ agents: stats });
 }

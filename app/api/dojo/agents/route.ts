@@ -12,15 +12,32 @@ async function ensureDir() {
   }
 }
 
+const DEFAULT_AGENTS = {
+  artist: { id:"artist", name:"PIXEL STUDIO", role:"Sprite & Tileset Lab", level:1, xp:0, totalXP:0, xpToNext:100, color:"#60a5fa", bgA:"#061220", motto:"Every pixel has a purpose.", skills:{ pixelart:{name:"Pixel Art",level:1,icon:"🖼",desc:"Sprite & tileset craftsmanship"}, color:{name:"Color Theory",level:1,icon:"🎨",desc:"Palette harmony & optical mixing"}, composition:{name:"Composition",level:1,icon:"📐",desc:"Layout, proportion & silhouette"}, speed:{name:"Speed",level:1,icon:"⚡",desc:"Fast iteration & rapid prototyping"} }, trainingHistory:[] },
+  webgen: { id:"webgen", name:"WEB GENERATOR", role:"Page & Component Forge", level:1, xp:0, totalXP:0, xpToNext:100, color:"#22d3ee", bgA:"#041820", motto:"I ship pixels and pages.", skills:{ frontend:{name:"Frontend",level:1,icon:"🖥",desc:"React/Next.js component craft"}, design:{name:"Design",level:1,icon:"🎯",desc:"UI/UX pattern implementation"}, responsive:{name:"Responsive",level:1,icon:"📱",desc:"Multi-device layouts"}, perf:{name:"Performance",level:1,icon:"⚡",desc:"Fast load & render optimization"} }, trainingHistory:[] },
+  popo: { id:"popo", name:"POPO COMMAND", role:"Director · Orchestrator", level:1, xp:0, totalXP:0, xpToNext:100, color:"#f5a623", bgA:"#1e1508", motto:"I orchestrate the chaos.", skills:{ orchestration:{name:"Orchestration",level:1,icon:"⚙",desc:"Coordinate multi-agent workflows"}, strategy:{name:"Strategy",level:1,icon:"♟",desc:"Plan optimal production routes"}, vision:{name:"Vision",level:1,icon:"👁",desc:"Define art direction & quality targets"}, delegation:{name:"Delegation",level:1,icon:"↗",desc:"Efficiently assign tasks to agents"} }, trainingHistory:[] },
+};
+
 async function loadStats() {
   try {
     await ensureDir();
-    if (!existsSync(STATS_PATH)) return {};
+    if (!existsSync(STATS_PATH)) {
+      // Seed defaults on cold start
+      await writeFile(STATS_PATH, JSON.stringify(DEFAULT_AGENTS, null, 2), "utf-8");
+      return { ...DEFAULT_AGENTS };
+    }
     const raw = await readFile(STATS_PATH, "utf-8");
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    // Merge defaults for any missing agents
+    let changed = false;
+    for (const [id, agent] of Object.entries(DEFAULT_AGENTS)) {
+      if (!data[id]) { data[id] = { ...agent }; changed = true; }
+    }
+    if (changed) await writeFile(STATS_PATH, JSON.stringify(data, null, 2), "utf-8");
+    return data;
   } catch (e: any) {
     console.error("loadStats error:", e.message);
-    return {};
+    return { ...DEFAULT_AGENTS };
   }
 }
 

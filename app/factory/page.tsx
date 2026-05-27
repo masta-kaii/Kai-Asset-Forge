@@ -994,16 +994,16 @@ export default function HermesOS() {
     setAsset(null);setQcRep(null);setDlReady(false);setWebPreview(null);
   },[]);
 
-  // ── Real Kanban Pipeline Execution ──
+  // ── AUTONOMOUS PIPELINE (No Hermes needed) ──
   const run = useCallback(async(userPrompt: string) => {
     if(running) return;
-    setRunning(true); setFlow("POPO → ARTIST → QC → PKG");
+    setRunning(true); setFlow("SCOUT → FORGE → QC → PACK → LIST");
     log("══════════════════════════════════","system");
-    log("✦ POPO INITIATING · " + userPrompt,"system","POPO");
+    log("✦ AUTONOMOUS PIPELINE · " + userPrompt,"system","POPO");
 
-    // Try real pipeline first
+    // Call the autonomous pipeline — all 5 stages run on Vercel
     try {
-      const res = await fetch('/api/forge/execute', {
+      const res = await fetch('/api/forge/autonomous', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ theme: userPrompt })
@@ -1011,155 +1011,34 @@ export default function HermesOS() {
       const data = await res.json();
 
       if (data.success) {
-        log("✦ SWARM DEPLOYED — agents collaborating freely","success","POPO");
+        log("✦ PIPELINE COMPLETE — all 5 stages done","success","POPO");
         log("Theme: " + data.theme,"info","POPO");
-        log("Workers: " + (data.swarm?.workers?.length || 0) + " in parallel","info","POPO");
-        log("Agents can discuss freely via task comments","system","POPO");
-        setFlow(data.message || "🐝 SWARM ACTIVE");
+        log("Sprites: " + data.summary.sprites + " (" + data.summary.topQuality + ")", "info","ARTIST");
+        log("QC: " + data.summary.qcPassed + "/" + data.summary.qcTotal + " passed — " + data.summary.qcStatus,"info","QC");
+        log("Page: " + data.summary.pageTier + " tier","info","WEBGEN");
+        log("Price: $" + data.summary.price,"success","PKG");
+        setFlow("✅ " + data.summary.qcStatus);
         setIsLive(true);
-        setTimeout(() => {
-          setRunning(false);
-          log("Pipeline handed off to Kanban agents","success","POPO");
-        }, 3000);
+        
+        // Show pipeline details
+        for (const stage of data.pipeline) {
+          if (stage.details) {
+            for (const detail of stage.details) {
+              log(detail, stage.status === "APPROVED" ? "success" : "info", stage.stage);
+            }
+          }
+        }
+        
+        setRunning(false);
         return;
       }
-      throw new Error(data.error || "Pipeline creation failed");
+      throw new Error(data.error || "Pipeline failed");
     } catch (err: any) {
-      log("Kanban unavailable: " + err.message,"warn","POPO");
-      log("Generating asset directly...","warn","POPO");
+      log("Pipeline error: " + err.message,"error","POPO");
+      setRunning(false);
+      setFlow("⚠ PIPELINE FAILED");
     }
-
-    // Generate asset directly (real file, not fake animation)
-    setFlow("✦ GENERATING ASSET");
-    try {
-      setSt("popo","active",20); setSelRoom("popo");
-      addTask("popo",{name:"Analyze Request",status:"running",desc:userPrompt,progress:30});
-      log("Analyzing request: " + userPrompt,"info","POPO");
-      await sleep(400);
-      updTask("popo","Analyze Request",{status:"done",progress:100});
-
-      // Call the generate API — creates a REAL PNG file
-      setSt("artist","working",30); setSelRoom("artist");
-      addTask("artist",{name:"Generate Sprite",status:"running",desc:userPrompt,progress:20});
-      log("Generating pixel art sprite...","info","ARTIST");
-
-      const genRes = await fetch('/api/forge/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: userPrompt, type: 'character' })
-      });
-      const genData = await genRes.json();
-
-      if (genData.success) {
-        updTask("artist","Generate Sprite",{status:"done",progress:100});
-        setSt("artist","idle",100);
-        setAsset(genData.asset);
-        log(`✓ Asset generated: ${genData.asset.name}.png`,"success","ARTIST");
-        log(`Palette: ${genData.asset.palette.join(' · ')}`,"info","ARTIST");
-      } else {
-        throw new Error(genData.error || "Generation failed");
-      }
-
-      // Web Generator — runs in parallel with Pixel Studio
-      setSt("webgen","working",30); setSelRoom("webgen");
-      addTask("webgen",{name:"Generate Web Page",status:"running",desc:userPrompt,progress:20});
-      log("Generating web landing page...","info","WEBGEN");
-
-      const webRes = await fetch('/api/forge/generate-web', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: userPrompt, feature: 'landing-page' })
-      });
-      const webData = await webRes.json();
-
-      if (webData.success) {
-        updTask("webgen","Generate Web Page",{status:"done",progress:100});
-        setSt("webgen","idle",100);
-        setWebPreview(webData.asset.previewUrl);
-        log(`✓ Web page ready: ${webData.asset.name}`,"success","WEBGEN");
-      } else {
-        log("Web generation skipped: " + (webData.error || "unknown"),"warn","WEBGEN");
-        setSt("webgen","idle",100);
-      }
-
-      // QC
-      setSt("qc","reviewing",20); setSelRoom("qc");
-      addTask("qc",{name:"Validate Asset",status:"reviewing",progress:30});
-      log("Running QC validation against reference benchmarks...","info","QC");
-      await sleep(200);
-
-      // ── REAL QC: Analyze against reference library ──
-      let qcResult: any;
-      try {
-        const qcRes = await fetch('/api/qc/validate', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            asset: genData.asset,
-            type: userPrompt,
-            size: spriteSize,
-          }),
-        });
-        qcResult = await qcRes.json();
-      } catch {
-        // Fallback to basic QC if API unavailable
-        qcResult = {
-          approved: true, score: 7,
-          checks: {
-            paletteConsistency: {pass:true, note:"Basic check — API unavailable"},
-            outlineQuality: {pass:true, note:"Basic check — API unavailable"},
-            silhouetteReadability: {pass:true, note:"Basic check — API unavailable"},
-            shadingTechnique: {pass:true, note:"Basic check — API unavailable"},
-            styleCoherence: {pass:true, note:"Basic check — API unavailable"},
-            referenceAlignment: {pass:true, note:"Skipped — API unavailable"},
-          },
-          autoFails: [],
-          feedback: "QC API unavailable — manual review recommended",
-          referenceMatch: "none",
-        };
-      }
-
-      updTask("qc","Validate Asset",{status:"done",progress:100});
-      setQcRep(qcResult);
-      setSt("qc","idle",100);
-      if (qcResult.approved) {
-        log(`✓ QC PASSED — ${qcResult.score}/100${qcResult.referenceMatch ? ` (ref: ${qcResult.referenceMatch})` : ''}`,"success","QC");
-      } else {
-        log(`⚠ QC FLAGGED — ${qcResult.score}/100 · ${qcResult.autoFails?.length||0} auto-fails`,"warn","QC");
-      }
-
-      // Package
-      setSt("pkg","packaging",20); setSelRoom("pkg");
-      addTask("pkg",{name:"Package Asset",status:"running",progress:30});
-      log("Packaging asset...","info","PKG");
-      await sleep(600);
-      updTask("pkg","Package Asset",{status:"done",progress:100});
-      setSt("pkg","idle",100);
-      setDlReady(true);
-      setProdCnt(p=>p+1);
-
-      // Feed XP via dojo API
-      try {
-        await fetch('/api/dojo/agents', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({agentId:'popo',xp:20,action:`Pipeline: ${userPrompt}`})
-        });
-        await fetch('/api/dojo/agents', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({agentId:'artist',xp:25,action:`Sprite generation: ${userPrompt}`})
-        });
-      } catch {}
-
-      log("══════════════════════════════════","system");
-      log(`✦ PRODUCTION COMPLETE · ${genData.asset.name}.png`,"success","POPO");
-      setFlow("");
-    } catch(err: any) {
-      log("GENERATION ERROR: " + err.message,"error","POPO");
-      setSt("popo","failed",0); setFlow("FAILED");
-    } finally { setRunning(false); }
-  },[running,log,setSt,addTask,updTask,reset]);
+  }, []);
 
   // ── Agent Chat Handler ──
   const sendChat = useCallback(async (agentId: string) => {
