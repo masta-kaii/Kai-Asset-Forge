@@ -85,7 +85,28 @@ function forgeStage(brief: any, stats: any, reworkFeedback?: any) {
   for (let i=0;i<count;i++) {
     const t = tmpls[i]||tmpls[0];
     const s = generateWithSkills(pSkills,t.name);
-    sprites.push({ name:t.name, qualityTier:s.qualityTier, colorsUsed:s.colorsUsed, size:`${s.width}×${s.height}` });
+    // Convert RGBA pixels to palette indices for QC engine
+    const idxGrid: number[][] = [];
+    for (let py = 0; py < s.height; py++) {
+      const row: number[] = [];
+      for (let px = 0; px < s.width; px++) {
+        const [r, g, b, a] = s.pixels[py][px];
+        if (a === 0) { row.push(-1); continue; }
+        let bestIdx = 0, bestDist = Infinity;
+        for (const [idx, rgb] of Object.entries(FORGE_PALETTE)) {
+          const [fr, fg, fb] = rgb;
+          const dist = (r-fr)**2 + (g-fg)**2 + (b-fb)**2;
+          if (dist < bestDist) { bestDist = dist; bestIdx = parseInt(idx); }
+        }
+        row.push(bestIdx);
+      }
+      idxGrid.push(row);
+    }
+    sprites.push({
+      name: t.name, qualityTier: s.qualityTier, colorsUsed: s.colorsUsed, size: `${s.width}×${s.height}`,
+      width: s.width, height: s.height,
+      pixels: idxGrid,  // palette indices for QC engine
+    });
   }
 
   const page = generatePage(wSkills,"landing");
@@ -95,7 +116,7 @@ function forgeStage(brief: any, stats: any, reworkFeedback?: any) {
   ensureDir(bd);
 
   fs.writeFileSync(path.join(bd,"assets.json"),JSON.stringify({
-    brief, sprites:sprites.map((s:any)=>({name:s.name,qualityTier:s.qualityTier,colorsUsed:s.colorsUsed,size:s.size})),
+    brief, sprites,  // full sprite data including pixels for QC
     pageTier:page.tier, pageFeatures:page.features,
     reworkCount: (reworkFeedback?.reworkCount||0)+1,
   },null,2));
@@ -273,12 +294,18 @@ function ensureDir(d:string){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true
 function loadLog():any{try{if(fs.existsSync(PIPELINE_LOG))return JSON.parse(fs.readFileSync(PIPELINE_LOG,"utf-8"));}catch{}return{};}
 function saveLog(l:any){ensureDir("/tmp");fs.writeFileSync(PIPELINE_LOG,JSON.stringify(l,null,2));}
 function loadStats():any{try{if(fs.existsSync(STATS_PATH))return JSON.parse(fs.readFileSync(STATS_PATH,"utf-8"));}catch{}return{};}
+function seedStats(stats:any):any {
+  if (!stats.artist) stats.artist = { name:"Pixel Artist", level:1, totalXP:0, xp:0, skills:{ pixelart:{level:1}, color:{level:1}, composition:{level:1}, speed:{level:1} } };
+  if (!stats.webgen) stats.webgen = { name:"Web Generator", level:1, totalXP:0, xp:0, skills:{ frontend:{level:1}, design:{level:1}, responsive:{level:1}, perf:{level:1} } };
+  if (!stats.popo) stats.popo = { name:"Popo", level:3, totalXP:300, xp:0, role:"QC Overseer" };
+  return stats;
+}
 
 // ═══════════════════════ MAIN — WITH REWORK LOOP ═══════════════════════
 export async function POST(request:Request) {
   try {
     const {theme}=await request.json().catch(()=>({}));
-    const stats=loadStats();
+    const stats=seedStats(loadStats());
 
     // STAGE 1: SCOUT
     const scout=scoutStage(theme,stats);
