@@ -130,6 +130,7 @@ function forgeStage(brief: any, stats: any, reworkFeedback?: any) {
     stage:"FORGE", status:"complete", batchId:bid, spritesGenerated:sprites.length,
     topQuality:sprites[0]?.qualityTier||"Basic", pageTier:page.tier, pageFeatures:page.features.length,
     reworked: !!reworkFeedback,
+    skillsUsed: { pixel: pSkills, web: wSkills },
     boostedSkills: reworkFeedback ? { pixel:pSkills, web:wSkills } : undefined,
   };
 }
