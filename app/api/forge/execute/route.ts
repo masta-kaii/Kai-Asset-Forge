@@ -32,7 +32,7 @@ async function feedAgentXP(agentId: string, xp: number, action: string) {
     agent.totalXP = (agent.totalXP || 0) + xp
     const required = xpForLevel(agent.level)
     let leveledUp = false
-    
+
     if (agent.totalXP >= required) {
       agent.level = agent.level + 1
       agent.xpToNext = xpForLevel(agent.level + 1)
@@ -61,67 +61,62 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const theme = body.theme || 'dungeon'
 
-    // Step 1: Create Scout task
+    // Step 1: SCOUT — Research trends
     const scoutOut = hermes(
-      `kanban create "Scout: Research ${theme} pixel art trends" --assignee scout --body "Research trending ${theme}-themed pixel art. Find asset gaps. Output list of sprite descriptions."`
+      `kanban create "Scout: Research ${theme} pixel art + web trends" --assignee scout --body "Research trending ${theme}-themed pixel art AND web design trends. Find asset gaps. Output creative briefs for both Pixel Studio and Web Generator."`
     )
     const scoutId = extractTaskId(scoutOut)
     if (!scoutId) throw new Error('Failed to create Scout task')
 
-    // Step 2: Create Forge task (parent = Scout)
-    const forgeOut = hermes(
-      `kanban create "Forge: Generate ${theme} pixel art sprites" --assignee forge --parent ${scoutId} --body "Generate sprites using aseprite-forge.py. Pass to Curator."`
+    // Step 2a: PIXEL STUDIO — Generate sprites (parallel with Web Generator)
+    const artistOut = hermes(
+      `kanban create "Pixel Studio: Generate ${theme} sprite pack" --assignee artist --parent ${scoutId} --body "Generate pixel art sprites + tilesets for ${theme} theme. Use aseprite-forge.py. Pass to QC."`
     )
-    const forgeId = extractTaskId(forgeOut)
-    if (!forgeId) throw new Error('Failed to create Forge task')
+    const artistId = extractTaskId(artistOut)
+    if (!artistId) throw new Error('Failed to create Pixel Studio task')
 
-    // Step 3: Create Curator task (parent = Forge)
-    const curatorOut = hermes(
-      `kanban create "Curator: Quality check ${theme} sprites" --assignee curator --parent ${forgeId} --body "Check against 0x72 standard. Score 1-10. Pass approved to Packager."`
+    // Step 2b: WEB GENERATOR — Generate web components (parallel)
+    const webgenOut = hermes(
+      `kanban create "Web Generator: Build ${theme} landing page" --assignee webgen --parent ${scoutId} --body "Generate responsive landing page + components for ${theme} theme. Pass to QC."`
     )
-    const curatorId = extractTaskId(curatorOut)
-    if (!curatorId) throw new Error('Failed to create Curator task')
+    const webgenId = extractTaskId(webgenOut)
+    if (!webgenId) throw new Error('Failed to create Web Generator task')
 
-    // Step 4: Create Packager task (parent = Curator)
-    const packagerOut = hermes(
-      `kanban create "Packager: Bundle ${theme} assets" --assignee packager --parent ${curatorId} --body "Bundle approved assets. Create sprite sheets and previews. Pass to Lister."`
+    // Step 3: QC CHAMBER — Review both outputs
+    const qcOut = hermes(
+      `kanban create "QC Chamber: Review ${theme} pixel + web assets" --assignee qc --body "Check pixel art against 0x72 standard. Validate web components. Score both 1-10. Pass approved to Packager."`
     )
-    const packagerId = extractTaskId(packagerOut)
-    if (!packagerId) throw new Error('Failed to create Packager task')
+    const qcId = extractTaskId(qcOut)
+    if (!qcId) throw new Error('Failed to create QC task')
 
-    // Step 5: Create Lister task (parent = Packager)
-    const listerOut = hermes(
-      `kanban create "Lister: Marketplace listing for ${theme} pack" --assignee lister --parent ${packagerId} --body "Write SEO titles, descriptions, pricing. Draft for Popo approval."`
+    // Step 4: PACKAGING BAY — Bundle everything
+    const pkgOut = hermes(
+      `kanban create "Packaging Bay: Bundle ${theme} pixel + web pack" --assignee pkg --parent ${qcId} --body "Bundle approved pixel assets AND web components. Create sprite sheets, deployable web build, and previews."`
     )
-    const listerId = extractTaskId(listerOut)
-    if (!listerId) throw new Error('Failed to create Lister task')
+    const pkgId = extractTaskId(pkgOut)
+    if (!pkgId) throw new Error('Failed to create Pkg task')
 
-    // ── FEED AGENT XP from production ──
+    // ── FEED AGENT XP ──
     const xpResults: any[] = []
-    
-    // Popo gets XP for orchestrating
-    const popoResult = await feedAgentXP('popo', 20, `Pipeline orchestration: ${theme}`)
-    if (popoResult) xpResults.push({ agent: 'popo', ...popoResult })
-    
-    // Artist gets XP for generating
-    const artistResult = await feedAgentXP('artist', 25, `Asset generation: ${theme}`)
-    if (artistResult) xpResults.push({ agent: 'artist', ...artistResult })
-    
-    // QC gets XP for reviewing
-    const qcResult = await feedAgentXP('qc', 15, `Quality review: ${theme}`)
-    if (qcResult) xpResults.push({ agent: 'qc', ...qcResult })
-    
-    // Pkg gets XP for packaging
-    const pkgResult = await feedAgentXP('pkg', 10, `Asset packaging: ${theme}`)
-    if (pkgResult) xpResults.push({ agent: 'pkg', ...pkgResult })
+    const feed = async (id: string, xp: number, action: string) => {
+      const r = await feedAgentXP(id, xp, action)
+      if (r) xpResults.push({ agent: id, ...r })
+    }
 
-    const levelUps = xpResults.filter((r: any) => r.leveledUp).map((r: any) => r.agent.agent?.name || r.agent)
+    await feed('popo', 20, `Pipeline orchestration: ${theme}`)
+    await feed('scout', 25, `Trend research: ${theme}`)
+    await feed('artist', 25, `Sprite generation: ${theme}`)
+    await feed('webgen', 25, `Web component generation: ${theme}`)
+    await feed('qc', 15, `Quality review: ${theme}`)
+    await feed('pkg', 10, `Asset packaging: ${theme}`)
+
+    const levelUps = xpResults.filter((r: any) => r.leveledUp).map((r: any) => r.agent?.agent?.name || r.agent)
 
     return NextResponse.json({
       success: true,
-      pipeline: [scoutId, forgeId, curatorId, packagerId, listerId],
+      pipeline: [scoutId, artistId, webgenId, qcId, pkgId],
       theme,
-      message: `✦ PIPELINE ACTIVE: ${theme.toUpperCase()} PACK IN PRODUCTION`,
+      message: `✦ PIPELINE ACTIVE: ${theme.toUpperCase()} — SCOUT→PIXEL+WEB→QC→PKG`,
       agentXP: xpResults.map((r: any) => ({
         agent: r.agent?.agent?.id || r.agent,
         name: r.agent?.agent?.name,

@@ -39,41 +39,53 @@ const SPRITES = {
   }
 };
 
+// Scout and WebGen reuse existing sprite sheets
+(SPRITES as any).scout = SPRITES.artist;
+(SPRITES as any).webgen = SPRITES.qc;
+
 
 const ROOM_DEF = {
-  popo:   { x:0,  y:0,  w:10, h:10 },
-  artist: { x:10, y:0,  w:10, h:10 },
-  dojo:   { x:20, y:0,  w:5,  h:10 },
-  library:{ x:25, y:0,  w:5,  h:10 },
-  qc:     { x:0,  y:12, w:16, h:10 },
-  pkg:    { x:16, y:12, w:14, h:10 },
+  popo:   { x:0,  y:0,  w:8,  h:10 },
+  scout:  { x:8,  y:0,  w:6,  h:10 },
+  artist: { x:14, y:0,  w:7,  h:10 },
+  webgen: { x:21, y:0,  w:5,  h:5  },
+  dojo:   { x:26, y:0,  w:4,  h:5  },
+  library:{ x:26, y:5,  w:4,  h:5  },
+  qc:     { x:21, y:7,  w:9,  h:15 },
+  pkg:    { x:0,  y:12, w:18, h:10 },
 };
 
 // Desk anchor (tile coords) — where agent sits when working
 const DESK_POS = {
   popo:   { tx:3,  ty:4  },
-  artist: { tx:13, ty:4  },
-  qc:     { tx:2,  ty:15 },
-  pkg:    { tx:22, ty:18 },
+  scout:  { tx:10, ty:4  },
+  artist: { tx:16, ty:4  },
+  webgen: { tx:23, ty:2  },
+  qc:     { tx:24, ty:13 },
+  pkg:    { tx:6,  ty:16 },
 };
 
 // Wander paths per room (tile coords, interior only)
 const WANDER = {
-  popo:   [{x:2,y:6},{x:4,y:7},{x:6,y:6},{x:7,y:8},{x:5,y:8},{x:3,y:7},{x:1,y:7},{x:2,y:8}],
-  artist: [{x:12,y:7},{x:14,y:8},{x:16,y:7},{x:18,y:8},{x:17,y:6},{x:15,y:7},{x:12,y:8},{x:13,y:6}],
-  qc:     [{x:2,y:17},{x:5,y:18},{x:8,y:17},{x:11,y:18},{x:13,y:17},{x:10,y:16},{x:6,y:18},{x:3,y:16}],
-  pkg:    [{x:18,y:17},{x:21,y:18},{x:24,y:17},{x:27,y:18},{x:26,y:16},{x:23,y:17},{x:20,y:18},{x:19,y:16}],
+  popo:   [{x:2,y:7},{x:4,y:8},{x:6,y:7},{x:5,y:9},{x:3,y:8},{x:1,y:7},{x:2,y:9}],
+  scout:  [{x:9,y:7},{x:10,y:8},{x:12,y:7},{x:13,y:9},{x:11,y:9},{x:9,y:8},{x:10,y:7}],
+  artist: [{x:15,y:7},{x:17,y:8},{x:19,y:7},{x:20,y:9},{x:18,y:9},{x:16,y:8},{x:15,y:9}],
+  webgen: [{x:22,y:2},{x:23,y:3},{x:24,y:2},{x:25,y:4},{x:23,y:4},{x:22,y:3}],
+  qc:     [{x:22,y:12},{x:24,y:14},{x:26,y:16},{x:28,y:18},{x:25,y:19},{x:23,y:15},{x:27,y:13},{x:22,y:17}],
+  pkg:    [{x:2,y:17},{x:5,y:18},{x:8,y:17},{x:11,y:19},{x:14,y:18},{x:16,y:19},{x:10,y:18},{x:4,y:19}],
 };
 
 const AGENT_MAP = { POPO:"popo", ARTIST:"artist", QC:"qc", PKG:"pkg" };
 
 const AGENT_CFG = {
   popo:   { name:"POPO COMMAND",  sub:"Director · Orchestrator", color:"#f5a623", bgA:"#1e1508", charKey:"popo",   isPopo:true  },
-  artist: { name:"PIXEL STUDIO",  sub:"Asset Generation Lab",    color:"#60a5fa", bgA:"#061220", charKey:"artist", isPopo:false },
-  qc:     { name:"QC CHAMBER",    sub:"Quality Control",         color:"#c084fc", bgA:"#0f0620", charKey:"qc",     isPopo:false },
-  pkg:    { name:"PACKAGING BAY", sub:"Export Pipeline",         color:"#4ade80", bgA:"#051810", charKey:"pkg",    isPopo:false },
+  scout:  { name:"SCOUT HUB",      sub:"Research & Trends",        color:"#f59e0b", bgA:"#1e1208", charKey:"artist", isPopo:false },
+  artist: { name:"PIXEL STUDIO",   sub:"Sprite & Tileset Lab",     color:"#60a5fa", bgA:"#061220", charKey:"artist", isPopo:false },
+  webgen: { name:"WEB GENERATOR",  sub:"Page & Component Forge",   color:"#22d3ee", bgA:"#041820", charKey:"qc",     isPopo:false },
+  qc:     { name:"QC CHAMBER",     sub:"Quality Control",          color:"#c084fc", bgA:"#0f0620", charKey:"qc",     isPopo:false },
+  pkg:    { name:"PACKAGING BAY",  sub:"Export Pipeline",          color:"#4ade80", bgA:"#051810", charKey:"pkg",    isPopo:false },
   dojo:   { name:"AGENT DOJO",     sub:"Training Ground",          color:"#c084fc", bgA:"#0f0620", charKey:"",       isPopo:false },
-  library:{ name:"ASSET LIBRARY",   sub:"Forge Output Browser",     color:"#60a5fa", bgA:"#061220", charKey:"",       isPopo:false },
+  library:{ name:"ASSET LIBRARY",  sub:"Forge Output Browser",     color:"#60a5fa", bgA:"#061220", charKey:"",       isPopo:false },
 };
 
 const STATUS_C = {
@@ -640,11 +652,11 @@ export default function HermesOS() {
     } catch { router.replace("/login"); }
   }, []);
 
-  const [agSt,  setAgSt]  = useState({popo:"idle",artist:"idle",qc:"idle",pkg:"idle"});
-  const [agPr,  setAgPr]  = useState({popo:0,artist:0,qc:0,pkg:0});
+  const [agSt,  setAgSt]  = useState({popo:"idle",scout:"idle",artist:"idle",webgen:"idle",qc:"idle",pkg:"idle"});
+  const [agPr,  setAgPr]  = useState({popo:0,scout:0,artist:0,webgen:0,qc:0,pkg:0});
   const [gLogs, setGLogs] = useState([]);
-  const [rLogs, setRLogs] = useState({popo:[],artist:[],qc:[],pkg:[]});
-  const [tasks, setTasks] = useState({popo:[],artist:[],qc:[],pkg:[]});
+  const [rLogs, setRLogs] = useState({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
+  const [tasks, setTasks] = useState({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
   const [asset,   setAsset]   = useState(null);
   const [qcRep,   setQcRep]   = useState(null);
   const [dlReady, setDlReady] = useState(false);
@@ -674,7 +686,7 @@ export default function HermesOS() {
         if (data?.agents) {
           const newSt: any = {};
           const newPr: any = {};
-          const newTasks: any = { popo:[], artist:[], qc:[], pkg:[] };
+          const newTasks: any = { popo:[], scout:[], artist:[], webgen:[], qc:[], pkg:[] };
           let hasActivity = false;
 
           for (const [id, agent] of Object.entries(data.agents) as any) {
@@ -730,10 +742,10 @@ export default function HermesOS() {
   const updTask = useCallback((ag,name,upd)=>setTasks(p=>({...p,[ag]:p[ag].map(t=>t.name===name?{...t,...upd}:t)})),[]);
 
   const reset = useCallback(()=>{
-    setAgSt({popo:"idle",artist:"idle",qc:"idle",pkg:"idle"});
-    setAgPr({popo:0,artist:0,qc:0,pkg:0});
-    setTasks({popo:[],artist:[],qc:[],pkg:[]});
-    setRLogs({popo:[],artist:[],qc:[],pkg:[]});
+    setAgSt({popo:"idle",scout:"idle",artist:"idle",webgen:"idle",qc:"idle",pkg:"idle"});
+    setAgPr({popo:0,scout:0,artist:0,webgen:0,qc:0,pkg:0});
+    setTasks({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
+    setRLogs({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
     setAsset(null);setQcRep(null);setDlReady(false);
   },[]);
 
