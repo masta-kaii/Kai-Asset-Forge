@@ -82,12 +82,18 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const theme = body.theme || 'dungeon'
 
-    // Step 1: SCOUT — Research trends
+    // Step 1: SCOUT — Research TWO separate tracks
     const scoutOut = hermes(
-      `kanban create "Scout: Research ${theme} trends" --assignee scout --body "Research trending ${theme}-themed pixel art AND web design trends. Find asset gaps. Output creative briefs for both Pixel Artist and Web Generator."`
+      `kanban create "Scout: Research ${theme} pixel art trends" --assignee scout --body "Research trending pixel art themes, reference game art, and visual styles for ${theme}. Find asset gaps in 0x72-style tilesets. Output creative brief for Pixel Artist."`
     )
     const scoutId = extractTaskId(scoutOut)
     if (!scoutId) throw new Error('Failed to create Scout task')
+
+    const webScoutOut = hermes(
+      `kanban create "Scout: Research Malaysian web design demand" --assignee scout --parent ${scoutId} --body "Research current Malaysian market web design trends: what industries are growing (food delivery, e-commerce, fintech, travel, education), what design styles are popular (modern minimalist, bold interactive, dark mode), what local payment methods matter (FPX, Touch n Go, GrabPay). Find fresh interactive design patterns. Output creative brief for Web Generator — this is a SEPARATE product from pixel art."`
+    )
+    const webScoutId = extractTaskId(webScoutOut)
+    // Web Scout optional — don't block pipeline if it fails
 
     // Step 2a: PIXEL ARTIST — Generate sprites
     const artistOut = hermes(
@@ -96,16 +102,16 @@ export async function POST(request: Request) {
     const artistId = extractTaskId(artistOut)
     if (!artistId) throw new Error('Failed to create Pixel Artist task')
 
-    // Step 2b: WEB GENERATOR — Generate page
+    // Step 2b: WEB GENERATOR — Build Malaysian-market website (SEPARATE product)
     const webgenOut = hermes(
-      `kanban create "Web Generator: Build ${theme} page" --assignee webgen --parent ${scoutId} --body "Generate responsive landing page + components for ${theme} theme. Pass to QC."`
+      `kanban create "Web Generator: Build Malaysian-market landing page" --assignee webgen --parent ${webScoutId || scoutId} --body "Build a modern, interactive, and visually striking landing page for the Malaysian market. Use fresh design trends — bold typography, smooth animations, glass morphism, dark mode. Focus on industries with Malaysian demand: food delivery, e-commerce fashion, fintech, travel, education. Include local context: FPX/TNG payment badges, Bahasa Malaysia option, mobile-first (92% mobile users). This is completely separate from pixel art — this is a web product."`
     )
     const webgenId = extractTaskId(webgenOut)
     if (!webgenId) throw new Error('Failed to create Web Generator task')
 
-    // Step 3: QC — Review both outputs
+    // Step 3: QC — Review Pixel Artist AND Web Generator outputs (separate products)
     const qcOut = hermes(
-      `kanban create "QC: Review ${theme} assets" --assignee qc --body "Check pixel art against 0x72 standard. Validate web components. Score both 1-10. Pass approved to Packager."`
+      `kanban create "QC: Review pixel art + Malaysian web product" --assignee qc --body "Review TWO separate products: (1) Pixel Artist's sprites — check against 0x72 standard, palette consistency, outlines. (2) Web Generator's landing page — check design quality, interactivity, mobile responsiveness, Malaysian market relevance (local payments, Bahasa support, industry fit). Score both 1-10 independently. Pass approved assets to Packager."`
     )
     const qcId = extractTaskId(qcOut)
     if (!qcId) throw new Error('Failed to create QC task')
