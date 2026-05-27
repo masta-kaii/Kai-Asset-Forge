@@ -45,14 +45,14 @@ const SPRITES = {
 
 
 const ROOM_DEF = {
-  popo:   { x:0,  y:0,  w:8,  h:10 },
-  scout:  { x:8,  y:0,  w:6,  h:10 },
-  artist: { x:14, y:0,  w:7,  h:10 },
+  popo:   { x:0,  y:0,  w:7,  h:10 },
+  scout:  { x:8,  y:0,  w:5,  h:10 },
+  artist: { x:14, y:0,  w:6,  h:10 },
   webgen: { x:21, y:0,  w:5,  h:5  },
   dojo:   { x:26, y:0,  w:4,  h:5  },
   library:{ x:26, y:5,  w:4,  h:5  },
   qc:     { x:21, y:7,  w:9,  h:15 },
-  pkg:    { x:0,  y:12, w:18, h:10 },
+  pkg:    { x:0,  y:12, w:17, h:10 },
 };
 
 // Desk anchor (tile coords) — where agent sits when working
@@ -62,14 +62,14 @@ const DESK_POS = {
   artist: { tx:16, ty:4  },
   webgen: { tx:23, ty:2  },
   qc:     { tx:24, ty:13 },
-  pkg:    { tx:6,  ty:16 },
+  pkg:    { tx:5,  ty:16 },
 };
 
 // Wander paths per room (tile coords, interior only)
 const WANDER = {
-  popo:   [{x:2,y:7},{x:4,y:8},{x:6,y:7},{x:5,y:9},{x:3,y:8},{x:1,y:7},{x:2,y:9}],
-  scout:  [{x:9,y:7},{x:10,y:8},{x:12,y:7},{x:13,y:9},{x:11,y:9},{x:9,y:8},{x:10,y:7}],
-  artist: [{x:15,y:7},{x:17,y:8},{x:19,y:7},{x:20,y:9},{x:18,y:9},{x:16,y:8},{x:15,y:9}],
+  popo:   [{x:1,y:7},{x:3,y:8},{x:5,y:7},{x:4,y:9},{x:2,y:8},{x:1,y:9},{x:3,y:7}],
+  scout:  [{x:9,y:7},{x:10,y:8},{x:11,y:7},{x:12,y:9},{x:10,y:9},{x:9,y:8}],
+  artist: [{x:15,y:8},{x:17,y:7},{x:18,y:9},{x:16,y:9},{x:15,y:7},{x:17,y:8}],
   webgen: [{x:22,y:2},{x:23,y:3},{x:24,y:2},{x:25,y:4},{x:23,y:4},{x:22,y:3}],
   qc:     [{x:22,y:12},{x:24,y:14},{x:26,y:16},{x:28,y:18},{x:25,y:19},{x:23,y:15},{x:27,y:13},{x:22,y:17}],
   pkg:    [{x:2,y:17},{x:5,y:18},{x:8,y:17},{x:11,y:19},{x:14,y:18},{x:16,y:19},{x:10,y:18},{x:4,y:19}],
@@ -350,7 +350,7 @@ function FacilityMap({ agentStatus, selRoom, onRoomClick, activeFlow }) {
         return (
           <div key={id} style={{
             position:"absolute", left:bx, top:by, width:bw, height:bh,
-            border:`${sel?2:1}px solid ${sel?cfg.color:active?cfg.color+"66":"transparent"}`,
+            border:`${sel?2:1}px solid ${sel?cfg.color:cfg.color+"55"}`,
             background:sel?`${cfg.color}18`:active?`${cfg.color}0a`:"transparent",
             boxShadow:sel?`inset 0 0 30px ${cfg.color}18,0 0 14px ${cfg.color}33`:"none",
             transition:"all 0.2s", pointerEvents:"none",
