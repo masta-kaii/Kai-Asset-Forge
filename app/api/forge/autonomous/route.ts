@@ -490,14 +490,7 @@ function qcStage(batchId: string, stats: any) {
   });
   if (pagePass) passed++;
 
-  const avgScore = assets.sprites.length > 0
-    ? Math.round(totalScore / assets.sprites.length)
-    : pageScore;
-  const overallPass = hasAutoFail
-    ? false
-    : passed >= Math.ceil(results.length * 0.6);
-
-  // Check global auto-fails
+  // Check global auto-fails (MUST be declared before overallPass computation)
   let hasAutoFail = false;
   const allAutoFails: string[] = [];
   for (const r of results) {
@@ -506,6 +499,13 @@ function qcStage(batchId: string, stats: any) {
       allAutoFails.push(`${r.name}: ${r.autoFails.join(", ")}`);
     }
   }
+
+  const avgScore = assets.sprites.length > 0
+    ? Math.round(totalScore / assets.sprites.length)
+    : pageScore;
+  const overallPass = hasAutoFail
+    ? false
+    : passed >= Math.ceil(results.length * 0.6);
 
   const report = {
     results,
