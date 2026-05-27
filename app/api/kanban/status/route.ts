@@ -11,12 +11,12 @@ function hermes(args: string): string {
 
 // Agent ID mapping: Kanban assignee → factory agent ID
 const ASSIGNEE_MAP: Record<string, string> = {
-  scout: 'artist',    // Scout → Pixel Studio room
-  forge: 'artist',    // Forge → Pixel Studio room
-  curator: 'qc',      // Curator → QC Chamber
-  packager: 'pkg',    // Packager → Packaging Bay
-  lister: 'pkg',      // Lister → Packaging Bay
-  popo: 'popo',       // Popo → Popo Command
+  scout: 'scout',
+  forge: 'artist',
+  curator: 'qc',
+  packager: 'pkg',
+  lister: 'pkg',
+  default: 'popo',
 }
 
 interface AgentStatus {
