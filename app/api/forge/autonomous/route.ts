@@ -17,6 +17,16 @@ const STATS_PATH = "/tmp/agent-stats.json";
 const OUTPUT_DIR = "/tmp/forge-output";
 const PIPELINE_LOG = "/tmp/pipeline-log.json";
 
+// ═══════════════════════ DEFAULT AGENT STATS ═══════════════════════
+const DEFAULT_AGENTS: Record<string, any> = {
+  artist: { id: "artist", name: "PIXEL STUDIO", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
+    skills: { pixelart: { level: 1, name: "Pixel Art" }, color: { level: 1, name: "Color Theory" }, composition: { level: 1, name: "Composition" }, speed: { level: 1, name: "Speed" } } },
+  webgen: { id: "webgen", name: "WEB GENERATOR", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
+    skills: { frontend: { level: 1, name: "Frontend" }, design: { level: 1, name: "Design" }, responsive: { level: 1, name: "Responsive" }, perf: { level: 1, name: "Performance" } } },
+  popo: { id: "popo", name: "POPO COMMAND", level: 1, xp: 0, totalXP: 0, xpToNext: 100,
+    skills: { orchestration: { level: 1, name: "Orchestration" }, strategy: { level: 1, name: "Strategy" }, vision: { level: 1, name: "Vision" }, delegation: { level: 1, name: "Delegation" } } },
+};
+
 // ═══════════════════════ 0x72 FORGE PALETTE ═══════════════════════
 const FORGE_PALETTE: Record<number, [number,number,number]> = {
   0:[0,0,0],1:[34,32,52],2:[69,40,60],3:[102,57,49],4:[143,86,59],
@@ -55,10 +65,15 @@ function forgeStage(brief: any, stats: any) {
   const wSkills = { frontend:w?.skills?.frontend?.level||1, design:w?.skills?.design?.level||1, responsive:w?.skills?.responsive?.level||1, perf:w?.skills?.perf?.level||1 };
   const sprites: any[] = [];
   const tmpls = TEMPLATES.filter((t:any)=>t.difficulty<=pSkills.pixelart+Math.floor(pSkills.color/2));
-  for (let i=0;i<Math.min(brief.spriteCount,tmpls.length);i++) {
+  const count = Math.min(brief.spriteCount, tmpls.length);
+  for (let i=0;i<count;i++) {
     const t = tmpls[i]||tmpls[0];
     const s = generateWithSkills(pSkills,t.name);
-    sprites.push({ name:t.name, qualityTier:s.qualityTier, colorsUsed:s.colorsUsed, size:`${s.width}×${s.height}` });
+    // Store pixel data so QC can do real pixel-level validation
+    sprites.push({
+      name: t.name, qualityTier: s.qualityTier, colorsUsed: s.colorsUsed, size: `${s.width}×${s.height}`,
+      width: s.width, height: s.height, pixels: s.pixels,
+    });
   }
   const page = generatePage(wSkills,"landing");
   ensureDir(OUTPUT_DIR);
@@ -215,7 +230,24 @@ function listStage(batchId:string,stats:any) {
 function ensureDir(d:string){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});}
 function loadLog():any{try{if(fs.existsSync(PIPELINE_LOG))return JSON.parse(fs.readFileSync(PIPELINE_LOG,"utf-8"));}catch{}return{};}
 function saveLog(l:any){ensureDir("/tmp");fs.writeFileSync(PIPELINE_LOG,JSON.stringify(l,null,2));}
-function loadStats():any{try{if(fs.existsSync(STATS_PATH))return JSON.parse(fs.readFileSync(STATS_PATH,"utf-8"));}catch{}return{};}
+function loadStats(): any {
+  try {
+    if (fs.existsSync(STATS_PATH)) {
+      const data = JSON.parse(fs.readFileSync(STATS_PATH, "utf-8"));
+      // Merge defaults for any missing agents (cold start recovery)
+      let changed = false;
+      for (const [id, agent] of Object.entries(DEFAULT_AGENTS)) {
+        if (!data[id]) { data[id] = { ...agent }; changed = true; }
+      }
+      if (changed) fs.writeFileSync(STATS_PATH, JSON.stringify(data, null, 2));
+      return data;
+    }
+  } catch {}
+  // Seed with defaults on first run / cold start
+  const defaults = JSON.parse(JSON.stringify(DEFAULT_AGENTS));
+  try { fs.writeFileSync(STATS_PATH, JSON.stringify(defaults, null, 2)); } catch {}
+  return defaults;
+}
 
 // ═══════════════════════ MAIN ═══════════════════════
 export async function POST(request:Request) {
