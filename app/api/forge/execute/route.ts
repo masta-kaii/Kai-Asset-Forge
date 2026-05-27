@@ -84,38 +84,38 @@ export async function POST(request: Request) {
 
     // Step 1: SCOUT — Research trends
     const scoutOut = hermes(
-      `kanban create "Scout: Research ${theme} pixel art + web trends" --assignee scout --body "Research trending ${theme}-themed pixel art AND web design trends. Find asset gaps. Output creative briefs for both Pixel Studio and Web Generator."`
+      `kanban create "Scout: Research ${theme} trends" --assignee scout --body "Research trending ${theme}-themed pixel art AND web design trends. Find asset gaps. Output creative briefs for both Pixel Artist and Web Generator."`
     )
     const scoutId = extractTaskId(scoutOut)
     if (!scoutId) throw new Error('Failed to create Scout task')
 
-    // Step 2a: PIXEL STUDIO — Generate sprites (parallel with Web Generator)
+    // Step 2a: PIXEL ARTIST — Generate sprites
     const artistOut = hermes(
-      `kanban create "Pixel Studio: Generate ${theme} sprite pack" --assignee artist --parent ${scoutId} --body "Generate pixel art sprites + tilesets for ${theme} theme. Use aseprite-forge.py. Pass to QC Chamber."`
+      `kanban create "Pixel Artist: Generate ${theme} sprites" --assignee artist --parent ${scoutId} --body "Generate pixel art sprites + tilesets for ${theme} theme. Use aseprite-forge.py. Pass to QC."`
     )
     const artistId = extractTaskId(artistOut)
-    if (!artistId) throw new Error('Failed to create Pixel Studio task')
+    if (!artistId) throw new Error('Failed to create Pixel Artist task')
 
-    // Step 2b: WEB GENERATOR — Generate web page (parallel)
+    // Step 2b: WEB GENERATOR — Generate page
     const webgenOut = hermes(
-      `kanban create "Web Generator: Build ${theme} landing page" --assignee webgen --parent ${scoutId} --body "Generate responsive landing page + components for ${theme} theme. Pass to QC Chamber."`
+      `kanban create "Web Generator: Build ${theme} page" --assignee webgen --parent ${scoutId} --body "Generate responsive landing page + components for ${theme} theme. Pass to QC."`
     )
     const webgenId = extractTaskId(webgenOut)
     if (!webgenId) throw new Error('Failed to create Web Generator task')
 
-    // Step 3: QC CHAMBER — Review both outputs
+    // Step 3: QC — Review both outputs
     const qcOut = hermes(
-      `kanban create "QC Chamber: Review ${theme} pixel + web assets" --assignee qc --body "Check pixel art against 0x72 standard. Validate web components. Score both 1-10. Pass approved to Packaging Bay."`
+      `kanban create "QC: Review ${theme} assets" --assignee qc --body "Check pixel art against 0x72 standard. Validate web components. Score both 1-10. Pass approved to Packager."`
     )
     const qcId = extractTaskId(qcOut)
     if (!qcId) throw new Error('Failed to create QC task')
 
-    // Step 4: PACKAGING BAY — Bundle everything
+    // Step 4: PACKAGER — Bundle everything
     const pkgOut = hermes(
-      `kanban create "Packaging Bay: Bundle ${theme} pixel + web pack" --assignee pkg --parent ${qcId} --body "Bundle approved pixel assets AND web components. Create sprite sheets, deployable web build, and previews."`
+      `kanban create "Packager: Bundle ${theme} pack" --assignee pkg --parent ${qcId} --body "Bundle approved pixel assets AND web components. Create sprite sheets, deployable web build, and previews."`
     )
     const pkgId = extractTaskId(pkgOut)
-    if (!pkgId) throw new Error('Failed to create Packaging Bay task')
+    if (!pkgId) throw new Error('Failed to create Packager task')
 
     // ── FEED AGENT XP ──
     const xpResults: any[] = []

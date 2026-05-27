@@ -80,10 +80,10 @@ const AGENT_MAP = { POPO:"popo", ARTIST:"artist", QC:"qc", PKG:"pkg" };
 const AGENT_CFG = {
   popo:   { name:"POPO COMMAND",  sub:"Director · Orchestrator", color:"#f5a623", bgA:"#1e1508", charKey:"popo",   isPopo:true  },
   scout:  { name:"SCOUT HUB",      sub:"Research & Trends",        color:"#f59e0b", bgA:"#1e1208", charKey:"artist", isPopo:false },
-  artist: { name:"PIXEL STUDIO",   sub:"Sprite & Tileset Lab",     color:"#60a5fa", bgA:"#061220", charKey:"artist", isPopo:false },
-  webgen: { name:"WEB GENERATOR",  sub:"Page & Component Forge",   color:"#22d3ee", bgA:"#041820", charKey:"qc",     isPopo:false },
-  qc:     { name:"QC CHAMBER",     sub:"Quality Control",          color:"#c084fc", bgA:"#0f0620", charKey:"qc",     isPopo:false },
-  pkg:    { name:"PACKAGING BAY",  sub:"Export Pipeline",          color:"#4ade80", bgA:"#051810", charKey:"pkg",    isPopo:false },
+  artist: { name:"PIXEL ARTIST",    sub:"Sprite & Tileset Lab",     color:"#60a5fa", bgA:"#061220", charKey:"artist", isPopo:false },
+  webgen: { name:"WEB GENERATOR",   sub:"Page & Component Forge",   color:"#22d3ee", bgA:"#041820", charKey:"qc",     isPopo:false },
+  qc:     { name:"QC",              sub:"Quality Control",          color:"#c084fc", bgA:"#0f0620", charKey:"qc",     isPopo:false },
+  pkg:    { name:"PACKAGER",        sub:"Export Pipeline",          color:"#4ade80", bgA:"#051810", charKey:"pkg",    isPopo:false },
   dojo:   { name:"AGENT DOJO",     sub:"Training Ground",          color:"#c084fc", bgA:"#0f0620", charKey:"",       isPopo:false },
   library:{ name:"ASSET LIBRARY",  sub:"Forge Output Browser",     color:"#60a5fa", bgA:"#061220", charKey:"",       isPopo:false },
 };
