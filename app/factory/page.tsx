@@ -180,7 +180,7 @@ function HumanSprite({ charKey, anim="idle", displaySize=56, flipX=false, bright
 }
 
 // ── Wandering / working agent overlay ──────────────────────────
-function AgentOverlay({ agentId, agentStatus, mapScale }) {
+function AgentOverlay({ agentId, agentStatus, mapScale, onSpriteClick }) {
   const cfg    = AGENT_CFG[agentId];
   const path   = WANDER[agentId];
   const desk   = DESK_POS[agentId];
@@ -295,18 +295,23 @@ function AgentOverlay({ agentId, agentStatus, mapScale }) {
         }}/>
       )}
 
-      {isPopo
-        ? <PopoSprite anim={anim} displaySize={SZ} flipX={flipX}
-            statusColor={STATUS_C[agentStatus]} isWorking={isWork}/>
-        : <HumanSprite charKey={cfg.charKey} anim={anim} displaySize={SZ}
-            flipX={flipX} bright={isWork || anim!=="idle"}/>
-      }
+      {/* Clickable sprite → persona editor */}
+      <div onClick={(e:any)=>{e.stopPropagation(); onSpriteClick?.(agentId);}}
+        title="Click to edit agent soul"
+        style={{pointerEvents:"auto", cursor:"pointer"}}>
+        {isPopo
+          ? <PopoSprite anim={anim} displaySize={SZ} flipX={flipX}
+              statusColor={STATUS_C[agentStatus]} isWorking={isWork}/>
+          : <HumanSprite charKey={cfg.charKey} anim={anim} displaySize={SZ}
+              flipX={flipX} bright={isWork || anim!=="idle"}/>
+        }
+      </div>
     </div>
   );
 }
 
 // ── Facility Map ────────────────────────────────────────────────
-function FacilityMap({ agentStatus, selRoom, onRoomClick, activeFlow }) {
+function FacilityMap({ agentStatus, selRoom, onRoomClick, activeFlow, onSpriteClick }) {
   const SCALE = 0.55;
   const DW    = Math.round(FAC_W * SCALE);
   const DH    = Math.round(FAC_H * SCALE);
@@ -376,7 +381,7 @@ function FacilityMap({ agentStatus, selRoom, onRoomClick, activeFlow }) {
 
       {/* All agents on map */}
       {Object.keys(AGENT_CFG).filter(id => id !== "dojo" && id !== "library").map(id => (
-        <AgentOverlay key={id} agentId={id} agentStatus={agentStatus[id]} mapScale={SCALE}/>
+        <AgentOverlay key={id} agentId={id} agentStatus={agentStatus[id]} mapScale={SCALE} onSpriteClick={onSpriteClick}/>
       ))}
 
       {/* Corridor label */}
@@ -478,15 +483,30 @@ function PixelCanvas({ grid, size=128 }) {
 }
 
 // ── Room Sidebar ────────────────────────────────────────────────
-function Sidebar({ agentId, status, progress, tasks, logs, asset, qcRep, onClose, onDownload, dlReady }) {
+function Sidebar({ agentId, status, progress, tasks, logs, asset, qcRep, onClose, onDownload, dlReady,
+  sidebarTab, onTabChange, chatMessages, onSendChat, chatInput, setChatInput, chatSending,
+  persona, onOpenPersona }) {
   const cfg  = AGENT_CFG[agentId];
   const col  = cfg.color;
   const busy = status!=="idle"&&status!=="failed";
   const SZ   = cfg.isPopo ? 64 : 52;
+  const msgs = chatMessages || [];
+  const p    = persona || {};
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  }, [msgs]);
+
+  const tabs = [
+    {key:"status", label:"STATUS"},
+    {key:"chat", label:"CHAT"},
+    {key:"monitor", label:"MONITOR"},
+  ];
 
   return (
     <div style={{
-      width:330, flexShrink:0,
+      width:360, flexShrink:0,
       background:"#12151d", borderLeft:`2px solid ${col}`,
       display:"flex", flexDirection:"column",
       boxShadow:`-8px 0 32px ${col}22`,
@@ -507,7 +527,11 @@ function Sidebar({ agentId, status, progress, tasks, logs, asset, qcRep, onClose
           <div style={{color:col,fontSize:cfg.isPopo?20:17,letterSpacing:1}}>
             {cfg.isPopo?"✦ ":""}{cfg.name}
           </div>
-          <div style={{color:"#475569",fontSize:11}}>{cfg.sub}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <span style={{color:"#475569",fontSize:11}}>{cfg.sub}</span>
+            <button onClick={onOpenPersona} title="Edit agent soul"
+              style={{background:"none",border:"none",color:"#475569",cursor:"pointer",fontFamily:"'VT323',monospace",fontSize:10,padding:0}}>⚙ SOUL</button>
+          </div>
         </div>
         <button onClick={onClose} style={{
           background:"none",border:"1px solid #252938",color:"#94a3b8",
@@ -524,62 +548,187 @@ function Sidebar({ agentId, status, progress, tasks, logs, asset, qcRep, onClose
         <span style={{color:"#475569",fontSize:11}}>{progress||0}%</span>
       </div>
 
-      <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:12}}>
-        {tasks.length>0 && (
-          <div>
-            <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ TASK QUEUE</div>
-            {tasks.map((t,i)=><Task key={i} task={t}/>)}
-          </div>
-        )}
-        {asset && agentId==="artist" && (
-          <div>
-            <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ GENERATED ASSET</div>
-            <div style={{background:"#191d28",border:"1px solid #252938",padding:10}}>
-              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                <PixelCanvas grid={asset.pixels} size={96}/>
-                <div style={{flex:1}}>
-                  <div style={{color:"#f5a623",fontSize:15,marginBottom:3}}>{asset.name}</div>
-                  <div style={{color:"#475569",fontSize:11}}>{asset.type?.toUpperCase()} · {asset.animationFrames}F</div>
-                  <div style={{display:"flex",gap:3,marginTop:6,flexWrap:"wrap"}}>
-                    {asset.palette?.map((p,i)=><div key={i} title={p} style={{width:14,height:14,background:p,border:"1px solid #252938"}}/>)}
+      {/* TAB BAR */}
+      <div style={{display:"flex",borderBottom:"1px solid #252938",flexShrink:0}}>
+        {tabs.map(t=>(
+          <button key={t.key} onClick={()=>onTabChange(t.key)}
+            style={{
+              flex:1,background:sidebarTab===t.key?`${col}18`:"transparent",
+              border:"none",borderBottom:sidebarTab===t.key?`2px solid ${col}`:"2px solid transparent",
+              color:sidebarTab===t.key?col:"#475569",padding:"7px 0",fontFamily:"'VT323',monospace",
+              fontSize:13,letterSpacing:2,cursor:"pointer",transition:"all 0.15s",
+            }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* STATUS TAB */}
+      {sidebarTab==="status" && (
+        <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:12}}>
+          {/* Persona preview */}
+          {p.personality && (
+            <div style={{background:"#050709",border:"1px solid #252938",padding:8}}>
+              <div style={{color:"#475569",fontSize:10,marginBottom:3,letterSpacing:1}}>▸ SOUL</div>
+              <div style={{color:"#94a3b8",fontSize:12,lineHeight:1.5,fontStyle:"italic"}}>"{p.personality.slice(0,120)}{p.personality.length>120?"…":""}"</div>
+              <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                {p.rules?.slice(0,3).map((r:string,i:number)=>(
+                  <span key={i} style={{color:"#f5a623",fontSize:10,background:"rgba(245,166,35,0.08)",padding:"1px 5px"}}>{r.slice(0,30)}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {tasks.length>0 && (
+            <div>
+              <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ TASK QUEUE</div>
+              {tasks.map((t,i)=><Task key={i} task={t}/>)}
+            </div>
+          )}
+          {asset && agentId==="artist" && (
+            <div>
+              <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ GENERATED ASSET</div>
+              <div style={{background:"#191d28",border:"1px solid #252938",padding:10}}>
+                <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                  <PixelCanvas grid={asset.pixels} size={96}/>
+                  <div style={{flex:1}}>
+                    <div style={{color:"#f5a623",fontSize:15,marginBottom:3}}>{asset.name}</div>
+                    <div style={{color:"#475569",fontSize:11}}>{asset.type?.toUpperCase()} · {asset.animationFrames}F</div>
+                    <div style={{display:"flex",gap:3,marginTop:6,flexWrap:"wrap"}}>
+                      {asset.palette?.map((p,i)=><div key={i} title={p} style={{width:14,height:14,background:p,border:"1px solid #252938"}}/>)}
+                    </div>
                   </div>
                 </div>
+                <div style={{color:"#94a3b8",fontSize:11,marginTop:8,lineHeight:1.6}}>{asset.description}</div>
+                <div style={{color:"#475569",fontSize:10,marginTop:5}}>LAYERS: {asset.layers?.join(" · ")}</div>
               </div>
-              <div style={{color:"#94a3b8",fontSize:11,marginTop:8,lineHeight:1.6}}>{asset.description}</div>
-              <div style={{color:"#475569",fontSize:10,marginTop:5}}>LAYERS: {asset.layers?.join(" · ")}</div>
             </div>
-          </div>
-        )}
-        {qcRep && agentId==="qc" && (
-          <div>
-            <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ QC REPORT</div>
-            <div style={{background:"#050709",border:`1px solid ${qcRep.approved?"#4ade80":"#f5a623"}`,padding:12,lineHeight:1.7}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                <span style={{color:qcRep.approved?"#4ade80":"#f5a623",fontSize:15}}>{qcRep.approved?"✓ APPROVED":"⚠ FLAGGED"}</span>
-                <span style={{color:"#e2e8f0"}}>SCORE: <b style={{color:qcRep.approved?"#4ade80":"#f5a623"}}>{qcRep.score}</b>/100</span>
-              </div>
-              {Object.entries(qcRep.checks||{}).map(([k,v])=>(
-                <div key={k} style={{color:(v as any).pass?"#4ade80":"#f5a623",fontSize:12}}>
-                  {(v as any).pass?"✓":"✗"} <span style={{color:"#94a3b8"}}>{k.replace(/([A-Z])/g," $1")}:</span>{" "}
-                  <span style={{color:"#475569"}}>{(v as any).note}</span>
+          )}
+          {qcRep && agentId==="qc" && (
+            <div>
+              <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ QC REPORT</div>
+              <div style={{background:"#050709",border:`1px solid ${qcRep.approved?"#4ade80":"#f5a623"}`,padding:12,lineHeight:1.7}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <span style={{color:qcRep.approved?"#4ade80":"#f5a623",fontSize:15}}>{qcRep.approved?"✓ APPROVED":"⚠ FLAGGED"}</span>
+                  <span style={{color:"#e2e8f0"}}>SCORE: <b style={{color:qcRep.approved?"#4ade80":"#f5a623"}}>{qcRep.score}</b>/100</span>
                 </div>
-              ))}
-              <div style={{marginTop:8,borderTop:"1px solid #252938",paddingTop:8,color:"#94a3b8",fontSize:12}}>{qcRep.feedback}</div>
+                {Object.entries(qcRep.checks||{}).map(([k,v])=>(
+                  <div key={k} style={{color:(v as any).pass?"#4ade80":"#f5a623",fontSize:12}}>
+                    {(v as any).pass?"✓":"✗"} <span style={{color:"#94a3b8"}}>{k.replace(/([A-Z])/g," $1")}:</span>{" "}
+                    <span style={{color:"#475569"}}>{(v as any).note}</span>
+                  </div>
+                ))}
+                <div style={{marginTop:8,borderTop:"1px solid #252938",paddingTop:8,color:"#94a3b8",fontSize:12}}>{qcRep.feedback}</div>
+              </div>
             </div>
+          )}
+          <div>
+            <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ ROOM LOG</div>
+            <Log logs={logs} h={140}/>
           </div>
-        )}
-        <div>
-          <div style={{color:"#475569",fontSize:11,marginBottom:6,letterSpacing:1}}>▸ ROOM LOG</div>
-          <Log logs={logs} h={140}/>
+          {dlReady && agentId==="pkg" && (
+            <button onClick={onDownload} style={{
+              background:"rgba(74,222,128,0.1)",border:"1px solid #4ade80",color:"#4ade80",
+              padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,
+              cursor:"pointer",letterSpacing:2,width:"100%",
+            }}>▼ DOWNLOAD ASSET PACK</button>
+          )}
         </div>
-        {dlReady && agentId==="pkg" && (
-          <button onClick={onDownload} style={{
-            background:"rgba(74,222,128,0.1)",border:"1px solid #4ade80",color:"#4ade80",
-            padding:"10px",fontFamily:"'VT323',monospace",fontSize:16,
-            cursor:"pointer",letterSpacing:2,width:"100%",
-          }}>▼ DOWNLOAD ASSET PACK</button>
-        )}
-      </div>
+      )}
+
+      {/* CHAT TAB */}
+      {sidebarTab==="chat" && (
+        <div style={{flex:1,display:"flex",flexDirection:"column"}}>
+          <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
+            {msgs.length===0 && (
+              <div style={{color:"#475569",fontSize:13,textAlign:"center",marginTop:40}}>
+                ▸ OPEN CHANNEL TO {cfg.name}<br/>
+                <span style={{fontSize:11,color:"#252938"}}>{cfg.isPopo?"🦀":"👤"} Type a message below</span>
+              </div>
+            )}
+            {msgs.map((m,i)=>(
+              <div key={i} style={{
+                alignSelf:m.role==="user"?"flex-end":"flex-start",
+                maxWidth:"85%",
+              }}>
+                <div style={{
+                  background:m.role==="user"?`${col}18`:"#191d28",
+                  border:`1px solid ${m.role==="user"?`${col}44`:"#252938"}`,
+                  padding:"8px 12px",
+                  color:m.role==="user"?col:"#e2e8f0",
+                  fontSize:13,lineHeight:1.5,
+                  fontFamily:"'VT323',monospace",
+                }}>
+                  {m.role==="agent" && <span style={{color:col,fontSize:10,display:"block",marginBottom:2}}>{cfg.name}:</span>}
+                  {m.text}
+                </div>
+                <div style={{fontSize:9,color:"#252938",marginTop:2,textAlign:m.role==="user"?"right":"left"}}>{m.ts}</div>
+              </div>
+            ))}
+            {chatSending && (
+              <div style={{color:col,fontSize:12,fontFamily:"'VT323',monospace",animation:"blink 0.6s step-end infinite"}}>
+                ▸ {cfg.name} is typing...
+              </div>
+            )}
+          </div>
+          <div style={{padding:"10px 14px",borderTop:"1px solid #252938",display:"flex",gap:6,flexShrink:0}}>
+            <input value={chatInput||""} onChange={(e:any)=>setChatInput(e.target.value)}
+              onKeyDown={(e:any)=>e.key==="Enter"&&onSendChat(agentId)}
+              placeholder={`Talk to ${cfg.name}...`}
+              style={{flex:1,background:"#050709",border:"1px solid #252938",color:"#e2e8f0",
+                padding:"8px 10px",fontFamily:"'VT323',monospace",fontSize:14,outline:"none"}}/>
+            <button onClick={()=>onSendChat(agentId)} disabled={chatSending} style={{
+              background:chatSending?"#191d28":`${col}15`,border:`1px solid ${chatSending?"#252938":col}`,
+              color:chatSending?"#475569":col,padding:"8px 14px",
+              fontFamily:"'VT323',monospace",fontSize:14,cursor:chatSending?"default":"pointer",letterSpacing:1}}>
+              {chatSending?"...":"SEND"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MONITOR TAB */}
+      {sidebarTab==="monitor" && (
+        <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{color:"#475569",fontSize:11,letterSpacing:1}}>▸ LIVE ACTIVITY FEED</div>
+          <div style={{background:"#050709",border:"1px solid #252938",padding:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+              <div style={{width:6,height:6,background:"#4ade80",animation:"blink 1s step-end infinite"}}/>
+              <span style={{color:"#4ade80",fontSize:12,fontFamily:"'VT323',monospace"}}>LIVE</span>
+              <span style={{color:"#475569",fontSize:10}}>Monitoring {cfg.name} activity</span>
+            </div>
+            {/* Show recent log entries as activity */}
+            {logs.slice(-8).reverse().map((l:any,i:number)=>(
+              <div key={i} style={{
+                display:"flex",gap:8,padding:"4px 0",borderBottom:"1px solid #0d0f14",
+                fontSize:11,fontFamily:"'VT323',monospace"
+              }}>
+                <span style={{color:"#252938",minWidth:50}}>{l.time}</span>
+                <span style={{
+                  color:l.type==="success"?"#4ade80":l.type==="warn"?"#f5a623":l.type==="error"?"#f87171":"#22d3ee"
+                }}>{l.message.slice(0,60)}</span>
+              </div>
+            ))}
+            {logs.length===0 && (
+              <div style={{color:"#475569",fontSize:11,textAlign:"center",padding:"20px 0"}}>
+                ▸ No activity yet. Trigger pipeline to see live data.
+              </div>
+            )}
+          </div>
+
+          {/* File/terminal panel */}
+          <div style={{color:"#475569",fontSize:11,letterSpacing:1}}>▸ TERMINAL MONITOR</div>
+          <div style={{
+            background:"#050709",border:"1px solid #4ade80",padding:"10px",
+            fontFamily:"'VT323',monospace",fontSize:12,color:"#22d3ee",
+            lineHeight:1.6,maxHeight:150,overflowY:"auto"
+          }}>
+            <div style={{color:"#4ade80"}}>$ hermes agent status {agentId}</div>
+            <div style={{color:"#e2e8f0"}}>{">"} agent: {agentId}</div>
+            <div style={{color:"#e2e8f0"}}>{">"} status: {status}</div>
+            <div style={{color:"#e2e8f0"}}>{">"} progress: {progress}%</div>
+            <div style={{color:"#e2e8f0"}}>{">"} tasks: {tasks.length} active</div>
+            <div style={{color:"#475569"}}>$ _</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -635,6 +784,67 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const QUICK = ["fantasy RPG warrior","sci-fi spaceship","magic health potion","dungeon floor tile","glowing gem","robot character","pixel sword","treasure chest"];
 
 // ═══════════════════════════════════════════════════════════════
+//  PERSONA EDITOR MODAL
+// ═══════════════════════════════════════════════════════════════
+function PersonaEditor({ agentId, personas, onSave, onClose }: { agentId:string, personas:Record<string,any>, onSave:(id:string, p:any)=>void, onClose:()=>void }) {
+  const cfg = AGENT_CFG[agentId];
+  const cur = personas[agentId] || { personality:'', rules:[], communicationStyle:'direct', constraints:[] };
+  const [p, setP] = useState({...cur});
+
+  const addRule = () => setP(pr => ({...pr, rules: [...pr.rules, '']}));
+  const addConstraint = () => setP(pr => ({...pr, constraints: [...pr.constraints, '']}));
+  const updRule = (i:number,v:string) => { const r=[...p.rules]; r[i]=v; setP({...p,rules:r}); };
+  const updConstraint = (i:number,v:string) => { const c=[...p.constraints]; c[i]=v; setP({...p,constraints:c}); };
+  const rmRule = (i:number) => setP(pr => ({...pr, rules:pr.rules.filter((_:any,ii:number)=>ii!==i)}));
+  const rmConstraint = (i:number) => setP(pr => ({...pr, constraints:pr.constraints.filter((_:any,ii:number)=>ii!==i)}));
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(5,7,9,0.92)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#12151d',border:`2px solid ${cfg.color}`,width:480,maxHeight:'80vh',overflowY:'auto',padding:20,fontFamily:"'VT323',monospace"}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,borderBottom:`1px solid ${cfg.color}33`,paddingBottom:10}}>
+          <span style={{color:cfg.color,fontSize:22,letterSpacing:2}}>{cfg.isPopo?'✦ ':''}{cfg.name} · SOUL CONFIG</span>
+          <button onClick={onClose} style={{background:'none',border:'1px solid #252938',color:'#94a3b8',padding:'2px 8px',fontFamily:"'VT323',monospace",fontSize:15,cursor:'pointer'}}>✕</button>
+        </div>
+
+        {/* Personality */}
+        <label style={{color:cfg.color,fontSize:13,letterSpacing:1,marginBottom:4,display:'block'}}>PERSONALITY</label>
+        <textarea value={p.personality} onChange={e=>setP({...p,personality:e.target.value})} rows={3}
+          style={{width:'100%',background:'#050709',border:'1px solid #252938',color:'#e2e8f0',padding:'8px 10px',fontFamily:"'VT323',monospace",fontSize:14,resize:'vertical',marginBottom:12,outline:'none'}}/>
+
+        {/* Communication Style */}
+        <label style={{color:cfg.color,fontSize:13,letterSpacing:1,marginBottom:4,display:'block'}}>COMMUNICATION STYLE</label>
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+          {['direct','analytical','energetic','blunt','precise','methodical','technical','casual'].map(s=>(
+            <button key={s} onClick={()=>setP({...p,communicationStyle:s})}
+              style={{background:p.communicationStyle===s?`${cfg.color}25`:'#191d28',border:`1px solid ${p.communicationStyle===s?cfg.color:'#252938'}`,color:p.communicationStyle===s?cfg.color:'#475569',padding:'3px 8px',fontFamily:"'VT323',monospace",fontSize:12,cursor:'pointer'}}>{s.toUpperCase()}</button>
+          ))}</div>
+
+        {/* Rules */}
+        <label style={{color:cfg.color,fontSize:13,letterSpacing:1,marginBottom:4,display:'block'}}>RULES ({p.rules.length}) <button onClick={addRule} style={{background:'rgba(74,222,128,0.1)',border:'1px solid #4ade80',color:'#4ade80',padding:'1px 6px',fontFamily:"'VT323',monospace",fontSize:11,cursor:'pointer',marginLeft:6}}>+ ADD</button></label>
+        {p.rules.map((r:string,i:number)=>(
+          <div key={i} style={{display:'flex',gap:4,marginBottom:4}}>
+            <input value={r} onChange={e=>updRule(i,e.target.value)} style={{flex:1,background:'#050709',border:'1px solid #252938',color:'#f5a623',padding:'5px 8px',fontFamily:"'VT323',monospace",fontSize:13,outline:'none'}}/>
+            <button onClick={()=>rmRule(i)} style={{background:'none',border:'1px solid #f8717155',color:'#f87171',padding:'2px 6px',fontFamily:"'VT323',monospace",fontSize:11,cursor:'pointer'}}>✕</button>
+          </div>))}
+
+        {/* Constraints */}
+        <label style={{color:cfg.color,fontSize:13,letterSpacing:1,marginBottom:4,display:'block',marginTop:12}}>CONSTRAINTS ({p.constraints.length}) <button onClick={addConstraint} style={{background:'rgba(245,166,35,0.1)',border:'1px solid #f5a623',color:'#f5a623',padding:'1px 6px',fontFamily:"'VT323',monospace",fontSize:11,cursor:'pointer',marginLeft:6}}>+ ADD</button></label>
+        {p.constraints.map((c:string,i:number)=>(
+          <div key={i} style={{display:'flex',gap:4,marginBottom:4}}>
+            <input value={c} onChange={e=>updConstraint(i,e.target.value)} style={{flex:1,background:'#050709',border:'1px solid #252938',color:'#c084fc',padding:'5px 8px',fontFamily:"'VT323',monospace",fontSize:13,outline:'none'}}/>
+            <button onClick={()=>rmConstraint(i)} style={{background:'none',border:'1px solid #f8717155',color:'#f87171',padding:'2px 6px',fontFamily:"'VT323',monospace",fontSize:11,cursor:'pointer'}}>✕</button>
+          </div>))}
+
+        <div style={{marginTop:16,display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{background:'#191d28',border:'1px solid #252938',color:'#94a3b8',padding:'8px 16px',fontFamily:"'VT323',monospace",fontSize:15,cursor:'pointer'}}>CANCEL</button>
+          <button onClick={()=>onSave(agentId,p)} style={{background:`${cfg.color}15`,border:`1px solid ${cfg.color}`,color:cfg.color,padding:'8px 20px',fontFamily:"'VT323',monospace",fontSize:15,letterSpacing:2,cursor:'pointer'}}>✦ SAVE SOUL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  ROOT APP
 // ═══════════════════════════════════════════════════════════════
 export default function HermesOS() {
@@ -665,8 +875,15 @@ export default function HermesOS() {
   const [prompt,  setPrompt]  = useState("a fantasy RPG warrior character");
   const [prodCnt, setProdCnt] = useState(0);
   const [flow,    setFlow]    = useState("");
-  const [clock,   setClock]   = useState(new Date());
-  const [isLive,  setIsLive]  = useState(false);
+  const [clock,      setClock]      = useState(new Date());
+  const [isLive,     setIsLive]     = useState(false);
+  const [personaAgent, setPersonaAgent] = useState<string|null>(null);
+  const [sidebarTab,   setSidebarTab]   = useState<string>("status");
+  const [gwStatus,     setGwStatus]     = useState<boolean|null>(null);
+  const [chatMessages, setChatMessages] = useState<Record<string,Array<{role:string,text:string,ts:string}>>>({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
+  const [personas,     setPersonas]     = useState<Record<string,any>>({});
+  const [chatInput,    setChatInput]    = useState<string>("");
+  const [chatSending,  setChatSending]  = useState<boolean>(false);
 
   // ── Navigate when dojo/library rooms clicked ──
   useEffect(() => {
@@ -728,6 +945,32 @@ export default function HermesOS() {
     poll(); pollStats();
     const interval = setInterval(() => { poll(); pollStats(); }, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  // ── Gateway health polling (every 30s) ──
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        setGwStatus(data.status === 'online');
+      } catch { setGwStatus(false); }
+    };
+    check();
+    const i = setInterval(check, 30000);
+    return () => clearInterval(i);
+  }, []);
+
+  // ── Load agent personas ──
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/persona');
+        const data = await res.json();
+        setPersonas(data);
+      } catch {}
+    };
+    load();
   }, []);
 
   const log = useCallback((message,type="info",agent=null)=>{
@@ -834,6 +1077,51 @@ export default function HermesOS() {
     } finally { setRunning(false); }
   },[running,log,setSt,addTask,updTask,reset]);
 
+  // ── Agent Chat Handler ──
+  const sendChat = useCallback(async (agentId: string) => {
+    if (!chatInput.trim() || chatSending) return;
+    const msg = chatInput.trim();
+    setChatInput("");
+    setChatSending(true);
+
+    // Add user message
+    const ts = new Date().toLocaleTimeString("en-US",{hour12:false});
+    setChatMessages(p => ({...p, [agentId]: [...p[agentId], {role:"user", text:msg, ts}]}));
+
+    try {
+      const res = await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({agentId, message: msg})
+      });
+      const data = await res.json();
+      const response = data.response || "(no response)";
+      const ts2 = new Date().toLocaleTimeString("en-US",{hour12:false});
+      setChatMessages(p => ({...p, [agentId]: [...p[agentId], {role:"agent", text:response, ts:ts2}]}));
+    } catch {
+      const ts2 = new Date().toLocaleTimeString("en-US",{hour12:false});
+      setChatMessages(p => ({...p, [agentId]: [...p[agentId], {role:"agent", text:"⚠ COMMS DOWN — try again", ts:ts2}]}));
+    } finally {
+      setChatSending(false);
+    }
+  }, [chatInput, chatSending]);
+
+  // ── Persona Save Handler ──
+  const savePersona = useCallback(async (agentId: string, persona: any) => {
+    try {
+      await fetch('/api/persona', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({agentId, persona})
+      });
+      setPersonas(p => ({...p, [agentId]: persona}));
+      log(`✦ ${AGENT_CFG[agentId].name} soul updated`,"success",agentId.toUpperCase());
+    } catch {
+      log("Failed to save persona","error");
+    }
+    setPersonaAgent(null);
+  }, [log]);
+
   const download = useCallback(()=>{
     if(!asset)return;
     const pack={hermesOS:"v5.0",division:"Pixel Factory",timestamp:new Date().toISOString(),
@@ -912,6 +1200,13 @@ export default function HermesOS() {
               <span>{b.l}</span><span style={{color:b.c}}>{b.m}</span>
             </div>
           ))}
+          <div style={{display:"flex",alignItems:"center",gap:5,
+            background:"#191d28",border:"1px solid #252938",padding:"2px 8px"}}>
+            <div style={{width:7,height:7,background:gwStatus===null?"#475569":gwStatus?"#4ade80":"#f87171",animation:gwStatus===true?"blink 2s step-end infinite":"none"}}/>
+            <span style={{color:gwStatus===null?"#475569":gwStatus?"#4ade80":"#f87171",fontSize:10,fontFamily:"'VT323',monospace",letterSpacing:1}}>
+              {gwStatus===null?"SCANNING":gwStatus?"GW ONLINE":"GW OFFLINE"}
+            </span>
+          </div>
           <div style={{textAlign:"right",fontFamily:"'VT323',monospace"}}>
             <div style={{color:"#22d3ee",fontSize:13}}>{clock.toLocaleTimeString("en-US",{hour12:false})}</div>
             <div style={{color:"#475569",fontSize:10}}>#{prodCnt.toString().padStart(4,"0")}</div>
@@ -951,7 +1246,7 @@ export default function HermesOS() {
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
           <div style={{flex:1,overflow:"auto",padding:10,display:"flex",
             justifyContent:"center",alignItems:"flex-start",background:"#0a0b10"}}>
-            <FacilityMap agentStatus={agSt} selRoom={selRoom} onRoomClick={setSelRoom} activeFlow={flow}/>
+            <FacilityMap agentStatus={agSt} selRoom={selRoom} onRoomClick={setSelRoom} activeFlow={flow} onSpriteClick={setPersonaAgent}/>
           </div>
 
           {/* Bottom strip */}
@@ -983,9 +1278,20 @@ export default function HermesOS() {
           <Sidebar agentId={selRoom} status={agSt[selRoom]} progress={agPr[selRoom]}
             tasks={tasks[selRoom]||[]} logs={rLogs[selRoom]||[]}
             asset={asset} qcRep={qcRep}
-            onClose={()=>setSelRoom(null)} onDownload={download} dlReady={dlReady}/>
+            onClose={()=>{setSelRoom(null);setSidebarTab("status")}} onDownload={download} dlReady={dlReady}
+            sidebarTab={sidebarTab} onTabChange={setSidebarTab}
+            chatMessages={chatMessages[selRoom]||[]} onSendChat={sendChat}
+            chatInput={chatInput} setChatInput={setChatInput} chatSending={chatSending}
+            persona={personas[selRoom]} onOpenPersona={()=>setPersonaAgent(selRoom)}
+          />
         )}
       </div>
+
+      {/* Persona Editor Modal */}
+      {personaAgent && (
+        <PersonaEditor agentId={personaAgent} personas={personas}
+          onSave={savePersona} onClose={()=>setPersonaAgent(null)}/>
+      )}
 
       <div style={{borderTop:"1px solid #252938",padding:"4px 16px",
         display:"flex",justifyContent:"space-between",
