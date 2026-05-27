@@ -12,11 +12,10 @@ async function scanDir(dir: string, category: string): Promise<any[]> {
     for (const f of files) {
       const fullPath = join(dir, f.name);
       if (f.isDirectory()) {
-        // Recurse with category = folder name
         const sub = await scanDir(fullPath, f.name);
         entries.push(...sub);
       } else if (f.name.endsWith(".png")) {
-        const s = await stat(fullPath).catch(() => ({ size: 0 }));
+        const s = await stat(fullPath).catch(() => ({ size: 0, mtimeMs: 0 }));
         const rel = relative(FORGE_DIR, fullPath).replace(/\\/g, "/");
         entries.push({
           id: rel.replace(/\.png$/i, "").replace(/\//g, "-"),
@@ -24,6 +23,7 @@ async function scanDir(dir: string, category: string): Promise<any[]> {
           filename: f.name,
           category,
           size: s.size,
+          mtime: (s as any).mtimeMs || Date.now(),
           path: `/api/library/image?file=${encodeURIComponent(rel)}`,
           relPath: rel,
         });
@@ -42,6 +42,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const catFilter = searchParams.get("category");
     const search = searchParams.get("search")?.toLowerCase();
+    const sortBy = searchParams.get("sort") || "newest"; // newest | oldest | name_asc | name_desc | size
 
     let allAssets: any[] = [];
 
@@ -54,13 +55,14 @@ export async function GET(req: Request) {
         allAssets.push(...sub);
       } else if (f.name.endsWith(".png")) {
         if (catFilter && catFilter !== "all" && catFilter !== "root") continue;
-        const s = await stat(fullPath).catch(() => ({ size: 0 }));
+        const s = await stat(fullPath).catch(() => ({ size: 0, mtimeMs: 0 }));
         allAssets.push({
           id: f.name.replace(/\.png$/i, ""),
           name: f.name.replace(/\.png$/i, "").replace(/_/g, " ").replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
           filename: f.name,
           category: "root",
           size: s.size,
+          mtime: (s as any).mtimeMs || Date.now(),
           path: `/api/library/image?file=${encodeURIComponent(f.name)}`,
           relPath: f.name,
         });
@@ -76,11 +78,26 @@ export async function GET(req: Request) {
       );
     }
 
-    // Sort by category then name
-    allAssets.sort((a, b) => {
-      if (a.category !== b.category) return a.category.localeCompare(b.category);
-      return a.name.localeCompare(b.name);
-    });
+    // Sort
+    switch (sortBy) {
+      case "newest":
+        allAssets.sort((a, b) => b.mtime - a.mtime);
+        break;
+      case "oldest":
+        allAssets.sort((a, b) => a.mtime - b.mtime);
+        break;
+      case "name_asc":
+        allAssets.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "name_desc":
+        allAssets.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case "size":
+        allAssets.sort((a, b) => b.size - a.size);
+        break;
+      default:
+        allAssets.sort((a, b) => b.mtime - a.mtime); // newest by default
+    }
 
     return NextResponse.json({ assets: allAssets, total: allAssets.length });
   } catch (e: any) {
