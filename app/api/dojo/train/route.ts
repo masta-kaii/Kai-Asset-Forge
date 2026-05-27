@@ -2,14 +2,26 @@ import { NextResponse } from 'next/server'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 
-const DATA_FILE = join(process.cwd(), 'data', 'agent-stats.json')
+const DATA_FILE = join(process.env.VERCEL ? '/tmp' : join(process.cwd(), 'data'), 'agent-stats.json')
 const XP_LEVELS = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000]
 
 function xpForLevel(lv: number) { return XP_LEVELS[Math.min(lv - 1, XP_LEVELS.length - 1)] || 0 }
 
 function loadAgents() {
   try {
-    if (!existsSync(DATA_FILE)) return {}
+    if (!existsSync(DATA_FILE)) {
+      // Seed default agents on cold start
+      const defaults: Record<string, any> = {
+        popo: { id:"popo",name:"POPO COMMAND",role:"Director · Orchestrator",level:1,xp:0,xpToNext:100,totalXP:0,color:"#f5a623",bgA:"#1e1508",motto:"I orchestrate the chaos.",skills:{orchestration:{name:"Orchestration",level:1,icon:"⚙",desc:"Coordinate multi-agent workflows"},strategy:{name:"Strategy",level:1,icon:"♟",desc:"Plan optimal production routes"},vision:{name:"Vision",level:1,icon:"👁",desc:"Define art direction & quality targets"},delegation:{name:"Delegation",level:1,icon:"↗",desc:"Efficiently assign tasks to agents"}},trainingHistory:[]},
+        scout: { id:"scout",name:"SCOUT HUB",role:"Research & Trends",level:1,xp:0,xpToNext:100,totalXP:0,color:"#f59e0b",bgA:"#1e1208",motto:"I find what's next.",skills:{research:{name:"Research",level:1,icon:"🔬",desc:"Deep market & trend analysis"},curation:{name:"Curation",level:1,icon:"📋",desc:"Identify high-value opportunities"},briefing:{name:"Briefing",level:1,icon:"📝",desc:"Clear creative briefs for studios"},speed:{name:"Speed",level:1,icon:"⚡",desc:"Fast research turnaround"}},trainingHistory:[]},
+        artist: { id:"artist",name:"PIXEL STUDIO",role:"Sprite & Tileset Lab",level:1,xp:0,xpToNext:100,totalXP:0,color:"#60a5fa",bgA:"#061220",motto:"Every pixel has a purpose.",skills:{pixelart:{name:"Pixel Art",level:1,icon:"🖼",desc:"Sprite & tileset craftsmanship"},color:{name:"Color Theory",level:1,icon:"🎨",desc:"Palette harmony & optical mixing"},composition:{name:"Composition",level:1,icon:"📐",desc:"Layout, proportion & silhouette"},speed:{name:"Speed",level:1,icon:"⚡",desc:"Fast iteration & rapid prototyping"}},trainingHistory:[]},
+        webgen: { id:"webgen",name:"WEB GENERATOR",role:"Page & Component Forge",level:1,xp:0,xpToNext:100,totalXP:0,color:"#22d3ee",bgA:"#041820",motto:"I ship pixels and pages.",skills:{frontend:{name:"Frontend",level:1,icon:"🖥",desc:"React/Next.js component craft"},design:{name:"Design",level:1,icon:"🎯",desc:"UI/UX pattern implementation"},responsive:{name:"Responsive",level:1,icon:"📱",desc:"Multi-device layouts"},perf:{name:"Performance",level:1,icon:"⚡",desc:"Fast load & render optimization"}},trainingHistory:[]},
+        qc: { id:"qc",name:"QC CHAMBER",role:"Quality Control",level:1,xp:0,xpToNext:100,totalXP:0,color:"#c084fc",bgA:"#0f0620",motto:"Nothing ships broken.",skills:{inspection:{name:"Inspection",level:1,icon:"🔍",desc:"Detect flaws & inconsistencies"},consistency:{name:"Consistency",level:1,icon:"📏",desc:"Maintain style across all assets"},accuracy:{name:"Accuracy",level:1,icon:"🎯",desc:"Precision in validation checks"},standards:{name:"Standards",level:1,icon:"📋",desc:"Enforce pipeline quality gates"}},trainingHistory:[]},
+        pkg: { id:"pkg",name:"PACKAGING BAY",role:"Export Pipeline",level:1,xp:0,xpToNext:100,totalXP:0,color:"#4ade80",bgA:"#051810",motto:"Ready for deployment.",skills:{export:{name:"Export",level:1,icon:"📦",desc:"Multi-format asset export"},optimization:{name:"Optimization",level:1,icon:"⚡",desc:"File size & performance tuning"},metadata:{name:"Metadata",level:1,icon:"🏷",desc:"Tagging & cataloging assets"},delivery:{name:"Delivery",level:1,icon:"🚀",desc:"Publish-ready packaging"}},trainingHistory:[]},
+      }
+      saveAgents(defaults)
+      return defaults
+    }
     return JSON.parse(readFileSync(DATA_FILE, 'utf-8'))
   } catch { return {} }
 }
