@@ -297,23 +297,22 @@ export async function POST(request:Request) {
 
     while (qc.reworkNeeded && reworks < MAX_REWORKS) {
       reworks++;
-      // Train agents based on what QC flagged
+      // Train agents based on what QC flagged — AGGRESSIVE BOOST on rework
       if (stats.artist && qc.spriteFeedback?.length > 0) {
-        stats.artist.totalXP=(stats.artist.totalXP||0)+15;
-        stats.artist.xp=(stats.artist.xp||0)+15;
-        // Boost skills permanently from rework training
+        stats.artist.totalXP=(stats.artist.totalXP||0)+25;
+        stats.artist.xp=(stats.artist.xp||0)+25;
         if (stats.artist.skills) {
-          if (qc.spriteFeedback.some((i:string)=>i.includes("outline")||i.includes("blob")))
-            stats.artist.skills.pixelart = { level: Math.min((stats.artist.skills.pixelart?.level||1)+1, 5) };
-          if (qc.spriteFeedback.some((i:string)=>i.includes("PINK")||i.includes("color")||i.includes("palette")))
-            stats.artist.skills.color = { level: Math.min((stats.artist.skills.color?.level||1)+1, 5) };
+          stats.artist.skills.pixelart = { level: Math.min((stats.artist.skills.pixelart?.level||1)+2, 5) };
+          stats.artist.skills.color = { level: Math.min((stats.artist.skills.color?.level||1)+2, 5) };
+          stats.artist.skills.composition = { level: Math.min((stats.artist.skills.composition?.level||1)+1, 5) };
         }
       }
       if (stats.webgen && qc.pageFeedback?.length > 0) {
-        stats.webgen.totalXP=(stats.webgen.totalXP||0)+10;
-        stats.webgen.xp=(stats.webgen.xp||0)+10;
+        stats.webgen.totalXP=(stats.webgen.totalXP||0)+20;
+        stats.webgen.xp=(stats.webgen.xp||0)+20;
         if (stats.webgen.skills) {
-          stats.webgen.skills.design = { level: Math.min((stats.webgen.skills.design?.level||1)+1, 5) };
+          stats.webgen.skills.design = { level: Math.min((stats.webgen.skills.design?.level||1)+3, 5) };
+          stats.webgen.skills.frontend = { level: Math.min((stats.webgen.skills.frontend?.level||1)+2, 5) };
         }
       }
 
