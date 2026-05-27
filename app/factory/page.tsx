@@ -43,6 +43,8 @@ const SPRITES = {
 const ROOM_DEF = {
   popo:   { x:0,  y:0,  w:10, h:10 },
   artist: { x:10, y:0,  w:10, h:10 },
+  dojo:   { x:20, y:0,  w:5,  h:10 },
+  library:{ x:25, y:0,  w:5,  h:10 },
   qc:     { x:0,  y:12, w:16, h:10 },
   pkg:    { x:16, y:12, w:14, h:10 },
 };
@@ -70,6 +72,8 @@ const AGENT_CFG = {
   artist: { name:"PIXEL STUDIO",  sub:"Asset Generation Lab",    color:"#60a5fa", bgA:"#061220", charKey:"artist", isPopo:false },
   qc:     { name:"QC CHAMBER",    sub:"Quality Control",         color:"#c084fc", bgA:"#0f0620", charKey:"qc",     isPopo:false },
   pkg:    { name:"PACKAGING BAY", sub:"Export Pipeline",         color:"#4ade80", bgA:"#051810", charKey:"pkg",    isPopo:false },
+  dojo:   { name:"AGENT DOJO",     sub:"Training Ground",          color:"#c084fc", bgA:"#0f0620", charKey:"",       isPopo:false },
+  library:{ name:"ASSET LIBRARY",   sub:"Forge Output Browser",     color:"#60a5fa", bgA:"#061220", charKey:"",       isPopo:false },
 };
 
 const STATUS_C = {
@@ -326,7 +330,8 @@ function FacilityMap({ agentStatus, selRoom, onRoomClick, activeFlow }) {
       {/* Room overlays */}
       {Object.entries(ROOM_DEF).map(([id,r]) => {
         const cfg    = AGENT_CFG[id];
-        const active = agentStatus[id] !== "idle";
+        const isAgent = id !== "dojo" && id !== "library";
+        const active = isAgent && agentStatus[id] !== "idle";
         const sel    = selRoom === id;
         const bx=r.x*TILE*SCALE, by=r.y*TILE*SCALE;
         const bw=r.w*TILE*SCALE, bh=r.h*TILE*SCALE;
@@ -358,7 +363,7 @@ function FacilityMap({ agentStatus, selRoom, onRoomClick, activeFlow }) {
       })}
 
       {/* All agents on map */}
-      {Object.keys(AGENT_CFG).map(id => (
+      {Object.keys(AGENT_CFG).filter(id => id !== "dojo" && id !== "library").map(id => (
         <AgentOverlay key={id} agentId={id} agentStatus={agentStatus[id]} mapScale={SCALE}/>
       ))}
 
@@ -649,7 +654,13 @@ export default function HermesOS() {
   const [prodCnt, setProdCnt] = useState(0);
   const [flow,    setFlow]    = useState("");
   const [clock,   setClock]   = useState(new Date());
-  const [isLive,  setIsLive]  = useState(false); // Real Kanban connection active
+  const [isLive,  setIsLive]  = useState(false);
+
+  // ── Navigate when dojo/library rooms clicked ──
+  useEffect(() => {
+    if (selRoom === "dojo") { setSelRoom(null); router.push("/dojo"); }
+    if (selRoom === "library") { setSelRoom(null); router.push("/library"); }
+  }, [selRoom]);
 
   // ── Clock tick ──
   useEffect(()=>{const t=setInterval(()=>setClock(new Date()),1000);return()=>clearInterval(t);},[]);
@@ -855,7 +866,7 @@ export default function HermesOS() {
         </div>
 
         <div style={{display:"flex",alignItems:"center",gap:8,flex:1,justifyContent:"center"}}>
-          {Object.entries(AGENT_CFG).map(([id,cfg])=>{
+          {Object.entries(AGENT_CFG).filter(([id])=>id!=="dojo"&&id!=="library").map(([id,cfg])=>{
             const st=agSt[id],on=st!=="idle";
             return (
               <div key={id} onClick={()=>setSelRoom(selRoom===id?null:id)} style={{
@@ -872,6 +883,9 @@ export default function HermesOS() {
               </div>
             );
           })}
+          {/* Dojo & Library quick nav */}
+          <div onClick={()=>router.push("/dojo")} style={{display:"flex",alignItems:"center",gap:5,background:"#191d28",border:"1px solid #c084fc33",padding:"3px 10px",cursor:"pointer",transition:"all 0.15s"}} onMouseEnter={(e)=>{e.currentTarget.style.borderColor="#c084fc";e.currentTarget.style.background="#c084fc15"}} onMouseLeave={(e)=>{e.currentTarget.style.borderColor="#c084fc33";e.currentTarget.style.background="#191d28"}}><span style={{fontSize:14}}>🏯</span><span style={{color:"#c084fc",fontSize:12,letterSpacing:1}}>DOJO</span></div>
+          <div onClick={()=>router.push("/library")} style={{display:"flex",alignItems:"center",gap:5,background:"#191d28",border:"1px solid #60a5fa33",padding:"3px 10px",cursor:"pointer",transition:"all 0.15s"}} onMouseEnter={(e)=>{e.currentTarget.style.borderColor="#60a5fa";e.currentTarget.style.background="#60a5fa15"}} onMouseLeave={(e)=>{e.currentTarget.style.borderColor="#60a5fa33";e.currentTarget.style.background="#191d28"}}><span style={{fontSize:14}}>📦</span><span style={{color:"#60a5fa",fontSize:12,letterSpacing:1}}>LIBRARY</span></div>
         </div>
 
         <div style={{display:"flex",alignItems:"center",gap:10}}>
