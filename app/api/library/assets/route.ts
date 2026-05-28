@@ -3,7 +3,7 @@ import { readdir, stat } from "fs/promises";
 import { join, relative } from "path";
 import { existsSync } from "fs";
 
-const FORGE_DIR = join(process.cwd(), "forge-output");
+const FORGE_DIR = "/tmp/forge-output";
 
 async function scanDir(dir: string, category: string): Promise<any[]> {
   const entries: any[] = [];

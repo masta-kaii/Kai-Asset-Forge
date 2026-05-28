@@ -3,7 +3,7 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 
-const FORGE_DIR = join(process.cwd(), "forge-output");
+const FORGE_DIR = "/tmp/forge-output";
 
 export async function GET(req: Request) {
   try {
