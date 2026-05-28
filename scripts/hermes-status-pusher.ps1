@@ -4,17 +4,20 @@
 
 $ErrorActionPreference = "Continue"
 
-$HermesUrl   = if ($env:HERMES_LOCAL_URL) { $env:HERMES_LOCAL_URL } else { "http://localhost:8080" }
-$HermesToken = $env:HERMES_LOCAL_TOKEN
+$HermesUrl   = if ($env:HERMES_LOCAL_URL) { $env:HERMES_LOCAL_URL } else { "http://localhost:8642" }
+$HermesToken = $env:HERMES_LOCAL_TOKEN  # optional; only sent if set
 $VercelUrl   = $env:KAI_VERCEL_URL
 $Secret      = $env:STATUS_PUSH_SECRET
 
-if (-not $HermesToken -or -not $VercelUrl -or -not $Secret) {
-    Write-Host "ERROR: missing one of HERMES_LOCAL_TOKEN, KAI_VERCEL_URL, STATUS_PUSH_SECRET."
+if (-not $VercelUrl -or -not $Secret) {
+    Write-Host "ERROR: missing KAI_VERCEL_URL or STATUS_PUSH_SECRET."
     Write-Host "Set them as user-level environment variables; see docs/SETUP-AUTOSTART.md."
     Start-Sleep -Seconds 10
     exit 1
 }
+
+$hermesHeaders = @{}
+if ($HermesToken) { $hermesHeaders["Authorization"] = "Bearer $HermesToken" }
 
 Write-Host "Status pusher up. Polling $HermesUrl/health/detailed -> $VercelUrl/api/status every 60s."
 
@@ -22,7 +25,7 @@ while ($true) {
     $stamp = Get-Date -Format "HH:mm:ss"
     try {
         $snap = Invoke-RestMethod -Uri "$HermesUrl/health/detailed" `
-            -Headers @{ Authorization = "Bearer $HermesToken" } `
+            -Headers $hermesHeaders `
             -TimeoutSec 5
 
         $body = $snap | ConvertTo-Json -Depth 6 -Compress

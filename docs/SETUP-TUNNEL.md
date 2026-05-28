@@ -7,11 +7,13 @@ at the login screen — no user session needed.
 ## Prerequisites
 
 - A Cloudflare account with a domain on it.
-- Hermes' HTTP API running on the PC with bearer-token auth already on
-  (you confirmed this).
-- The Hermes API port and bearer token to hand. Default in
-  `scripts/hermes-status-pusher.ps1` is `localhost:8080`; change it if
-  yours differs.
+- Hermes' HTTP API running on the PC. Default port is `8642` and binds to
+  `127.0.0.1` only.
+- **A bearer token set on Hermes' side.** By default Hermes ships with the
+  bearer-token slot empty, so any local request goes through unauthenticated.
+  That's fine for localhost, but if you tunnel without setting a token the
+  *only* thing standing between the internet and Hermes is the Cloudflare
+  Zero Trust Access policy below — set the token first.
 
 ## Steps
 
@@ -38,7 +40,7 @@ tunnel: <uuid-from-step-3>
 credentials-file: C:\Users\khair\.cloudflared\<uuid>.json
 ingress:
   - hostname: hermes.your-domain.example
-    service: http://localhost:8080   # change if Hermes binds elsewhere
+    service: http://localhost:8642   # Hermes default; change if you've moved it
   - service: http_status:404
 ```
 

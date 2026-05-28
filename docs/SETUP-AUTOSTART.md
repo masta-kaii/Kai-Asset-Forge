@@ -22,8 +22,8 @@ New, for each:
 
 | Variable             | Value                                              |
 | -------------------- | -------------------------------------------------- |
-| `HERMES_LOCAL_URL`   | `http://localhost:8080` (or wherever Hermes binds) |
-| `HERMES_LOCAL_TOKEN` | Hermes' bearer token                               |
+| `HERMES_LOCAL_URL`   | `http://localhost:8642` (Hermes' default API port) |
+| `HERMES_LOCAL_TOKEN` | *(optional)* Hermes' bearer token, if you've set one |
 | `KAI_VERCEL_URL`     | `https://kai-asset-forge-hub.vercel.app`           |
 | `STATUS_PUSH_SECRET` | Same value as the Vercel env var of the same name  |
 
