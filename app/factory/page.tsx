@@ -882,6 +882,8 @@ export default function HermesOS() {
   const [personaAgent, setPersonaAgent] = useState<string|null>(null);
   const [sidebarTab,   setSidebarTab]   = useState<string>("status");
   const [gwStatus,     setGwStatus]     = useState<boolean|null>(null);
+  const [pcStatus,     setPcStatus]     = useState<"scanning"|"online"|"stale"|"offline">("scanning");
+  const [pcAge,        setPcAge]        = useState<number|null>(null);
   const [chatMessages, setChatMessages] = useState<Record<string,Array<{role:string,text:string,ts:string}>>>({popo:[],scout:[],artist:[],webgen:[],qc:[],pkg:[]});
   const [personas,     setPersonas]     = useState<Record<string,any>>({});
   const [chatInput,    setChatInput]    = useState<string>("");
@@ -960,6 +962,24 @@ export default function HermesOS() {
     };
     check();
     const i = setInterval(check, 30000);
+    return () => clearInterval(i);
+  }, []);
+
+  // ── PC heartbeat polling (every 10s) ──
+  // Reads the snapshot the home PC pushes to /api/status every 60s.
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await fetch('/api/status');
+        if (!res.ok) { setPcStatus("offline"); setPcAge(null); return; }
+        const data = await res.json();
+        if (data?.ageSeconds == null) { setPcStatus("offline"); setPcAge(null); return; }
+        setPcAge(data.ageSeconds);
+        setPcStatus(data.ageSeconds < 120 ? "online" : "stale");
+      } catch { setPcStatus("offline"); setPcAge(null); }
+    };
+    check();
+    const i = setInterval(check, 10000);
     return () => clearInterval(i);
   }, []);
 
@@ -1182,6 +1202,23 @@ export default function HermesOS() {
               {gwStatus===null?"SCANNING":gwStatus?"GW ONLINE":"GW OFFLINE"}
             </span>
           </div>
+          {(() => {
+            const c = pcStatus==="online"  ? "#4ade80"
+                    : pcStatus==="stale"   ? "#f5a623"
+                    : pcStatus==="offline" ? "#f87171"
+                    :                        "#475569";
+            const label = pcStatus==="scanning" ? "PC ?"
+                        : pcStatus==="online"   ? `PC ${pcAge ?? 0}s`
+                        : pcStatus==="stale"    ? `PC STALE ${pcAge ?? 0}s`
+                        :                          "PC OFFLINE";
+            return (
+              <div title="Heartbeat from Hermes-on-PC, pushed every 60s" style={{display:"flex",alignItems:"center",gap:5,
+                background:"#191d28",border:"1px solid #252938",padding:"2px 8px"}}>
+                <div style={{width:7,height:7,background:c,animation:pcStatus==="online"?"blink 2s step-end infinite":"none"}}/>
+                <span style={{color:c,fontSize:10,fontFamily:"'VT323',monospace",letterSpacing:1}}>{label}</span>
+              </div>
+            );
+          })()}
           <div style={{textAlign:"right",fontFamily:"'VT323',monospace"}}>
             <div style={{color:"#22d3ee",fontSize:13}}>{clock.toLocaleTimeString("en-US",{hour12:false})}</div>
             <div style={{color:"#475569",fontSize:10}}>#{prodCnt.toString().padStart(4,"0")}</div>
