@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
+import { getDb } from "@/lib/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,11 +17,7 @@ type HermesSnapshot = {
   [k: string]: unknown;
 };
 
-type Stored = HermesSnapshot & { receivedAt: string };
-
-// Module-level cache. On Vercel this lives only as long as the warm instance,
-// but the pusher hits every 60s so a cold start re-populates within one tick.
-let latest: Stored | null = null;
+const DOC_PATH = "status/hermes";
 
 function getSecret(): string | null {
   const s = process.env.STATUS_PUSH_SECRET;
@@ -55,20 +53,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "missing status" }, { status: 400 });
   }
 
-  latest = { ...body, receivedAt: new Date().toISOString() };
+  const receivedAt = new Date().toISOString();
+  await getDb().doc(DOC_PATH).set({
+    snapshot: body,
+    receivedAt,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
   return NextResponse.json({ ok: true });
 }
 
 export async function GET() {
-  if (!latest) {
+  const snap = await getDb().doc(DOC_PATH).get();
+  if (!snap.exists) {
     return NextResponse.json(
       { latest: null, ageSeconds: null },
       { headers: { "cache-control": "no-store" } },
     );
   }
-  const ageSeconds = ageSecondsFrom(latest.receivedAt);
+  const data = snap.data() as
+    | { snapshot: HermesSnapshot; receivedAt: string }
+    | undefined;
+  if (!data?.receivedAt || !data.snapshot) {
+    return NextResponse.json(
+      { latest: null, ageSeconds: null },
+      { headers: { "cache-control": "no-store" } },
+    );
+  }
   return NextResponse.json(
-    { latest, ageSeconds },
+    {
+      latest: { ...data.snapshot, receivedAt: data.receivedAt },
+      ageSeconds: ageSecondsFrom(data.receivedAt),
+    },
     { headers: { "cache-control": "no-store" } },
   );
 }
