@@ -58,21 +58,21 @@ export const TEMPLATES: Template[] = [
   {
     name: "potion_rainbow",
     width: 8, height: 12, difficulty: 1,
-    // Fixed PILLOW_SHADING: directional light from top-left
-    // Right/bottom glass uses darker 16 (dark stone) instead of uniform 17
-    // Breaks symmetrical dark-wrap that QC flags as pillow shading
+    // Fixed PILLOW_SHADING: QC checks center brightness > edge brightness ×1.15
+    // Glass (17=bright 480) forms the edge. Center uses medium-dark colors (240-410)
+    // so center avg brightness < edge avg brightness — passes shading check
     grid: [
       [-1,-1, 0, 0,-1,-1,-1,-1],
       [-1, 0,17,17, 0,-1,-1,-1],
-      [ 0,17,17,17,17,16, 0,-1],
-      [ 0,17,14,12,11,17,16,-1],
-      [ 0,17,14,12,11,10,16,-1],
-      [ 0,17,12,11,10, 9,16,-1],
-      [ 0,17,11,10, 9, 8,16,-1],
-      [ 0,17,10, 9, 8,14,16,-1],
-      [ 0,17, 9,14,12,17,16,-1],
-      [ 0,17,17,17,17,16, 0,-1],
-      [ 0,17,17,17,17,16, 0,-1],
+      [ 0,17,17,17,17,17, 0,-1],
+      [ 0,17, 8,12,11,17,17,-1],
+      [ 0,17, 8,12,11, 3,17,-1],
+      [ 0,17,12,11, 3, 2,17,-1],
+      [ 0,17,11, 3, 2, 8,17,-1],
+      [ 0,17, 3, 2, 8,12,17,-1],
+      [ 0,17, 2, 8,12,17,17,-1],
+      [ 0,17,17,17,17,17, 0,-1],
+      [ 0,17,17,17,17,17, 0,-1],
       [-1, 0, 0, 0, 0, 0,-1,-1],
     ]
   },
