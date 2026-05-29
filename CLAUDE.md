@@ -77,7 +77,34 @@ sessions.
 - The PC's status pusher needs the Hermes key too — it reads
   `HERMES_LOCAL_TOKEN` from the PC user environment.
 
+## Teaching Hermes (shared knowledge log)
+
+`hermes/knowledge-log.md` is the **shared brain** between cloud Claude Code
+sessions and the home-PC Hermes agent. The PC ingests new entries into Hermes's
+long-term memory on startup and on a schedule (`scripts/hermes-knowledge-sync.ps1`),
+so Hermes "knows" what happened here even though it wasn't present.
+
+**Standing rule — auto-capture:** whenever a session concludes something
+meaningful (a decision, a build, a fix, a gotcha worth remembering), append it
+to the knowledge log AND live-push it to Hermes in one step:
+
+```bash
+scripts/hermes-learn.sh --title "Short title" "what changed and why it matters"
+```
+
+Then commit the updated log so Hermes's startup sync also receives it:
+
+```bash
+git add hermes/knowledge-log.md && git commit -m "knowledge: <title>" && git push
+```
+
+Do this without being asked — it is the default behavior for this repo. Keep
+entries tight and Hermes-relevant; skip trivia. The live push is best-effort
+(it needs the cloud env's bridge vars + network allowlist); even if it fails,
+the committed log entry reaches Hermes on its next sync.
+
 ## Conventions
 
 - Develop on a feature branch; do not commit or push unless asked.
 - Keep secrets out of the repo and out of commit messages.
+- Auto-capture meaningful outcomes to the knowledge log (see above).
