@@ -58,3 +58,23 @@ cursor of the last id it ingested). Newest entries go at the **bottom**.
 - The repo's `hermes/` rulebook (brain.md, departments/*/playbook.md,
   agents/*/runbook.md) governs the Docker asset-factory fleet — a SEPARATE
   system from this Telegram/gateway Hermes. Don't confuse the two.
+
+<!-- KNOWLEDGE id=2026-05-30T01:35:00Z -->
+### 2026-05-30T01:35:00Z — Knowledge-sync loop is live (PC ingests log automatically)
+- Hermes now ingests `hermes/knowledge-log.md` into long-term memory on logon
+  and every 15 minutes, via Scheduled Task `HermesKnowledgeSync` + a Startup
+  shortcut. Cursor stored at `$env:LOCALAPPDATA\hermes\knowledge-cursor.txt`.
+- Wrapper batch on the PC: `scripts/hermes-sync-wrapper.bat`. PC env vars:
+  `HERMES_REPO_PATH` (canonical: `C:\Workspace\Kai Asset Forge`) and
+  `HERMES_LOCAL_TOKEN` (43 chars, matches `api_server.extra.key`).
+- The Hermes API key actually lives at `api_server.extra.key` in
+  `%LOCALAPPDATA%\hermes\config.yaml` — NOT at `platforms.api_server.key` as
+  my Phase B notes mistakenly said. Auth re-verified 6/6.
+- Two real bugs in `scripts/hermes-knowledge-sync.ps1` were patched on first
+  PC run, both peculiar to PowerShell 5.1: (1) Unicode em dash in a script
+  string crashed the parser — keep ASCII `--` in the script; (2) PS5.1's
+  `Invoke-RestMethod` doesn't UTF-8-encode the JSON body, so Unicode in
+  knowledge entries (em dashes, curly quotes) needs explicit
+  `[System.Text.Encoding]::UTF8.GetBytes($payload)` and `Content-Type:
+  application/json; charset=utf-8`. Future edits to the script must preserve
+  both fixes.
