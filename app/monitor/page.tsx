@@ -82,6 +82,30 @@ export default function MonitorPage() {
   const seen = useRef<Set<string>>(new Set());
   const font = "var(--font-vt323), monospace";
 
+  // ─── Run detail drawer (event replay via /api/runs/[id]) ───
+  const [selected, setSelected] = useState<string | null>(null);
+  const [detail, setDetail] = useState<{ run: Run; events: Activity[] } | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const openRun = useCallback(async (id: string) => {
+    setSelected(id);
+    setDetail(null);
+    setLoadingDetail(true);
+    try {
+      const [rRes, eRes] = await Promise.all([
+        fetch(`/api/runs/${id}`),
+        fetch(`/api/runs/${id}/events?limit=500`),
+      ]);
+      const run = (await rRes.json()).run as Run;
+      const events = ((await eRes.json()).events || []) as Activity[];
+      setDetail({ run, events: events.map((e) => ({ ...e, runId: id })) });
+    } catch {
+      setDetail(null);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, []);
+
   // Auth guard — same convention as the other pages.
   useEffect(() => {
     try {
@@ -178,6 +202,30 @@ export default function MonitorPage() {
         </span>
       </div>
 
+      {/* ── Headline live pipeline rail ── */}
+      <div style={{ padding: "10px 18px 0", maxWidth: 1280, margin: "0 auto" }}>
+        <SectionTitle>PIPELINE{activeRuns[0] ? ` · ${activeRuns[0].theme || activeRuns[0].kind}` : " · IDLE"}</SectionTitle>
+        <PipelineRail run={activeRuns[0] || { id: "", source: "vercel", kind: "", status: "queued", stage: null, progress: 0, startedAt: "" }} />
+      </div>
+
+      {/* ── Run history strip ── */}
+      {runs.length > 0 && (
+        <div style={{ padding: "10px 18px 0", maxWidth: 1280, margin: "0 auto" }}>
+          <SectionTitle>RUN HISTORY</SectionTitle>
+          <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+            {[...runs].reverse().map((r) => {
+              const c = STATUS_COLOR[r.status];
+              return (
+                <div key={r.id} onClick={() => openRun(r.id)} title={`${r.theme || r.kind} · ${r.status} · ${ago(r.startedAt)}`}
+                  style={{ width: 22, height: 22, background: `${c}22`, border: `1px solid ${c}`, borderRadius: 2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: c, fontSize: 11 }}>
+                  {r.status === "running" ? "▶" : r.status === "passed" ? "✓" : r.status === "failed" ? "✕" : "·"}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Body: runs rail + activity feed ── */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 1fr) minmax(320px, 1.4fr)", gap: 16, padding: 16, maxWidth: 1280, margin: "0 auto" }}>
         {/* Runs */}
@@ -207,6 +255,16 @@ export default function MonitorPage() {
           </div>
         </section>
       </div>
+      {/* ── Run detail drawer ── */}
+      {selected && (
+        <RunDrawer
+          runId={selected}
+          detail={detail}
+          loading={loadingDetail}
+          onClose={() => { setSelected(null); setDetail(null); }}
+        />
+      )}
+
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}`}</style>
     </div>
   );
@@ -215,7 +273,7 @@ export default function MonitorPage() {
     const sc = STATUS_COLOR[run.status];
     const stageColor = run.stage ? AGENT_COLOR[run.stage === "forge" ? "artist" : run.stage === "list" || run.stage === "package" ? "pkg" : run.stage] || sc : sc;
     return (
-      <div style={{ background: "#0d1018", border: `1px solid ${sc}33`, borderLeft: `3px solid ${sc}`, borderRadius: 4, padding: "8px 10px", marginBottom: 8 }}>
+      <div onClick={() => openRun(run.id)} title="Open run detail" style={{ background: "#0d1018", border: `1px solid ${sc}33`, borderLeft: `3px solid ${sc}`, borderRadius: 4, padding: "8px 10px", marginBottom: 8, cursor: "pointer", transition: "border-color .15s" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = sc; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${sc}33`; e.currentTarget.style.borderLeftColor = sc; }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "#e2e8f0", fontSize: 15, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {run.theme || run.kind}
@@ -264,4 +322,101 @@ function SectionTitle({ children, style }: { children: React.ReactNode; style?: 
 }
 function Empty({ children }: { children: React.ReactNode }) {
   return <div style={{ color: "#334155", fontSize: 14, padding: "8px 2px" }}>{children}</div>;
+}
+
+// ─── Pipeline rail: Scout → Forge → QC → Pack → List ─────────────────
+const RAIL = [
+  { key: "scout", label: "SCOUT", color: "#f59e0b" },
+  { key: "forge", label: "FORGE", color: "#60a5fa" },
+  { key: "qc", label: "QC", color: "#c084fc" },
+  { key: "package", label: "PACK", color: "#4ade80" },
+  { key: "list", label: "LIST", color: "#4ade80" },
+];
+const RAIL_INDEX: Record<string, number> = {
+  scout: 0, forge: 1, rework: 1, qc: 2, package: 3, list: 4, done: 5,
+};
+
+function PipelineRail({ run }: { run: Run }) {
+  const cur = run.stage ? RAIL_INDEX[run.stage] ?? 0 : 0;
+  const passed = run.status === "passed";
+  const failed = run.status === "failed";
+  return (
+    <div style={{ display: "flex", alignItems: "stretch", margin: "10px 0 4px" }}>
+      {RAIL.map((s, i) => {
+        let state: "done" | "active" | "pending" | "failed" = "pending";
+        if (passed) state = "done";
+        else if (i < cur) state = "done";
+        else if (i === cur) state = failed ? "failed" : run.status === "running" ? "active" : "done";
+        const col = state === "done" ? "#4ade80" : state === "active" ? "#f5a623" : state === "failed" ? "#f87171" : "#334155";
+        return (
+          <div key={s.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
+            {i < RAIL.length - 1 && (
+              <div style={{ position: "absolute", top: 13, left: "50%", width: "100%", height: 2, background: i < cur || passed ? "#4ade80" : "#1e2533" }} />
+            )}
+            <div style={{ width: 28, height: 28, borderRadius: "50%", border: `2px solid ${col}`, background: state === "active" ? "#f5a62322" : "#0d1018", color: col, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, zIndex: 1, boxShadow: state === "active" ? `0 0 10px ${col}` : "none", animation: state === "active" ? "pulse 1.2s infinite" : "none" }}>
+              {state === "done" ? "✓" : state === "failed" ? "✕" : i + 1}
+            </div>
+            <span style={{ color: col, fontSize: 12, marginTop: 4, letterSpacing: 1 }}>{s.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Run detail drawer with full event replay ────────────────────────
+function RunDrawer({ runId, detail, loading, onClose }: {
+  runId: string;
+  detail: { run: Run; events: Activity[] } | null;
+  loading: boolean;
+  onClose: () => void;
+}) {
+  const run = detail?.run;
+  const events = detail?.events || [];
+  const dur = run?.finishedAt && run.startedAt
+    ? Math.max(0, Math.round((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000))
+    : null;
+  const sc = run ? STATUS_COLOR[run.status] : "#94a3b8";
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "#000a", zIndex: 50, display: "flex", justifyContent: "flex-end" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 100%)", height: "100%", background: "#0a0c12", borderLeft: "1px solid #1e2533", overflowY: "auto", padding: 18, fontFamily: "var(--font-vt323), monospace" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <span style={{ color: "#e2e8f0", fontSize: 19, flex: 1 }}>{run?.theme || run?.kind || runId}</span>
+          <button onClick={onClose} style={{ background: "none", border: "1px solid #334155", color: "#94a3b8", cursor: "pointer", fontSize: 14, padding: "1px 9px", fontFamily: "inherit", borderRadius: 3 }}>✕</button>
+        </div>
+
+        {loading && <Empty>Loading run…</Empty>}
+        {!loading && !run && <Empty>Run not found.</Empty>}
+
+        {run && (
+          <>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13, color: "#64748b", marginBottom: 4 }}>
+              <span style={{ color: run.source === "hermes" ? "#22d3ee" : "#f5a623" }}>{run.source.toUpperCase()}</span>
+              <span style={{ color: sc }}>{run.status.toUpperCase()}</span>
+              {run.reworks ? <span style={{ color: "#f5a623" }}>{run.reworks} rework(s)</span> : null}
+              {dur != null && <span>{dur}s</span>}
+              <span>started {ago(run.startedAt)}</span>
+            </div>
+
+            <PipelineRail run={run} />
+            {run.error && <div style={{ color: "#f87171", fontSize: 13, margin: "6px 0", padding: 8, background: "#f8717111", border: "1px solid #f8717133", borderRadius: 3 }}>{run.error}</div>}
+
+            <SectionTitle style={{ marginTop: 16 }}>EVENT LOG · {events.length}</SectionTitle>
+            <div style={{ background: "#0d1018", border: "1px solid #1e2533", borderRadius: 4, padding: 10, fontSize: 13, lineHeight: 1.55 }}>
+              {events.length === 0 && <Empty>No events recorded.</Empty>}
+              {events.map((ev) => (
+                <div key={`${ev.runId}:${ev.seq}`} style={{ display: "flex", gap: 8, padding: "2px 0", borderBottom: "1px solid #141925" }}>
+                  <span style={{ color: "#475569", minWidth: 30 }}>#{ev.seq}</span>
+                  <span style={{ color: "#475569", minWidth: 62 }}>{new Date(ev.ts).toLocaleTimeString([], { hour12: false })}</span>
+                  {ev.agent && <span style={{ color: AGENT_COLOR[ev.agent] || "#94a3b8", minWidth: 70, textTransform: "uppercase" }}>{ev.agent}</span>}
+                  {ev.stage && <span style={{ color: "#475569", minWidth: 52 }}>{STAGE_LABEL[ev.stage] || ev.stage}</span>}
+                  <span style={{ color: LEVEL_COLOR[ev.level], flex: 1 }}>{ev.message}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
