@@ -111,3 +111,7 @@ Added a Firestore runs/{id}+events store (lib/runs.ts) with /api/runs* endpoints
 <!-- KNOWLEDGE id=2026-05-30T08:43:32Z -->
 ### 2026-05-30T08:43:32Z — Phase 2: live SSE monitor
 Added /api/stream (SSE) that multiplexes Hermes liveness, current runs, and cross-run activity deltas from the Phase 1 ledger; self-terminates ~25s and resumes via Last-Event-ID (EventSource auto-reconnect). Added lib/runs.ts listRecentActivity() collection-group query (needs COLLECTION_GROUP index on events.ts). New /monitor page: staleness banner (green<90s/amber<300s/red), active-run rail with stage+progress, and auto-scroll activity feed. Factory got a MONITOR nav chip. All stream DB reads are guarded so missing index / unconfigured Firestore degrades to an empty stream, never a 500.
+
+<!-- KNOWLEDGE id=2026-05-30T10:31:03Z -->
+### 2026-05-30T10:31:03Z — Phase 3: pipeline rail + run replay
+Monitor now has a live PipelineRail (Scout->Forge->QC->Pack->List stepper, current stage pulses, connectors fill on completion) adapted from design-explorations/pipeline-timeline.html — shown as a headline rail and in a per-run detail drawer. Clicking any run card or history block opens a side drawer that fetches /api/runs/[id] + /api/runs/[id]/events and replays the full event log with duration/reworks/error. Added a run-history strip of colored status blocks. All graceful without Firestore.
