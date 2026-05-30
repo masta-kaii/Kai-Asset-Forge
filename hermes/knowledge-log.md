@@ -103,3 +103,7 @@ cursor of the last id it ingested). Newest entries go at the **bottom**.
   intentional local-only assets (tileset references, `app/api/pixelforge/`,
   utility scripts, sync wrapper) — none of those should be committed without
   explicit decision.
+
+<!-- KNOWLEDGE id=2026-05-30T07:22:38Z -->
+### 2026-05-30T07:22:38Z — Phase 1: durable run ledger + fleet telemetry
+Added a Firestore runs/{id}+events store (lib/runs.ts) with /api/runs* endpoints; the Vercel autonomous pipeline and the Hermes fleet (agent.js) now both write to this single ledger. Fixed /api/kanban/status and /api/forge/stats to read the ledger instead of execSync('hermes ...') which never worked on Vercel. Implemented the agent.js monitor role (health poll -> /api/status snapshot) and gave the fleet STATUS_PUSH_SECRET. Telemetry writes auth via STATUS_PUSH_SECRET and are best-effort (never break task processing).
