@@ -67,7 +67,9 @@ Log ("found {0} entr{1} total" -f $entries.Count, $(if ($entries.Count -eq 1) {"
 # 4. Ingest the new ones (id greater than cursor, ordinal compare).
 $newest = $cursor
 $ingested = 0
-$headers = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
+# Content-Type is set on each request via -ContentType so it carries the
+# UTF-8 charset alongside the explicit UTF-8 body bytes (see ingest loop).
+$headers = @{ Authorization = "Bearer $token" }
 
 foreach ($m in $entries) {
   $id   = $m.Groups['id'].Value.Trim()
@@ -90,8 +92,14 @@ $body
 
   try {
     Log "ingesting $id ..."
+    # NOTE (PS 5.1): Invoke-RestMethod does not UTF-8-encode the body, so any
+    # non-ASCII characters in a knowledge entry (em dash, curly quotes, emoji)
+    # arrive as mojibake and the Hermes API rejects them as invalid JSON.
+    # Encode the body to UTF-8 bytes explicitly and pass charset on Content-Type.
+    $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
     Invoke-RestMethod -Uri "$HermesUrl/v1/chat/completions" -Method Post `
-      -Headers $headers -Body $payload -TimeoutSec 180 | Out-Null
+      -Headers $headers -Body $bodyBytes `
+      -ContentType "application/json; charset=utf-8" -TimeoutSec 180 | Out-Null
     $ingested++
     if ([string]::CompareOrdinal($id, $newest) -gt 0) { $newest = $id }
   } catch {
@@ -108,5 +116,6 @@ if ($newest -ne $cursor) {
   Log "cursor advanced to '$newest'"
 }
 
-Log ("done — {0} new entr{1} ingested" -f $ingested, $(if ($ingested -eq 1) {"y"} else {"ies"}))
+# NOTE (PS 5.1): keep this line ASCII. A literal em dash here crashes the parser.
+Log ("done -- {0} new entr{1} ingested" -f $ingested, $(if ($ingested -eq 1) {"y"} else {"ies"}))
 exit 0
