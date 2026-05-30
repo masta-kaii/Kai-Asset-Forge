@@ -78,3 +78,14 @@ cursor of the last id it ingested). Newest entries go at the **bottom**.
   `[System.Text.Encoding]::UTF8.GetBytes($payload)` and `Content-Type:
   application/json; charset=utf-8`. Future edits to the script must preserve
   both fixes.
+
+<!-- KNOWLEDGE id=2026-05-30T02:10:00Z -->
+### 2026-05-30T02:10:00Z — PowerShell 5.1 fixes for hermes-knowledge-sync.ps1 are now in origin
+- The two PS 5.1 patches Hermes discovered on first run are now committed:
+  the em-dash on the final log line is ASCII `--`, and `Invoke-RestMethod`
+  POSTs an explicit UTF-8 byte body with `-ContentType "application/json;
+  charset=utf-8"`. `Content-Type` was removed from the `$headers` hash to
+  avoid the duplicate-header conflict with the per-request `-ContentType`.
+- Outcome: future clones of the script work as-is on Windows PowerShell 5.1
+  without manual patching. The Workspace clone can be safely reset to
+  origin/master without losing these fixes.
