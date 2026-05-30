@@ -8,6 +8,14 @@
 import { NextResponse } from "next/server";
 import { generateWithSkills, TEMPLATES } from "@/lib/skill-sprite-gen";
 import { generatePage } from "@/lib/skill-page-gen";
+import {
+  createRun,
+  patchRun,
+  appendEvent,
+  finishRun,
+  type RunStage,
+  type EventLevel,
+} from "@/lib/runs";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -304,9 +312,42 @@ function seedStats(stats:any):any {
 
 // ═══════════════════════ MAIN — WITH REWORK LOOP ═══════════════════════
 export async function POST(request:Request) {
+  // Durable run telemetry. Best-effort: a Firestore hiccup must never break
+  // the pipeline, so every call is swallowed. runId stays null if unconfigured.
+  let runId: string | null = null;
+  const track = async (
+    stage: RunStage | null,
+    progress: number | null,
+    level: EventLevel,
+    agent: string,
+    message: string,
+    data?: Record<string, unknown>,
+  ) => {
+    if (!runId) return;
+    try {
+      await appendEvent(runId, { stage: stage ?? undefined, agent, level, message, data });
+      if (stage !== null || progress !== null) {
+        await patchRun(runId, {
+          stage: stage ?? undefined,
+          progress: progress ?? undefined,
+        });
+      }
+    } catch {}
+  };
+
   try {
     const {theme}=await request.json().catch(()=>({}));
     const stats=seedStats(loadStats());
+
+    try {
+      runId = await createRun({
+        source: "vercel",
+        kind: "autonomous-pipeline",
+        theme: theme || undefined,
+        status: "running",
+        stage: "scout",
+      });
+    } catch {}
 
     // STAGE 1: SCOUT
     const scout=scoutStage(theme,stats);
@@ -314,14 +355,30 @@ export async function POST(request:Request) {
     let batchId="";
     let finalQc:any=null;
     let reworks=0;
+    await track("scout", 10, "info", "scout",
+      `Scout brief: ${scout.brief.theme} · ${scout.brief.palette} · ${scout.brief.spriteCount} sprites @ ${scout.brief.targetSize}`,
+      { brief: scout.brief });
 
     // STAGE 2+3: FORGE → QC → REWORK LOOP (up to MAX_REWORKS)
     let forge=forgeStage(scout.brief,stats);
     pipeline.push(forge);
     batchId=forge.batchId;
+    await track("forge", 35, "info", "artist",
+      `Forged ${forge.spritesGenerated} sprite(s) · top tier ${forge.topQuality} · page tier ${forge.pageTier}`,
+      { batchId });
+    try {
+      if (runId)
+        await patchRun(runId, {
+          meta: { batchId, sprites: forge.spritesGenerated, topQuality: forge.topQuality, pageTier: forge.pageTier },
+        });
+    } catch {}
 
     let qc=qcStage(batchId,stats);
     pipeline.push(qc);
+    await track("qc", 55, qc.reworkNeeded ? "warn" : "success", "qc",
+      `QC ${qc.status}: ${qc.passed}/${qc.checks} checks · score ${qc.avgScore}` +
+        (qc.autoFails ? ` · ${qc.autoFails} auto-fail(s)` : ""),
+      { passed: qc.passed, checks: qc.checks, avgScore: qc.avgScore });
 
     while (qc.reworkNeeded && reworks < MAX_REWORKS) {
       reworks++;
@@ -355,20 +412,41 @@ export async function POST(request:Request) {
 
       qc = qcStage(batchId, stats);
       pipeline.push(qc);
+      try { if (runId) await patchRun(runId, { reworks }); } catch {}
+      await track("rework", 55, qc.reworkNeeded ? "warn" : "success", "qc",
+        `Rework ${reworks}/${MAX_REWORKS} → QC ${qc.status}: ${qc.passed}/${qc.checks} · score ${qc.avgScore}`,
+        { reworks });
 
       if (!qc.reworkNeeded) break;
     }
 
     finalQc = qc;
+    if (qc.reworkNeeded && reworks >= MAX_REWORKS) {
+      await track("rework", 60, "error", "qc",
+        `Reworks exhausted (${MAX_REWORKS}) — shipping with QC concerns`, { reworks });
+    }
     try{fs.writeFileSync(STATS_PATH,JSON.stringify(stats,null,2));}catch{}
 
     // STAGE 4: PACK (only if QC passed or max reworks exhausted)
     const pack = packStage(batchId, stats);
     pipeline.push(pack);
+    await track("package", 80, "info", "pkg", `Packaged batch ${batchId}`, { batchId });
 
     // STAGE 5: LIST
     const list = listStage(batchId, stats);
     pipeline.push(list);
+    await track("list", 95, "success", "pkg",
+      `Listing ready · ${list.listing?.price ? "$" + list.listing.price : "price TBD"}`,
+      { price: list.listing?.price });
+
+    try {
+      if (runId) {
+        await patchRun(runId, {
+          meta: { qcScore: finalQc?.avgScore, qcStatus: finalQc?.status, price: list.listing?.price },
+        });
+        await finishRun(runId, "passed");
+      }
+    } catch {}
 
     return NextResponse.json({
       success:true, autonomous:true, batchId, theme:scout.brief.theme,
@@ -386,6 +464,12 @@ export async function POST(request:Request) {
       output:`/api/forge/autonomous?batch=${forge.batchId}`,
     });
   } catch(e:any) {
+    try {
+      if (runId) {
+        await appendEvent(runId, { level: "error", agent: "popo", message: `Pipeline error: ${e.message}` });
+        await finishRun(runId, "failed", e.message);
+      }
+    } catch {}
     return NextResponse.json({success:false,error:e.message},{status:500});
   }
 }

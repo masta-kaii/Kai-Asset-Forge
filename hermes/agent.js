@@ -7,6 +7,13 @@ const API_TOKEN = process.env.KAI_API_TOKEN || ""
 const POLL_SECONDS = parseInt(process.env.POLL_SECONDS || "10", 10)
 const HEARTBEAT_MINUTES = parseInt(process.env.HEARTBEAT_MINUTES || "30", 10)
 
+// Telemetry → durable runs store + status snapshot on the Vercel hub.
+// These endpoints authenticate with STATUS_PUSH_SECRET (the same secret the
+// PC-side status pusher already holds), not the /api/agents bearer.
+const STATUS_PUSH_SECRET = process.env.STATUS_PUSH_SECRET || ""
+// Monitor role: how often to push a fleet health snapshot (runbook: ~5 min).
+const MONITOR_MINUTES = parseInt(process.env.MONITOR_MINUTES || "5", 10)
+
 const projectRoot = path.resolve(__dirname, "..")
 const conf = {
   orchestrator: {
@@ -23,13 +30,25 @@ const conf = {
     endpoint: "/api/agents/listing",
     method: "POST",
   },
+  // The monitor does not process inbox tasks; it polls fleet health and pushes
+  // a snapshot to the hub so the dashboard can show liveness/staleness.
+  monitor: {
+    inbox: path.join(projectRoot, ".memory/agent-bus/ops/inbox"),
+    outbox: path.join(projectRoot, ".memory/agent-bus/ops/outbox"),
+    archive: path.join(projectRoot, ".memory/agent-bus/ops/archive"),
+    endpoint: null,
+    method: null,
+  },
 }
 
 const cfg = conf[ROLE]
 if (!cfg) {
-  console.error(`Unknown ROLE: ${ROLE}. Use orchestrator or lister.`)
+  console.error(`Unknown ROLE: ${ROLE}. Use orchestrator, lister, or monitor.`)
   process.exit(1)
 }
+
+// Maps fleet role → the pipeline stage it represents in the runs store.
+const ROLE_STAGE = { orchestrator: "forge", lister: "list", monitor: "done" }
 
 function ensureDirs() {
   for (const d of [cfg.inbox, cfg.outbox, cfg.archive]) {
@@ -57,6 +76,60 @@ async function apiFetch(endpoint, body = null) {
   const data = await res.json()
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(data)}`)
   return data
+}
+
+// ─── Telemetry to the durable runs store (best-effort) ──────────────
+// Authenticates with STATUS_PUSH_SECRET. Never throws: monitoring must not
+// take down task processing. Returns null on any failure.
+async function hubFetch(endpoint, method, body) {
+  try {
+    const opts = { method, headers: { "Content-Type": "application/json" } }
+    if (STATUS_PUSH_SECRET) opts.headers.Authorization = `Bearer ${STATUS_PUSH_SECRET}`
+    if (body) opts.body = JSON.stringify(body)
+    const res = await fetch(`${API_BASE}${endpoint}`, opts)
+    if (!res.ok) {
+      log(`telemetry ${method} ${endpoint} → HTTP ${res.status}`)
+      return null
+    }
+    return await res.json().catch(() => ({}))
+  } catch (err) {
+    log(`telemetry ${method} ${endpoint} failed: ${err.message}`)
+    return null
+  }
+}
+
+async function createRunRemote(theme) {
+  const data = await hubFetch("/api/runs", "POST", {
+    source: "hermes",
+    kind: ROLE,
+    theme,
+    status: "running",
+    stage: ROLE_STAGE[ROLE] || null,
+    meta: { role: ROLE },
+  })
+  return data && data.id ? data.id : null
+}
+
+async function emitRemote(runId, level, message, data) {
+  if (!runId) return
+  await hubFetch(`/api/runs/${runId}/events`, "POST", {
+    level,
+    agent: ROLE,
+    stage: ROLE_STAGE[ROLE] || undefined,
+    message,
+    data,
+  })
+}
+
+async function finishRunRemote(runId, status, error) {
+  if (!runId) return
+  await hubFetch(`/api/runs/${runId}`, "PATCH", {
+    status,
+    stage: "done",
+    progress: 100,
+    error: error || null,
+    finishedAt: new Date().toISOString(),
+  })
 }
 
 function parseTaskFile(filepath) {
@@ -98,6 +171,7 @@ async function processTask(filepath) {
   const basename = path.basename(filepath)
   log(`Processing ${basename}`)
 
+  let runId = null
   try {
     const parsed = parseTaskFile(filepath)
     let payload
@@ -107,6 +181,10 @@ async function processTask(filepath) {
     } else if (ROLE === "lister") {
       payload = buildListerPayload(parsed)
     }
+
+    // Open a durable run so this task shows up live on the dashboard.
+    runId = await createRunRemote(parsed.theme || parsed.title || basename)
+    await emitRemote(runId, "info", `Processing ${basename}`, { file: basename })
 
     const result = await apiFetch(cfg.endpoint, payload)
 
@@ -118,6 +196,8 @@ async function processTask(filepath) {
     fs.renameSync(filepath, archivePath)
 
     log(`Done → ${outName}`)
+    await emitRemote(runId, "success", `Done → ${outName}`)
+    await finishRunRemote(runId, "passed")
   } catch (err) {
     log(`Failed: ${err.message}`)
 
@@ -127,6 +207,9 @@ async function processTask(filepath) {
 
     const archivePath = path.join(cfg.archive, basename)
     try { fs.renameSync(filepath, archivePath) } catch {}
+
+    await emitRemote(runId, "error", `Failed: ${err.message}`, { file: basename })
+    await finishRunRemote(runId, "failed", err.message)
   }
 }
 
@@ -162,18 +245,53 @@ async function heartbeat() {
   }
 }
 
+// ─── Monitor role ───────────────────────────────────────────────────
+// Polls fleet health and pushes a snapshot to /api/status, which the
+// dashboard reads (and ages out into a staleness alarm). This implements the
+// monitor runbook that previously had no code behind it.
+async function monitorTick() {
+  let health = null
+  try {
+    health = await apiFetch("/api/agents/health")
+  } catch (err) {
+    log(`Health check failed: ${err.message}`)
+  }
+
+  const snapshot = {
+    status: health ? "healthy" : "degraded",
+    gateway_state: health ? "connected" : "unreachable",
+    active_agents: (health && (health.active_agents ?? health.activeAgents)) || 0,
+    platforms: (health && health.platforms) || undefined,
+    role: "monitor",
+    updated_at: new Date().toISOString(),
+  }
+
+  const pushed = await hubFetch("/api/status", "POST", snapshot)
+
+  // Keep a local breadcrumb too (matches the orchestrator heartbeat).
+  try {
+    const statusPath = path.join(cfg.outbox, `status-${new Date().toISOString().replace(/[:.]/g, "-")}.md`)
+    fs.writeFileSync(statusPath, `## Monitor ${snapshot.updated_at}\n\`\`\`json\n${JSON.stringify(snapshot, null, 2)}\n\`\`\`\n`)
+  } catch {}
+
+  log(`Monitor tick → ${snapshot.status}${pushed ? " (pushed)" : ""}`)
+}
+
 async function main() {
   log(`Starting — role=${ROLE} base=${API_BASE} poll=${POLL_SECONDS}s heartbeat=${HEARTBEAT_MINUTES}m`)
   ensureDirs()
 
-  let ticks = 0
-  const heartbeatInterval = HEARTBEAT_MINUTES * 60
+  if (ROLE === "monitor") {
+    setInterval(monitorTick, MONITOR_MINUTES * 60 * 1000)
+    monitorTick()
+    return
+  }
 
   setInterval(pollInbox, POLL_SECONDS * 1000)
   pollInbox()
 
   if (ROLE === "orchestrator") {
-    setInterval(heartbeat, heartbeatInterval * 1000)
+    setInterval(heartbeat, HEARTBEAT_MINUTES * 60 * 1000)
     setTimeout(heartbeat, 3000)
   }
 }

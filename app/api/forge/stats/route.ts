@@ -1,15 +1,15 @@
-import { execSync } from 'child_process'
-import { existsSync, readdirSync, statSync } from 'fs'
-import { join } from 'path'
 import { NextResponse } from 'next/server'
+import { listRuns } from '@/lib/runs'
 
-function hermes(args: string): string {
-  try {
-    return execSync(`hermes ${args} 2>&1`, { encoding: 'utf-8', timeout: 15000 })
-  } catch (e: any) {
-    return e.stdout || e.stderr || e.message
-  }
-}
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+/**
+ * Production stats for the factory HUD, aggregated from the durable runs
+ * store. Previously this scanned a hardcoded Windows path
+ * (C:\Users\khair\...) and shelled out to `hermes kanban list` — both dead on
+ * Vercel. Now it reads the same unified ledger every other view uses.
+ */
 
 interface ForgeStats {
   totalProductions: number
@@ -21,81 +21,58 @@ interface ForgeStats {
   forgeOutput: Array<{ name: string; type: string; date: string }>
 }
 
+const EMPTY: ForgeStats = {
+  totalProductions: 0,
+  spritesGenerated: 0,
+  tileSetsGenerated: 0,
+  qualityScore: null,
+  lastProduction: null,
+  activeAgents: 0,
+  forgeOutput: [],
+}
+
 export async function GET(): Promise<NextResponse> {
   try {
-    const forgeDir = 'C:\\Users\\khair\\Kai-Asset-Forge\\forge-output'
+    const runs = await listRuns({ limit: 100 })
 
-    // Count productions from forge-output directories
     let spritesGenerated = 0
-    let tileSetsGenerated = 0
-    const recentOutputs: Array<{ name: string; type: string; date: string }> = []
+    let totalProductions = 0
+    let activeAgents = 0
+    let qualityScore: number | null = null
+    let lastProduction: string | null = null
+    const forgeOutput: Array<{ name: string; type: string; date: string }> = []
 
-    if (existsSync(forgeDir)) {
-      const entries = readdirSync(forgeDir).filter(e => !e.startsWith('.'))
-      for (const entry of entries) {
-        const fullPath = join(forgeDir, entry)
-        try {
-          const stat = statSync(fullPath)
-          if (stat.isDirectory()) {
-            // Check for sprite directories vs tile directories
-            const subFiles = readdirSync(fullPath).filter(f => f.endsWith('.png'))
-            if (entry.includes('tile') || entry.includes('tiles')) {
-              tileSetsGenerated += subFiles.length
-            } else {
-              spritesGenerated += subFiles.length
-            }
-
-            if (subFiles.length > 0) {
-              recentOutputs.push({
-                name: entry,
-                type: entry.includes('tile') ? 'tiles' : 'sprite',
-                date: stat.mtime.toISOString().split('T')[0],
-              })
-            }
-          }
-        } catch {}
+    for (const run of runs) {
+      if (run.status === 'running') activeAgents++
+      if (run.status === 'passed') {
+        totalProductions++
+        const meta = (run.meta as Record<string, unknown>) || {}
+        spritesGenerated += Number(meta.sprites) || 0
+        if (lastProduction === null) {
+          lastProduction = run.theme || run.kind || run.id
+          const qc = Number(meta.qcScore)
+          if (!Number.isNaN(qc) && qc > 0) qualityScore = qc
+        }
+        forgeOutput.push({
+          name: run.theme || run.kind || run.id,
+          type: 'sprite',
+          date: (run.finishedAt || run.startedAt || '').split('T')[0],
+        })
       }
     }
-
-    // Get done task count from Kanban for total productions
-    const kanban = hermes('kanban list')
-    const doneMatches = kanban.match(/\b(done|completed)\b/gi) || []
-    const totalProductions = doneMatches.length
-
-    // Get active agents
-    const activeMatches = kanban.match(/\b(active|running|in_progress)\b/gi) || []
-    const activeAgents = activeMatches.length
-
-    // Quality score from last QC review (if any)
-    let qualityScore: number | null = null
-    const qcComments = kanban.match(/QC.*?(\d+)\/10/i)
-    if (qcComments) {
-      qualityScore = parseInt(qcComments[1])
-    }
-
-    // Sort outputs by date (newest first)
-    recentOutputs.sort((a, b) => b.date.localeCompare(a.date))
 
     const stats: ForgeStats = {
       totalProductions,
       spritesGenerated,
-      tileSetsGenerated,
-      qualityScore,
-      lastProduction: recentOutputs.length > 0 ? recentOutputs[0].name : null,
-      activeAgents,
-      forgeOutput: recentOutputs.slice(0, 10),
-    }
-
-    return NextResponse.json(stats)
-  } catch (e: any) {
-    return NextResponse.json({
-      totalProductions: 0,
-      spritesGenerated: 0,
       tileSetsGenerated: 0,
-      qualityScore: null,
-      lastProduction: null,
-      activeAgents: 0,
-      forgeOutput: [],
-    })
+      qualityScore,
+      lastProduction,
+      activeAgents,
+      forgeOutput: forgeOutput.slice(0, 10),
+    }
+    return NextResponse.json(stats, { headers: { 'cache-control': 'no-store' } })
+  } catch (e) {
+    console.error('forge stats error:', e)
+    return NextResponse.json(EMPTY, { headers: { 'cache-control': 'no-store' } })
   }
 }
