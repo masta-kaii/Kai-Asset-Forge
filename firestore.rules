@@ -53,6 +53,12 @@ service cloud.firestore {
       }
     }
 
+    // === Alert de-dup state ===
+    // Written by /api/cron/staleness via the admin SDK. No client access.
+    match /alerts/{docId} {
+      allow read, write: if false;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

@@ -314,3 +314,82 @@ export async function listRecentActivity(
     return { ...ev, runId };
   });
 }
+
+// ─── Aggregates for the budget gauge + HUD (Phase 4) ─────────────────
+
+export interface BudgetSummary {
+  month: { usd: number; tokens: number; runs: number; since: string };
+  today: { total: number; passed: number; failed: number };
+  cap: number; // monthly budget cap in USD
+  pct: number; // 0-100, month spend vs cap
+}
+
+/** Start of the current UTC month / day, as ISO strings. */
+function periodStarts(): { monthIso: string; dayIso: string } {
+  const now = new Date();
+  const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return { monthIso: month.toISOString(), dayIso: day.toISOString() };
+}
+
+export function monthlyCap(): number {
+  const v = parseFloat(process.env.MONTHLY_BUDGET_USD || "10");
+  return Number.isFinite(v) && v > 0 ? v : 10;
+}
+
+/**
+ * Spend + throughput for the current month/day, summed from the run ledger.
+ * Cost is fed by callers via patchRun({ costDelta }) — the deterministic
+ * Vercel pipeline reports ~0; the Hermes fleet reports real LLM/image spend.
+ */
+export async function budgetSummary(): Promise<BudgetSummary> {
+  const { monthIso, dayIso } = periodStarts();
+  const cap = monthlyCap();
+  const snap = await getDb()
+    .collection(COLLECTION)
+    .where("startedAt", ">=", monthIso)
+    .get();
+
+  let usd = 0;
+  let tokens = 0;
+  let runs = 0;
+  let dToday = 0;
+  let pToday = 0;
+  let fToday = 0;
+
+  snap.forEach((d) => {
+    runs++;
+    const cost = (d.get("cost") as { usd?: number; tokens?: number }) || {};
+    usd += cost.usd || 0;
+    tokens += cost.tokens || 0;
+    const startedAt = (d.get("startedAt") as string) || "";
+    if (startedAt >= dayIso) {
+      dToday++;
+      const status = d.get("status") as RunStatus;
+      if (status === "passed") pToday++;
+      else if (status === "failed") fToday++;
+    }
+  });
+
+  return {
+    month: { usd, tokens, runs, since: monthIso },
+    today: { total: dToday, passed: pToday, failed: fToday },
+    cap,
+    pct: cap > 0 ? Math.min(100, Math.round((usd / cap) * 100)) : 0,
+  };
+}
+
+/** Runs that entered a failed state since the given ISO cursor (for alerting). */
+export async function failedRunsSince(sinceIso: string): Promise<RunDoc[]> {
+  const snap = await getDb()
+    .collection(COLLECTION)
+    .where("finishedAt", ">", sinceIso)
+    .get();
+  return snap.docs
+    .map((d) => {
+      const data = d.data() as RunDoc & { updatedAt?: unknown };
+      return { ...data, updatedAt: toIso(data.updatedAt) };
+    })
+    .filter((r) => r.status === "failed")
+    .sort((a, b) => (a.finishedAt || "").localeCompare(b.finishedAt || ""));
+}

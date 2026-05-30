@@ -31,6 +31,12 @@ interface StatusPayload {
   latest: ({ receivedAt?: string } & Record<string, unknown>) | null;
   ageSeconds: number | null;
 }
+interface BudgetSummary {
+  month: { usd: number; tokens: number; runs: number; since: string };
+  today: { total: number; passed: number; failed: number };
+  cap: number;
+  pct: number;
+}
 
 // ─── Visual vocabulary ───────────────────────────────────────────────
 const AGENT_COLOR: Record<string, string> = {
@@ -86,6 +92,7 @@ export default function MonitorPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ run: Run; events: Activity[] } | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [budget, setBudget] = useState<BudgetSummary | null>(null);
 
   const openRun = useCallback(async (id: string) => {
     setSelected(id);
@@ -122,6 +129,21 @@ export default function MonitorPage() {
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  // Budget gauge + today's throughput (cheap aggregate; poll lightly).
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/budget");
+        const d = await r.json();
+        if (alive) setBudget(d);
+      } catch {}
+    };
+    load();
+    const i = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(i); };
   }, []);
 
   // ─── SSE connection ───
@@ -201,6 +223,30 @@ export default function MonitorPage() {
           <Stat label="RUNS" value={runs.length} color="#94a3b8" />
         </span>
       </div>
+
+      {/* ── HUD metrics bar (budget gauge + throughput) ── */}
+      {budget && (
+        <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap", padding: "10px 18px", borderBottom: "1px solid #1e2533", background: "#0b0e15" }}>
+          <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 3 }}>
+              <span style={{ letterSpacing: 1 }}>MONTHLY BUDGET</span>
+              <span style={{ color: budget.pct >= 100 ? "#f87171" : budget.pct >= 80 ? "#f5a623" : "#4ade80" }}>
+                ${budget.month.usd.toFixed(2)} / ${budget.cap.toFixed(2)} · {budget.pct}%
+              </span>
+            </div>
+            <div style={{ height: 8, background: "#1e2533", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ width: `${budget.pct}%`, height: "100%", transition: "width .4s", background: budget.pct >= 100 ? "#f87171" : budget.pct >= 80 ? "#f5a623" : "#4ade80" }} />
+            </div>
+          </div>
+          <span style={{ display: "flex", gap: 18, fontSize: 14 }}>
+            <Stat label="TODAY" value={budget.today.total} color="#94a3b8" />
+            <Stat label="PASSED" value={budget.today.passed} color="#4ade80" />
+            <Stat label="FAILED" value={budget.today.failed} color={budget.today.failed ? "#f87171" : "#475569"} />
+            <Stat label="MO RUNS" value={budget.month.runs} color="#60a5fa" />
+            <Stat label="TOKENS" value={budget.month.tokens} color="#c084fc" />
+          </span>
+        </div>
+      )}
 
       {/* ── Headline live pipeline rail ── */}
       <div style={{ padding: "10px 18px 0", maxWidth: 1280, margin: "0 auto" }}>
