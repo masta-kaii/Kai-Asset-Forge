@@ -115,3 +115,7 @@ Added /api/stream (SSE) that multiplexes Hermes liveness, current runs, and cros
 <!-- KNOWLEDGE id=2026-05-30T10:31:03Z -->
 ### 2026-05-30T10:31:03Z — Phase 3: pipeline rail + run replay
 Monitor now has a live PipelineRail (Scout->Forge->QC->Pack->List stepper, current stage pulses, connectors fill on completion) adapted from design-explorations/pipeline-timeline.html — shown as a headline rail and in a per-run detail drawer. Clicking any run card or history block opens a side drawer that fetches /api/runs/[id] + /api/runs/[id]/events and replays the full event log with duration/reworks/error. Added a run-history strip of colored status blocks. All graceful without Firestore.
+
+<!-- KNOWLEDGE id=2026-05-30T18:28:37Z -->
+### 2026-05-30T18:28:37Z — Phase 4: budget gauge + Telegram alerts
+Added budgetSummary()/failedRunsSince() in lib/runs.ts + /api/budget for a HUD budget gauge on /monitor (month $used/$cap, green->amber->red at 80/100%, default cap $10/mo via MONTHLY_BUDGET_USD per brain.md). lib/notify.ts is an env-gated best-effort Telegram notifier (TELEGRAM_BOT_TOKEN/CHAT_ID). /api/cron/staleness (vercel cron */5, CRON_SECRET-gated) detects fleet silence (>STALE_SECONDS), budget breach, and new failed runs, firing de-duped alerts via alerts/state doc; guarded so Firestore outage returns ok:false not a crash. Cost is fed via patchRun costDelta — fleet should report LLM/image spend there. All 4 phases in PR #5 (base master).
