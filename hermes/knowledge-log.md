@@ -89,3 +89,17 @@ cursor of the last id it ingested). Newest entries go at the **bottom**.
 - Outcome: future clones of the script work as-is on Windows PowerShell 5.1
   without manual patching. The Workspace clone can be safely reset to
   origin/master without losing these fixes.
+
+<!-- KNOWLEDGE id=2026-05-30T02:30:00Z -->
+### 2026-05-30T02:30:00Z — Single canonical clone at C:\Workspace\Kai Asset Forge
+- The PC now has ONE canonical repo clone at `C:\Workspace\Kai Asset Forge`,
+  tracking `origin/master`. The earlier duplicate at
+  `C:\Users\khair\Kai-Asset-Forge` was deleted after the workspace clone was
+  reset --hard to origin/master.
+- `HERMES_REPO_PATH` (user env var) points at the canonical clone.
+- `scripts/hermes-knowledge-sync.ps1` no longer needs local patches — the
+  PowerShell 5.1 fixes (em dash + UTF-8 body) are baked into origin.
+- Stashes are clean; the only untracked files in the workspace clone are
+  intentional local-only assets (tileset references, `app/api/pixelforge/`,
+  utility scripts, sync wrapper) — none of those should be committed without
+  explicit decision.
