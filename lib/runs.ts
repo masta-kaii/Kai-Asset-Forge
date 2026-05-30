@@ -278,3 +278,39 @@ export async function listEvents(
   const snap = await q.limit(limit).get();
   return snap.docs.map((d) => d.data() as RunEvent);
 }
+
+export interface ActivityEvent extends RunEvent {
+  runId: string;
+}
+
+/**
+ * Cross-run activity feed via a collection-group query over all events.
+ * Without a cursor: the newest `limit` events (returned oldest→newest so the
+ * UI can append). With `afterTs`: only events newer than the cursor — the
+ * delta the SSE stream pushes on each tick.
+ *
+ * Requires a COLLECTION_GROUP index on events.ts (see firestore.indexes.json
+ * fieldOverrides).
+ */
+export async function listRecentActivity(
+  opts: { afterTs?: string; limit?: number } = {},
+): Promise<ActivityEvent[]> {
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+  const events = getDb().collectionGroup("events");
+
+  let docs;
+  if (opts.afterTs) {
+    docs = (
+      await events.where("ts", ">", opts.afterTs).orderBy("ts", "asc").limit(limit).get()
+    ).docs;
+  } else {
+    // Newest first for the initial window, then flip to chronological.
+    docs = (await events.orderBy("ts", "desc").limit(limit).get()).docs.reverse();
+  }
+
+  return docs.map((d) => {
+    const ev = d.data() as RunEvent;
+    const runId = d.ref.parent.parent?.id || "";
+    return { ...ev, runId };
+  });
+}

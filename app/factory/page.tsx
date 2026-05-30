@@ -1178,7 +1178,8 @@ export default function HermesOS() {
               </div>
             );
           })}
-          {/* Dojo & Library quick nav */}
+          {/* Monitor, Dojo & Library quick nav */}
+          <div onClick={()=>router.push("/monitor")} style={{display:"flex",alignItems:"center",gap:5,background:"#191d28",border:"1px solid #4ade8033",padding:"3px 10px",cursor:"pointer",transition:"all 0.15s"}} onMouseEnter={(e)=>{e.currentTarget.style.borderColor="#4ade80";e.currentTarget.style.background="#4ade8015"}} onMouseLeave={(e)=>{e.currentTarget.style.borderColor="#4ade8033";e.currentTarget.style.background="#191d28"}}><span style={{fontSize:14}}>📡</span><span style={{color:"#4ade80",fontSize:12,letterSpacing:1}}>MONITOR</span></div>
           <div onClick={()=>router.push("/dojo")} style={{display:"flex",alignItems:"center",gap:5,background:"#191d28",border:"1px solid #c084fc33",padding:"3px 10px",cursor:"pointer",transition:"all 0.15s"}} onMouseEnter={(e)=>{e.currentTarget.style.borderColor="#c084fc";e.currentTarget.style.background="#c084fc15"}} onMouseLeave={(e)=>{e.currentTarget.style.borderColor="#c084fc33";e.currentTarget.style.background="#191d28"}}><span style={{fontSize:14}}>🏯</span><span style={{color:"#c084fc",fontSize:12,letterSpacing:1}}>DOJO</span></div>
           <div onClick={()=>router.push("/library")} style={{display:"flex",alignItems:"center",gap:5,background:"#191d28",border:"1px solid #60a5fa33",padding:"3px 10px",cursor:"pointer",transition:"all 0.15s"}} onMouseEnter={(e)=>{e.currentTarget.style.borderColor="#60a5fa";e.currentTarget.style.background="#60a5fa15"}} onMouseLeave={(e)=>{e.currentTarget.style.borderColor="#60a5fa33";e.currentTarget.style.background="#191d28"}}><span style={{fontSize:14}}>📦</span><span style={{color:"#60a5fa",fontSize:12,letterSpacing:1}}>LIBRARY</span></div>
         </div>
