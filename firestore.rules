@@ -42,6 +42,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // === Production runs + activity events ===
+    // Durable run ledger written by /api/runs* using the admin SDK (which
+    // bypasses these rules). No direct client access — the dashboard reads
+    // via the API. Covers the events subcollection too.
+    match /runs/{runId} {
+      allow read, write: if false;
+      match /events/{eventId} {
+        allow read, write: if false;
+      }
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;
