@@ -107,3 +107,7 @@ cursor of the last id it ingested). Newest entries go at the **bottom**.
 <!-- KNOWLEDGE id=2026-05-30T07:22:38Z -->
 ### 2026-05-30T07:22:38Z — Phase 1: durable run ledger + fleet telemetry
 Added a Firestore runs/{id}+events store (lib/runs.ts) with /api/runs* endpoints; the Vercel autonomous pipeline and the Hermes fleet (agent.js) now both write to this single ledger. Fixed /api/kanban/status and /api/forge/stats to read the ledger instead of execSync('hermes ...') which never worked on Vercel. Implemented the agent.js monitor role (health poll -> /api/status snapshot) and gave the fleet STATUS_PUSH_SECRET. Telemetry writes auth via STATUS_PUSH_SECRET and are best-effort (never break task processing).
+
+<!-- KNOWLEDGE id=2026-05-30T08:43:32Z -->
+### 2026-05-30T08:43:32Z — Phase 2: live SSE monitor
+Added /api/stream (SSE) that multiplexes Hermes liveness, current runs, and cross-run activity deltas from the Phase 1 ledger; self-terminates ~25s and resumes via Last-Event-ID (EventSource auto-reconnect). Added lib/runs.ts listRecentActivity() collection-group query (needs COLLECTION_GROUP index on events.ts). New /monitor page: staleness banner (green<90s/amber<300s/red), active-run rail with stage+progress, and auto-scroll activity feed. Factory got a MONITOR nav chip. All stream DB reads are guarded so missing index / unconfigured Firestore degrades to an empty stream, never a 500.
