@@ -31,6 +31,16 @@ interface StatusPayload {
   latest: ({ receivedAt?: string } & Record<string, unknown>) | null;
   ageSeconds: number | null;
 }
+interface BudgetSummary {
+  month: { usd: number; tokens: number; runs: number; since: string };
+  today: { total: number; passed: number; failed: number; usd: number };
+  cap: number;
+  dailyCap: number;
+  pct: number;
+  dailyPct: number;
+  blocked: boolean;
+  blockReason: string | null;
+}
 
 // ─── Visual vocabulary ───────────────────────────────────────────────
 const AGENT_COLOR: Record<string, string> = {
@@ -86,6 +96,7 @@ export default function MonitorPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ run: Run; events: Activity[] } | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [budget, setBudget] = useState<BudgetSummary | null>(null);
 
   const openRun = useCallback(async (id: string) => {
     setSelected(id);
@@ -96,8 +107,13 @@ export default function MonitorPage() {
         fetch(`/api/runs/${id}`),
         fetch(`/api/runs/${id}/events?limit=500`),
       ]);
-      const run = (await rRes.json()).run as Run;
-      const events = ((await eRes.json()).events || []) as Activity[];
+      const run = rRes.ok ? ((await rRes.json()).run as Run) : null;
+      if (!run) {
+        // Run evicted / never existed — surface it instead of an empty drawer.
+        setDetail(null);
+        return;
+      }
+      const events = (eRes.ok ? (await eRes.json()).events || [] : []) as Activity[];
       setDetail({ run, events: events.map((e) => ({ ...e, runId: id })) });
     } catch {
       setDetail(null);
@@ -122,6 +138,21 @@ export default function MonitorPage() {
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  // Budget gauge + today's throughput (cheap aggregate; poll lightly).
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/budget");
+        const d = await r.json();
+        if (alive) setBudget(d);
+      } catch {}
+    };
+    load();
+    const i = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(i); };
   }, []);
 
   // ─── SSE connection ───
@@ -201,6 +232,28 @@ export default function MonitorPage() {
           <Stat label="RUNS" value={runs.length} color="#94a3b8" />
         </span>
       </div>
+
+      {/* ── Kill-switch banner (budget cap reached → new work blocked) ── */}
+      {budget?.blocked && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 18px", background: "#f8717122", borderBottom: "1px solid #f87171", color: "#fca5a5", fontSize: 15, letterSpacing: 1 }}>
+          🛑 PIPELINE HALTED — {budget.blockReason || "budget cap reached"}. New forge work is blocked until the budget resets.
+        </div>
+      )}
+
+      {/* ── HUD metrics bar (budget gauges + throughput) ── */}
+      {budget && (
+        <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap", padding: "10px 18px", borderBottom: "1px solid #1e2533", background: "#0b0e15" }}>
+          <BudgetGauge label="MONTHLY" usd={budget.month.usd} cap={budget.cap} pct={budget.pct} />
+          <BudgetGauge label="TODAY" usd={budget.today.usd} cap={budget.dailyCap} pct={budget.dailyPct} />
+          <span style={{ display: "flex", gap: 18, fontSize: 14 }}>
+            <Stat label="RUNS" value={budget.today.total} color="#94a3b8" />
+            <Stat label="PASSED" value={budget.today.passed} color="#4ade80" />
+            <Stat label="FAILED" value={budget.today.failed} color={budget.today.failed ? "#f87171" : "#475569"} />
+            <Stat label="MO RUNS" value={budget.month.runs} color="#60a5fa" />
+            <Stat label="TOKENS" value={budget.month.tokens} color="#c084fc" />
+          </span>
+        </div>
+      )}
 
       {/* ── Headline live pipeline rail ── */}
       <div style={{ padding: "10px 18px 0", maxWidth: 1280, margin: "0 auto" }}>
@@ -315,6 +368,22 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
       <span style={{ color, fontSize: 18 }}>{value}</span>
       <span style={{ color: "#475569", fontSize: 10, letterSpacing: 1 }}>{label}</span>
     </span>
+  );
+}
+function BudgetGauge({ label, usd, cap, pct }: { label: string; usd: number; cap: number; pct: number }) {
+  const color = pct >= 100 ? "#f87171" : pct >= 80 ? "#f5a623" : "#4ade80";
+  // Sub-dollar caps (e.g. the $0.33 daily) need cents to be legible.
+  const fmt = (n: number) => (cap < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`);
+  return (
+    <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 3 }}>
+        <span style={{ letterSpacing: 1 }}>{label} BUDGET</span>
+        <span style={{ color }}>{fmt(usd)} / {fmt(cap)} · {pct}%</span>
+      </div>
+      <div style={{ height: 8, background: "#1e2533", borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", transition: "width .4s", background: color }} />
+      </div>
+    </div>
   );
 }
 function SectionTitle({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {

@@ -132,6 +132,30 @@ async function finishRunRemote(runId, status, error) {
   })
 }
 
+// Forward provider spend to the budget ledger when the hub result carries it.
+// Accepts either an explicit { usd } or { model, usage:{input,output}, images }
+// that the hub prices server-side. Best-effort; never throws.
+async function reportSpendRemote(result) {
+  if (!result || typeof result !== "object") return
+  const c = result.cost || result.usage || result.spend
+  if (!c && result.usd == null && result.tokens == null) return
+  const report = {
+    usd: result.usd ?? result.cost?.usd,
+    tokens: result.tokens ?? result.cost?.tokens,
+    usage: result.usage || result.cost?.usage,
+    images: result.images ?? result.cost?.images,
+    model: result.model || result.cost?.model,
+    provider: result.provider || result.cost?.provider,
+    note: `${ROLE} task`,
+  }
+  if (
+    report.usd == null && report.tokens == null &&
+    report.usage == null && report.images == null
+  ) return
+  const r = await hubFetch("/api/budget", "POST", report)
+  if (r && r.recorded) log(`Spend reported: $${(r.recorded.usd || 0).toFixed(4)}`)
+}
+
 function parseTaskFile(filepath) {
   const raw = fs.readFileSync(filepath, "utf8")
   const out = {}
@@ -196,6 +220,7 @@ async function processTask(filepath) {
     fs.renameSync(filepath, archivePath)
 
     log(`Done → ${outName}`)
+    await reportSpendRemote(result)
     await emitRemote(runId, "success", `Done → ${outName}`)
     await finishRunRemote(runId, "passed")
   } catch (err) {
