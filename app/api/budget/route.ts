@@ -18,9 +18,13 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json(
       {
         month: { usd: 0, tokens: 0, runs: 0, since: new Date().toISOString() },
-        today: { total: 0, passed: 0, failed: 0 },
+        today: { total: 0, passed: 0, failed: 0, usd: 0 },
         cap: 10,
+        dailyCap: 0.33,
         pct: 0,
+        dailyPct: 0,
+        blocked: false,
+        blockReason: null,
       },
       { headers: NO_STORE },
     );

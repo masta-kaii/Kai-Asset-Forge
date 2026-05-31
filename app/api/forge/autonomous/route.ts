@@ -13,6 +13,7 @@ import {
   patchRun,
   appendEvent,
   finishRun,
+  budgetGate,
   type RunStage,
   type EventLevel,
 } from "@/lib/runs";
@@ -336,6 +337,17 @@ export async function POST(request:Request) {
   };
 
   try {
+    // KILL SWITCH (brain.md: $10/mo, $0.33/day). Refuse to start new work when
+    // a cap is reached. Fails open on a storage error so a Firestore hiccup
+    // can't wedge the factory.
+    const blocked = await budgetGate();
+    if (blocked) {
+      return NextResponse.json(
+        { success: false, blocked: true, reason: blocked },
+        { status: 402 },
+      );
+    }
+
     const {theme}=await request.json().catch(()=>({}));
     const stats=seedStats(loadStats());
 

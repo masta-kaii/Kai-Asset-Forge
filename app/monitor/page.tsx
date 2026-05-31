@@ -33,9 +33,13 @@ interface StatusPayload {
 }
 interface BudgetSummary {
   month: { usd: number; tokens: number; runs: number; since: string };
-  today: { total: number; passed: number; failed: number };
+  today: { total: number; passed: number; failed: number; usd: number };
   cap: number;
+  dailyCap: number;
   pct: number;
+  dailyPct: number;
+  blocked: boolean;
+  blockReason: string | null;
 }
 
 // ─── Visual vocabulary ───────────────────────────────────────────────
@@ -229,22 +233,20 @@ export default function MonitorPage() {
         </span>
       </div>
 
-      {/* ── HUD metrics bar (budget gauge + throughput) ── */}
+      {/* ── Kill-switch banner (budget cap reached → new work blocked) ── */}
+      {budget?.blocked && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 18px", background: "#f8717122", borderBottom: "1px solid #f87171", color: "#fca5a5", fontSize: 15, letterSpacing: 1 }}>
+          🛑 PIPELINE HALTED — {budget.blockReason || "budget cap reached"}. New forge work is blocked until the budget resets.
+        </div>
+      )}
+
+      {/* ── HUD metrics bar (budget gauges + throughput) ── */}
       {budget && (
         <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap", padding: "10px 18px", borderBottom: "1px solid #1e2533", background: "#0b0e15" }}>
-          <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 3 }}>
-              <span style={{ letterSpacing: 1 }}>MONTHLY BUDGET</span>
-              <span style={{ color: budget.pct >= 100 ? "#f87171" : budget.pct >= 80 ? "#f5a623" : "#4ade80" }}>
-                ${budget.month.usd.toFixed(2)} / ${budget.cap.toFixed(2)} · {budget.pct}%
-              </span>
-            </div>
-            <div style={{ height: 8, background: "#1e2533", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ width: `${budget.pct}%`, height: "100%", transition: "width .4s", background: budget.pct >= 100 ? "#f87171" : budget.pct >= 80 ? "#f5a623" : "#4ade80" }} />
-            </div>
-          </div>
+          <BudgetGauge label="MONTHLY" usd={budget.month.usd} cap={budget.cap} pct={budget.pct} />
+          <BudgetGauge label="TODAY" usd={budget.today.usd} cap={budget.dailyCap} pct={budget.dailyPct} />
           <span style={{ display: "flex", gap: 18, fontSize: 14 }}>
-            <Stat label="TODAY" value={budget.today.total} color="#94a3b8" />
+            <Stat label="RUNS" value={budget.today.total} color="#94a3b8" />
             <Stat label="PASSED" value={budget.today.passed} color="#4ade80" />
             <Stat label="FAILED" value={budget.today.failed} color={budget.today.failed ? "#f87171" : "#475569"} />
             <Stat label="MO RUNS" value={budget.month.runs} color="#60a5fa" />
@@ -366,6 +368,22 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
       <span style={{ color, fontSize: 18 }}>{value}</span>
       <span style={{ color: "#475569", fontSize: 10, letterSpacing: 1 }}>{label}</span>
     </span>
+  );
+}
+function BudgetGauge({ label, usd, cap, pct }: { label: string; usd: number; cap: number; pct: number }) {
+  const color = pct >= 100 ? "#f87171" : pct >= 80 ? "#f5a623" : "#4ade80";
+  // Sub-dollar caps (e.g. the $0.33 daily) need cents to be legible.
+  const fmt = (n: number) => (cap < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`);
+  return (
+    <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 3 }}>
+        <span style={{ letterSpacing: 1 }}>{label} BUDGET</span>
+        <span style={{ color }}>{fmt(usd)} / {fmt(cap)} · {pct}%</span>
+      </div>
+      <div style={{ height: 8, background: "#1e2533", borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", transition: "width .4s", background: color }} />
+      </div>
+    </div>
   );
 }
 function SectionTitle({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {

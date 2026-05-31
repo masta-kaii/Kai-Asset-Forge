@@ -77,18 +77,29 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
   patch.stale = isStale;
 
-  // 2) Budget — alert once when month spend reaches the cap.
+  // 2) Budget — alert once when the month cap is reached, and once per day
+  // when the daily cap is reached (the kill switch is enforced separately in
+  // the pipeline; this is the heads-up). De-dup keyed on the day for the
+  // daily alert so it fires at most once per UTC day.
   let summary;
+  const today = new Date().toISOString().slice(0, 10);
   try {
     summary = await budgetSummary();
     const over = summary.month.usd >= summary.cap;
     if (over && !wasOverBudget) {
-      await notify(`🚨 *Budget cap hit* — $${summary.month.usd.toFixed(2)} / $${summary.cap.toFixed(2)} this month (${summary.month.runs} runs).`);
+      await notify(`🚨 *Monthly budget cap hit* — $${summary.month.usd.toFixed(2)} / $${summary.cap.toFixed(2)} this month (${summary.month.runs} runs). New pipeline work is now blocked.`);
       fired.push("budget");
     } else if (!over && wasOverBudget) {
       fired.push("budget-reset");
     }
     patch.budget = over;
+
+    const overDay = summary.today.usd >= summary.dailyCap;
+    if (overDay && state.dailyAlertedOn !== today) {
+      await notify(`🚨 *Daily budget cap hit* — $${summary.today.usd.toFixed(2)} / $${summary.dailyCap.toFixed(2)} today. New pipeline work is blocked until tomorrow (UTC).`);
+      fired.push("budget-daily");
+      patch.dailyAlertedOn = today;
+    }
   } catch {
     /* budget read failed — leave prior state */
   }

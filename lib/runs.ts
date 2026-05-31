@@ -320,9 +320,13 @@ export async function listRecentActivity(
 
 export interface BudgetSummary {
   month: { usd: number; tokens: number; runs: number; since: string };
-  today: { total: number; passed: number; failed: number };
+  today: { total: number; passed: number; failed: number; usd: number };
   cap: number; // monthly budget cap in USD
+  dailyCap: number; // daily budget cap in USD (brain.md: $0.33/day)
   pct: number; // 0-100, month spend vs cap
+  dailyPct: number; // 0-100, today spend vs daily cap
+  blocked: boolean; // true when month OR day cap is reached (kill switch)
+  blockReason: string | null;
 }
 
 /** Start of the current UTC month / day, as ISO strings. */
@@ -338,6 +342,11 @@ export function monthlyCap(): number {
   return Number.isFinite(v) && v > 0 ? v : 10;
 }
 
+export function dailyCap(): number {
+  const v = parseFloat(process.env.DAILY_BUDGET_USD || "0.33");
+  return Number.isFinite(v) && v > 0 ? v : 0.33;
+}
+
 /**
  * Spend + throughput for the current month/day, summed from the run ledger.
  * Cost is fed by callers via patchRun({ costDelta }) — the deterministic
@@ -346,6 +355,7 @@ export function monthlyCap(): number {
 export async function budgetSummary(): Promise<BudgetSummary> {
   const { monthIso, dayIso } = periodStarts();
   const cap = monthlyCap();
+  const dCap = dailyCap();
   const snap = await getDb()
     .collection(COLLECTION)
     .where("startedAt", ">=", monthIso)
@@ -357,6 +367,7 @@ export async function budgetSummary(): Promise<BudgetSummary> {
   let dToday = 0;
   let pToday = 0;
   let fToday = 0;
+  let usdToday = 0;
 
   snap.forEach((d) => {
     runs++;
@@ -366,23 +377,50 @@ export async function budgetSummary(): Promise<BudgetSummary> {
     const startedAt = (d.get("startedAt") as string) || "";
     if (startedAt >= dayIso) {
       dToday++;
+      usdToday += cost.usd || 0;
       const status = d.get("status") as RunStatus;
       if (status === "passed") pToday++;
       else if (status === "failed") fToday++;
     }
   });
 
-  // Fold in standalone spend reported by the home-PC agent (untied to runs).
-  const spend = await monthlySpend();
-  usd += spend.usd;
-  tokens += spend.tokens;
+  // Fold in standalone spend reported by the home-PC agent (untied to runs),
+  // for both the month and today.
+  const [mSpend, dSpend] = await Promise.all([monthlySpend(), dailySpend()]);
+  usd += mSpend.usd;
+  tokens += mSpend.tokens;
+  usdToday += dSpend.usd;
+
+  const overMonth = cap > 0 && usd >= cap;
+  const overDay = dCap > 0 && usdToday >= dCap;
+  const blockReason = overMonth
+    ? `monthly cap reached ($${usd.toFixed(2)} / $${cap.toFixed(2)})`
+    : overDay
+      ? `daily cap reached ($${usdToday.toFixed(2)} / $${dCap.toFixed(2)})`
+      : null;
 
   return {
     month: { usd, tokens, runs, since: monthIso },
-    today: { total: dToday, passed: pToday, failed: fToday },
+    today: { total: dToday, passed: pToday, failed: fToday, usd: usdToday },
     cap,
+    dailyCap: dCap,
     pct: cap > 0 ? Math.min(100, Math.round((usd / cap) * 100)) : 0,
+    dailyPct: dCap > 0 ? Math.min(100, Math.round((usdToday / dCap) * 100)) : 0,
+    blocked: overMonth || overDay,
+    blockReason,
   };
+}
+
+/** Budget gate for the kill switch: returns a reason string when new work
+ *  must NOT start (cap reached), or null when spending is allowed. Fails OPEN
+ *  on a storage error so a Firestore hiccup can't wedge the whole factory. */
+export async function budgetGate(): Promise<string | null> {
+  try {
+    const s = await budgetSummary();
+    return s.blocked ? s.blockReason : null;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Standalone spend ledger (Phase 4.1) ─────────────────────────────
@@ -450,11 +488,12 @@ export function resolveSpend(r: SpendReport): { usd: number; tokens: number } {
   return { usd: Math.max(0, usd), tokens: Math.max(0, tokens) };
 }
 
-/** Record ad-hoc spend into the current month's ledger. Returns the delta. */
+/** Record ad-hoc spend into the current month's AND day's ledgers (one doc
+ *  each, keyed YYYY-MM / YYYY-MM-DD). Returns the delta. */
 export async function recordSpend(
   r: SpendReport,
-): Promise<{ usd: number; tokens: number; month: string }> {
-  const { monthKey } = periodKeys();
+): Promise<{ usd: number; tokens: number; month: string; day: string }> {
+  const { monthKey, dayKey } = periodKeys();
   const { usd, tokens } = resolveSpend(r);
   const update: Record<string, unknown> = {
     updatedAt: FieldValue.serverTimestamp(),
@@ -463,19 +502,32 @@ export async function recordSpend(
     reports: FieldValue.increment(1),
   };
   if (r.provider) update[`byProvider.${r.provider}`] = FieldValue.increment(usd);
-  await getDb().collection(SPEND).doc(monthKey).set(update, { merge: true });
-  return { usd, tokens, month: monthKey };
+  const col = getDb().collection(SPEND);
+  await Promise.all([
+    col.doc(monthKey).set(update, { merge: true }),
+    col.doc(dayKey).set(update, { merge: true }),
+  ]);
+  return { usd, tokens, month: monthKey, day: dayKey };
 }
 
-/** Current month's standalone (non-run) spend. */
-async function monthlySpend(): Promise<{ usd: number; tokens: number }> {
-  const { monthKey } = periodKeys();
-  const snap = await getDb().collection(SPEND).doc(monthKey).get();
+/** Spend recorded against a SPEND doc id (month or day key). */
+async function spendDoc(key: string): Promise<{ usd: number; tokens: number }> {
+  const snap = await getDb().collection(SPEND).doc(key).get();
   if (!snap.exists) return { usd: 0, tokens: 0 };
   return {
     usd: (snap.get("usd") as number) || 0,
     tokens: (snap.get("tokens") as number) || 0,
   };
+}
+
+/** Current month's standalone (non-run) spend. */
+async function monthlySpend(): Promise<{ usd: number; tokens: number }> {
+  return spendDoc(periodKeys().monthKey);
+}
+
+/** Today's standalone (non-run) spend. */
+async function dailySpend(): Promise<{ usd: number; tokens: number }> {
+  return spendDoc(periodKeys().dayKey);
 }
 
 /** "YYYY-MM" / "YYYY-MM-DD" keys for the current UTC period. */
