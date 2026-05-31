@@ -59,6 +59,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // === Monthly spend ledger (Phase 4.1) ===
+    // Written by /api/budget (POST) via the admin SDK. No direct client access;
+    // reads go through GET /api/budget.
+    match /spend/{monthId} {
+      allow read, write: if false;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

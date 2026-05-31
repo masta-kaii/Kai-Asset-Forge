@@ -68,6 +68,7 @@ export interface RunEvent {
 }
 
 const COLLECTION = "runs";
+const SPEND = "spend"; // monthly standalone-spend ledger: spend/{YYYY-MM}
 
 function newRunId(): string {
   // Lexically sortable by creation time, with a short random suffix.
@@ -371,6 +372,11 @@ export async function budgetSummary(): Promise<BudgetSummary> {
     }
   });
 
+  // Fold in standalone spend reported by the home-PC agent (untied to runs).
+  const spend = await monthlySpend();
+  usd += spend.usd;
+  tokens += spend.tokens;
+
   return {
     month: { usd, tokens, runs, since: monthIso },
     today: { total: dToday, passed: pToday, failed: fToday },
@@ -379,17 +385,121 @@ export async function budgetSummary(): Promise<BudgetSummary> {
   };
 }
 
-/** Runs that entered a failed state since the given ISO cursor (for alerting). */
-export async function failedRunsSince(sinceIso: string): Promise<RunDoc[]> {
+// ─── Standalone spend ledger (Phase 4.1) ─────────────────────────────
+//
+// The in-repo pipeline is deterministic ($0); real money is spent by the
+// home-PC Hermes agent (Claude / OpenAI / DeepSeek), much of it not tied to a
+// forge run (Telegram chats, terminal work). Those reporters POST to
+// /api/budget, which increments a per-month spend/{YYYY-MM} doc. budgetSummary()
+// folds this into the gauge alongside run-attributed cost.
+
+/** USD per 1M tokens, [input, output], by model. Estimates — reporters may
+ *  send an explicit `usd` to bypass this entirely. Unknown models → 0. */
+const TOKEN_PRICING: Record<string, [number, number]> = {
+  "claude-opus-4": [15, 75],
+  "claude-sonnet-4": [3, 15],
+  "claude-haiku-4": [0.8, 4],
+  "gpt-4o": [2.5, 10],
+  "gpt-4o-mini": [0.15, 0.6],
+  "deepseek-chat": [0.27, 1.1],
+  "deepseek-reasoner": [0.55, 2.19],
+};
+
+/** Per-image USD for image models (point estimate; reporters may override). */
+const IMAGE_PRICING: Record<string, number> = {
+  "gpt-image-1": 0.04,
+  "dall-e-3": 0.04,
+};
+
+/** Compute USD from token usage for a known model. Matches on prefix so
+ *  dated IDs (claude-sonnet-4-20250514) resolve to their family. */
+export function costFromUsage(
+  model: string,
+  usage: { input?: number; output?: number },
+): number {
+  const key = Object.keys(TOKEN_PRICING).find((k) => model.startsWith(k));
+  if (!key) return 0;
+  const [inRate, outRate] = TOKEN_PRICING[key];
+  return ((usage.input || 0) * inRate + (usage.output || 0) * outRate) / 1_000_000;
+}
+
+export function costFromImages(model: string, count: number): number {
+  const key = Object.keys(IMAGE_PRICING).find((k) => model.startsWith(k));
+  return key ? IMAGE_PRICING[key] * Math.max(0, count) : 0;
+}
+
+export interface SpendReport {
+  usd?: number; // explicit dollar amount — wins over derived
+  tokens?: number;
+  usage?: { input?: number; output?: number };
+  images?: number;
+  model?: string;
+  provider?: string; // "anthropic" | "openai" | "deepseek" | …
+  note?: string;
+}
+
+/** Resolve a report to a USD/token delta (without writing). Exposed for tests. */
+export function resolveSpend(r: SpendReport): { usd: number; tokens: number } {
+  let usd = r.usd ?? 0;
+  if (r.usd == null && r.model) {
+    if (r.usage) usd += costFromUsage(r.model, r.usage);
+    if (r.images) usd += costFromImages(r.model, r.images);
+  }
+  const tokens =
+    r.tokens ?? (r.usage ? (r.usage.input || 0) + (r.usage.output || 0) : 0);
+  return { usd: Math.max(0, usd), tokens: Math.max(0, tokens) };
+}
+
+/** Record ad-hoc spend into the current month's ledger. Returns the delta. */
+export async function recordSpend(
+  r: SpendReport,
+): Promise<{ usd: number; tokens: number; month: string }> {
+  const { monthKey } = periodKeys();
+  const { usd, tokens } = resolveSpend(r);
+  const update: Record<string, unknown> = {
+    updatedAt: FieldValue.serverTimestamp(),
+    usd: FieldValue.increment(usd),
+    tokens: FieldValue.increment(tokens),
+    reports: FieldValue.increment(1),
+  };
+  if (r.provider) update[`byProvider.${r.provider}`] = FieldValue.increment(usd);
+  await getDb().collection(SPEND).doc(monthKey).set(update, { merge: true });
+  return { usd, tokens, month: monthKey };
+}
+
+/** Current month's standalone (non-run) spend. */
+async function monthlySpend(): Promise<{ usd: number; tokens: number }> {
+  const { monthKey } = periodKeys();
+  const snap = await getDb().collection(SPEND).doc(monthKey).get();
+  if (!snap.exists) return { usd: 0, tokens: 0 };
+  return {
+    usd: (snap.get("usd") as number) || 0,
+    tokens: (snap.get("tokens") as number) || 0,
+  };
+}
+
+/** "YYYY-MM" / "YYYY-MM-DD" keys for the current UTC period. */
+function periodKeys(): { monthKey: string; dayKey: string } {
+  const iso = new Date().toISOString();
+  return { monthKey: iso.slice(0, 7), dayKey: iso.slice(0, 10) };
+}
+
+/** Runs that entered a failed state since the given ISO cursor (for alerting).
+ *  Bounded: filters status server-side and caps the result so a stuck cursor
+ *  or a backlog can't turn each cron tick into an unbounded scan + alert storm. */
+export async function failedRunsSince(
+  sinceIso: string,
+  max = 25,
+): Promise<RunDoc[]> {
   const snap = await getDb()
     .collection(COLLECTION)
+    .where("status", "==", "failed")
     .where("finishedAt", ">", sinceIso)
+    .orderBy("finishedAt", "asc")
+    .limit(max)
     .get();
-  return snap.docs
-    .map((d) => {
-      const data = d.data() as RunDoc & { updatedAt?: unknown };
-      return { ...data, updatedAt: toIso(data.updatedAt) };
-    })
-    .filter((r) => r.status === "failed")
-    .sort((a, b) => (a.finishedAt || "").localeCompare(b.finishedAt || ""));
+  return snap.docs.map((d) => {
+    const data = d.data() as RunDoc & { updatedAt?: unknown };
+    return { ...data, updatedAt: toIso(data.updatedAt) };
+  });
 }

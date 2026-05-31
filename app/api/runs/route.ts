@@ -5,6 +5,7 @@ import {
   listRuns,
   type RunSource,
   type RunStatus,
+  type RunStage,
 } from "@/lib/runs";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       kind,
       theme: typeof body.theme === "string" ? body.theme : undefined,
       status: body.status as RunStatus | undefined,
+      stage: typeof body.stage === "string" ? (body.stage as RunStage) : undefined,
       meta: (body.meta as Record<string, unknown>) || undefined,
       id: typeof body.id === "string" ? body.id : undefined,
     });

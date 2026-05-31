@@ -103,8 +103,13 @@ export default function MonitorPage() {
         fetch(`/api/runs/${id}`),
         fetch(`/api/runs/${id}/events?limit=500`),
       ]);
-      const run = (await rRes.json()).run as Run;
-      const events = ((await eRes.json()).events || []) as Activity[];
+      const run = rRes.ok ? ((await rRes.json()).run as Run) : null;
+      if (!run) {
+        // Run evicted / never existed — surface it instead of an empty drawer.
+        setDetail(null);
+        return;
+      }
+      const events = (eRes.ok ? (await eRes.json()).events || [] : []) as Activity[];
       setDetail({ run, events: events.map((e) => ({ ...e, runId: id })) });
     } catch {
       setDetail(null);

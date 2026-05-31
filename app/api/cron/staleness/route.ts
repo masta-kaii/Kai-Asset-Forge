@@ -56,7 +56,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const state = (await stateRef.get().catch(() => null))?.data() || {};
   const wasStale = !!state.stale;
   const wasOverBudget = !!state.budget;
-  const lastFailedAt: string = state.lastFailedAt || new Date(0).toISOString();
+  // First run (no cursor yet): seed at "now" so we don't alert on the entire
+  // history of past failures — only failures from here forward.
+  const firstRun = !state.lastFailedAt;
+  const nowIso = new Date().toISOString();
+  const lastFailedAt: string = state.lastFailedAt || nowIso;
 
   const fired: string[] = [];
   const patch: Record<string, unknown> = { checkedAt: FieldValue.serverTimestamp() };
@@ -89,15 +93,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     /* budget read failed — leave prior state */
   }
 
-  // 3) New failed runs since last check.
+  // 3) New failed runs since last check. On the very first run we only seed
+  // the cursor (no backlog spam); subsequent runs alert on genuinely new ones.
   try {
-    const failures = await failedRunsSince(lastFailedAt);
-    for (const r of failures) {
-      await notify(`⚠️ *Run failed* — ${r.theme || r.kind} (${r.source})\n${r.error || "no error message"}\n${HUB}/monitor`, { silent: true });
-      fired.push(`fail:${r.id}`);
-    }
-    if (failures.length > 0) {
-      patch.lastFailedAt = failures[failures.length - 1].finishedAt || new Date().toISOString();
+    if (firstRun) {
+      patch.lastFailedAt = nowIso;
+    } else {
+      const failures = await failedRunsSince(lastFailedAt);
+      for (const r of failures) {
+        await notify(`⚠️ *Run failed* — ${r.theme || r.kind} (${r.source})\n${r.error || "no error message"}\n${HUB}/monitor`, { silent: true });
+        fired.push(`fail:${r.id}`);
+      }
+      if (failures.length > 0) {
+        patch.lastFailedAt = failures[failures.length - 1].finishedAt || nowIso;
+      }
     }
   } catch {
     /* failure scan failed — leave cursor */
